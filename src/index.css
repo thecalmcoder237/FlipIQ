@@ -1,0 +1,84 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light Theme Colors - FlipIQ Brand */
+    --background: 255 255 255;
+    --foreground: 15 23 42; /* slate-900 */
+    --card: 255 255 255;
+    --card-foreground: 15 23 42;
+    --popover: 255 255 255;
+    --popover-foreground: 15 23 42;
+    --primary: 37 99 235; /* blue-600 */
+    --primary-foreground: 255 255 255;
+    --secondary: 241 245 249; /* slate-100 */
+    --secondary-foreground: 15 23 42;
+    --muted: 248 250 252; /* slate-50 */
+    --muted-foreground: 100 116 139; /* slate-500 */
+    --accent: 249 250 251; /* gray-50 */
+    --accent-foreground: 15 23 42;
+    --destructive: 239 68 68; /* red-500 */
+    --destructive-foreground: 255 255 255;
+    --border: 226 232 240; /* slate-200 */
+    --input: 226 232 240;
+    --ring: 37 99 235; /* blue-600 */
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-white text-slate-900;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  /* Custom color utilities for the design system */
+  .text-gold-400 {
+    color: #fbbf24;
+  }
+  .text-gold-300 {
+    color: #fcd34d;
+  }
+  .text-gold-200 {
+    color: #fde68a;
+  }
+  .bg-gold-400 {
+    background-color: #fbbf24;
+  }
+  .bg-gold-500 {
+    background-color: #f59e0b;
+  }
+  .bg-gold-600 {
+    background-color: #d97706;
+  }
+  .border-gold-400 {
+    border-color: #fbbf24;
+  }
+  .from-gold-400 {
+    --tw-gradient-from: #fbbf24;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(251, 191, 36, 0));
+  }
+  .to-gold-600 {
+    --tw-gradient-to: #d97706;
+  }
+  .from-gold-500 {
+    --tw-gradient-from: #f59e0b;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(245, 158, 11, 0));
+  }
+  .to-gold-700 {
+    --tw-gradient-to: #b45309;
+  }
+  .ring-gold-400 {
+    --tw-ring-color: #fbbf24;
+  }
+}

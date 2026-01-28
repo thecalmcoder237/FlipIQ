@@ -1,0 +1,139 @@
+
+import { supabase } from '@/lib/customSupabaseClient';
+import { inputsToDatabase, databaseToInputs } from '@/utils/databaseMapping';
+
+export const dealService = {
+  /**
+   * Saves a deal to the database (insert or update).
+   * Automatically handles mapping and timestamp updates.
+   * @param {Object} inputs - The camelCase input data from the application.
+   * @param {string} userId - The current user's ID.
+   * @returns {Promise<Object>} The saved deal data in camelCase format.
+   */
+  async saveDeal(inputs, userId) {
+    if (!userId) throw new Error("User ID is required to save a deal.");
+
+    try {
+      // inputsToDatabase ensures we don't try to save 'scenarios' array to the deals table
+      const payload = inputsToDatabase(inputs);
+      payload.user_id = userId;
+      payload.updated_at = new Date().toISOString();
+
+      // If it's a new deal (no ID), explicitly set created_at
+      if (!inputs.id) {
+        payload.created_at = new Date().toISOString();
+      } else {
+        payload.id = inputs.id;
+      }
+
+      const { data, error } = await supabase
+        .from('deals')
+        .upsert(payload)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return databaseToInputs(data);
+    } catch (error) {
+      console.error("dealService.saveDeal Error:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Loads a single deal by ID.
+   * Fetches associated scenarios via join.
+   * @param {string} dealId - The deal UUID.
+   * @param {string} userId - The current user's ID (for security verification).
+   * @returns {Promise<Object>} The loaded deal in camelCase format.
+   */
+  async loadDeal(dealId, userId) {
+    if (!dealId) throw new Error("Deal ID is required.");
+    
+    try {
+      // We join scenarios table to get the list of scenarios for this deal
+      // Note: 'scenarios' is not a column in 'deals', it's a related table.
+      // We use the explicit foreign key column 'deal_id' to disambiguate the relationship
+      // because there are two FKs between deals and scenarios.
+      const { data, error } = await supabase
+        .from('deals')
+        .select('*, scenarios:scenarios!deal_id(*)')
+        .eq('id', dealId)
+        .single();
+
+      if (error) throw error;
+      
+      // Security: Enforce ownership check
+      if (userId && data.user_id !== userId) {
+          throw new Error("Access denied: You do not have permission to access this deal.");
+      }
+
+      return databaseToInputs(data);
+    } catch (error) {
+      console.error("dealService.loadDeal Error:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Loads all deals for the authenticated user.
+   * @param {string} userId - The current user's ID.
+   * @returns {Promise<Array>} Array of deals in camelCase format.
+   */
+  async loadUserDeals(userId) {
+     if (!userId) throw new Error("User ID is required.");
+
+     try {
+        const { data, error } = await supabase
+           .from('deals')
+           .select('*') // Usually don't need full scenario history for list view
+           .eq('user_id', userId) // Security: Filter by user_id to prevent data leakage
+           .order('updated_at', { ascending: false });
+        
+        if (error) throw error;
+        return data.map(databaseToInputs);
+     } catch (error) {
+        console.error("dealService.loadUserDeals Error:", error);
+        throw error;
+     }
+  },
+
+  /**
+   * Deletes a deal by ID.
+   * @param {string} dealId 
+   * @param {string} userId 
+   * @returns {Promise<boolean>} True if successful.
+   */
+  async deleteDeal(dealId, userId) {
+    if (!dealId) throw new Error("Deal ID is required.");
+    if (!userId) throw new Error("User ID is required for security verification.");
+
+    try {
+      // Security: First verify ownership before deleting
+      const { data: deal, error: fetchError } = await supabase
+        .from('deals')
+        .select('user_id')
+        .eq('id', dealId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!deal) throw new Error("Deal not found.");
+      if (deal.user_id !== userId) {
+        throw new Error("Access denied: You do not have permission to delete this deal.");
+      }
+
+      // Now safe to delete
+      const { error } = await supabase
+        .from('deals')
+        .delete()
+        .eq('id', dealId)
+        .eq('user_id', userId); // Double-check with user_id filter
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error("dealService.deleteDeal Error:", error);
+      throw error;
+    }
+  }
+};
