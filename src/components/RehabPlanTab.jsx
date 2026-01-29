@@ -27,16 +27,16 @@ const RehabPlanTab = ({ deal, setDeal, isHighPotential }) => {
 
   if (!isHighPotential && !deal.property_details) {
      return (
-        <div className="flex flex-col items-center justify-center py-16 bg-slate-900/50 rounded-2xl border border-white/10 text-center px-4">
-           <div className="bg-slate-800 p-6 rounded-full mb-6 relative">
-              <Lock className="w-12 h-12 text-gray-500" />
-              <div className="absolute top-0 right-0 bg-gold-500 p-1 rounded-full"><Sparkles size={12} className="text-black"/></div>
+        <div className="flex flex-col items-center justify-center py-16 bg-card rounded-2xl border border-border text-center px-4 shadow-sm">
+           <div className="bg-muted p-6 rounded-full mb-6 relative">
+              <Lock className="w-12 h-12 text-muted-foreground" />
+              <div className="absolute top-0 right-0 bg-primary p-1 rounded-full"><Sparkles size={12} className="text-primary-foreground"/></div>
            </div>
-           <h3 className="text-2xl font-bold text-white mb-2">Advanced Analysis Locked</h3>
-           <p className="text-gray-400 max-w-md mb-6">
+           <h3 className="text-2xl font-bold text-foreground mb-2">Advanced Analysis Locked</h3>
+           <p className="text-muted-foreground max-w-md mb-6">
               This deal currently has a score below 75. Improve the deal metrics or override manually to unlock AI-powered rehab planning, vision analysis, and budget generation.
            </p>
-           <Button variant="outline" onClick={() => setIsAdvancedModalOpen(true)} className="border-purple-500 text-purple-400 hover:bg-purple-900/20">
+           <Button variant="outline" onClick={() => setIsAdvancedModalOpen(true)} className="border-border text-foreground hover:bg-accent">
               Override & Unlock Anyway
            </Button>
            <AdvancedAnalysisModal 
@@ -54,13 +54,13 @@ const RehabPlanTab = ({ deal, setDeal, isHighPotential }) => {
        {/* 1. Header & Actions */}
        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-             <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                <Hammer className="text-gold-400" /> Rehab Planning Center
+             <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                <Hammer className="text-primary" /> Rehab Planning Center
              </h2>
-             <p className="text-gray-400 text-sm">Manage renovations, analyze photos, and track budget.</p>
+             <p className="text-muted-foreground text-sm">Manage renovations, analyze photos, and track budget.</p>
           </div>
           {!deal.property_details && (
-             <Button onClick={() => setIsAdvancedModalOpen(true)} className="bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-900/20">
+             <Button onClick={() => setIsAdvancedModalOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
                 <Sparkles className="w-4 h-4 mr-2" /> Start AI Analysis
              </Button>
           )}
@@ -68,13 +68,13 @@ const RehabPlanTab = ({ deal, setDeal, isHighPotential }) => {
 
        {/* 2. Property Details Extraction */}
        {deal.property_details && (
-          <motion.div initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} className="bg-slate-800/30 p-6 rounded-xl border border-white/5">
-             <h3 className="text-white font-bold mb-4">Property Specifications</h3>
+          <motion.div initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} className="bg-card p-6 rounded-xl border border-border shadow-sm">
+             <h3 className="text-foreground font-bold mb-4">Property Specifications</h3>
              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {Object.entries(deal.property_details).slice(0, 8).map(([key, value]) => (
-                   <div key={key} className="bg-slate-900/50 p-3 rounded-lg border border-white/5">
-                      <p className="text-xs text-gray-500 uppercase">{key.replace(/_/g, ' ')}</p>
-                      <p className="text-white font-medium truncate" title={value}>{value}</p>
+                   <div key={key} className="bg-muted/50 p-3 rounded-lg border border-border">
+                      <p className="text-xs text-muted-foreground uppercase">{key.replace(/_/g, ' ')}</p>
+                      <p className="text-foreground font-medium truncate" title={value}>{value}</p>
                    </div>
                 ))}
              </div>

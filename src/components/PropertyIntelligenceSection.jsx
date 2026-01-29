@@ -12,13 +12,13 @@ import { logDataFlow } from "@/utils/dataFlowDebug";
 import { fetchPropertyIntelligence } from '@/services/edgeFunctionService';
 
 const SpecItem = ({ icon: Icon, label, value }) => (
-  <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg border border-white/5">
-    <div className="p-2 bg-slate-700/50 rounded-md">
-      <Icon size={16} className="text-gold-400" />
+  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border">
+    <div className="p-2 bg-primary/10 rounded-md">
+      <Icon size={16} className="text-primary" />
     </div>
     <div>
-      <p className="text-xs text-gray-400">{label}</p>
-      <p className="text-sm font-semibold text-white truncate">{value || 'N/A'}</p>
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="text-sm font-semibold text-foreground truncate">{value || 'N/A'}</p>
     </div>
   </div>
 );
@@ -117,19 +117,19 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
       <div className="space-y-6">
         {/* Fetch Card / Header Section */}
         {!hasData && !loading && (
-           <Card className="bg-slate-900 border-white/10 border-dashed">
+           <Card className="bg-card border-border border-dashed shadow-sm">
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="p-4 bg-blue-500/10 rounded-full mb-4">
-                <Sparkles className="w-8 h-8 text-blue-400" />
+              <div className="p-4 bg-primary/20 rounded-full mb-4">
+                <Sparkles className="w-8 h-8 text-primary" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Enhance with AI Intelligence</h3>
-              <p className="text-gray-400 max-w-md mb-6">
+              <h3 className="text-xl font-bold text-foreground mb-2">Enhance with AI Intelligence</h3>
+              <p className="text-muted-foreground max-w-md mb-6">
                 Instantly retrieve specs, taxes, school info, and verified comps using live market data via Claude AI.
               </p>
               <Button 
                 onClick={handleFetchIntelligence} 
                 disabled={!inputs?.address || inputs.address.length < 3}
-                className="bg-blue-600 hover:bg-blue-700 text-white min-w-[200px]"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground min-w-[200px]"
               >
                 Fetch Property Data
               </Button>
@@ -138,22 +138,22 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
         )}
 
         {loading && (
-          <div className="h-48 bg-slate-800 rounded-xl flex items-center justify-center border border-white/5">
+          <div className="h-48 bg-muted rounded-xl flex items-center justify-center border border-border">
             <div className="flex flex-col items-center gap-3">
-               <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
-               <p className="text-sm text-blue-300 font-medium">Analyzing property records & market data...</p>
+               <RefreshCw className="w-8 h-8 text-primary animate-spin" />
+               <p className="text-sm text-muted-foreground font-medium">Analyzing property records & market data...</p>
             </div>
           </div>
         )}
 
         {fetchError && (
-            <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4 flex flex-col items-start gap-2">
-                <div className="flex items-center gap-2 font-bold">
+            <div className="bg-destructive/10 border border-destructive/30 text-destructive rounded-lg p-4 flex flex-col items-start gap-2">
+                <div className="flex items-center gap-2 font-bold text-foreground">
                     <AlertTriangle className="h-5 w-5"/>
                     <span>Error Fetching Intelligence</span>
                 </div>
-                <p className="text-sm">{fetchError}</p>
-                <Button variant="outline" size="sm" onClick={() => setFetchError(null)} className="mt-2 border-red-300 text-red-800 hover:bg-red-100">
+                <p className="text-sm text-foreground">{fetchError}</p>
+                <Button variant="outline" size="sm" onClick={() => setFetchError(null)} className="mt-2 border-border text-foreground hover:bg-accent">
                     Dismiss
                 </Button>
             </div>
@@ -162,24 +162,24 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
         {hasData && (
           <>
             {/* Specs Section */}
-            <Card className="bg-slate-900 border-white/10 overflow-hidden">
+            <Card className="bg-card border-border overflow-hidden shadow-sm">
               <CardHeader 
-                className="cursor-pointer hover:bg-slate-800/50 transition-colors flex flex-row items-center justify-between"
+                className="cursor-pointer hover:bg-accent/50 transition-colors flex flex-row items-center justify-between"
                 onClick={() => setIsSpecsOpen(!isSpecsOpen)}
               >
-                <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
-                  <Building2 className="text-blue-400" /> Property Intelligence
+                <CardTitle className="text-xl font-bold text-foreground flex items-center gap-2">
+                  <Building2 className="text-primary" /> Property Intelligence
                 </CardTitle>
                 <div className="flex items-center gap-2">
                    <Button 
                      variant="ghost" 
                      size="sm" 
-                     className="h-8 w-8 p-0 text-gray-500 hover:text-white"
+                     className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
                      onClick={(e) => { e.stopPropagation(); handleFetchIntelligence(); }}
                    >
                      <RefreshCw className="h-4 w-4" />
                    </Button>
-                   {isSpecsOpen ? <ChevronUp className="text-gray-400" /> : <ChevronDown className="text-gray-400" />}
+                   {isSpecsOpen ? <ChevronUp className="text-muted-foreground" /> : <ChevronDown className="text-muted-foreground" />}
                 </div>
               </CardHeader>
               <AnimatePresence>
@@ -209,15 +209,15 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
             </Card>
 
             {/* Comps Section */}
-            <Card className="bg-slate-900 border-white/10 overflow-hidden">
+            <Card className="bg-card border-border overflow-hidden shadow-sm">
               <CardHeader 
-                className="cursor-pointer hover:bg-slate-800/50 transition-colors flex flex-row items-center justify-between"
+                className="cursor-pointer hover:bg-accent/50 transition-colors flex flex-row items-center justify-between"
                 onClick={() => setIsCompsOpen(!isCompsOpen)}
               >
-                <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
-                  <DollarSign className="text-green-400" /> Verified Recent Comps
+                <CardTitle className="text-xl font-bold text-foreground flex items-center gap-2">
+                  <DollarSign className="text-primary" /> Verified Recent Comps
                 </CardTitle>
-                {isCompsOpen ? <ChevronUp className="text-gray-400" /> : <ChevronDown className="text-gray-400" />}
+                {isCompsOpen ? <ChevronUp className="text-muted-foreground" /> : <ChevronDown className="text-muted-foreground" />}
               </CardHeader>
               <AnimatePresence>
                 {isCompsOpen && (
@@ -230,30 +230,30 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
                       <div className="overflow-x-auto">
                         <Table>
                           <TableHeader>
-                            <TableRow className="border-white/10 hover:bg-transparent">
-                              <TableHead className="text-gray-400">Address</TableHead>
-                              <TableHead className="text-gray-400">Sale Price</TableHead>
-                              <TableHead className="text-gray-400">Sqft</TableHead>
-                              <TableHead className="text-gray-400">Beds/Baths</TableHead>
-                              <TableHead className="text-gray-400">DOM</TableHead>
-                              <TableHead className="text-gray-400">Sale Date</TableHead>
+                            <TableRow className="border-border hover:bg-transparent">
+                              <TableHead className="text-muted-foreground font-medium">Address</TableHead>
+                              <TableHead className="text-muted-foreground font-medium">Sale Price</TableHead>
+                              <TableHead className="text-muted-foreground font-medium">Sqft</TableHead>
+                              <TableHead className="text-muted-foreground font-medium">Beds/Baths</TableHead>
+                              <TableHead className="text-muted-foreground font-medium">DOM</TableHead>
+                              <TableHead className="text-muted-foreground font-medium">Sale Date</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {recentComps?.length > 0 ? (
                               recentComps.map((comp, i) => (
-                                <TableRow key={i} className="border-white/5 hover:bg-white/5">
-                                  <TableCell className="font-medium text-white">{comp.address}</TableCell>
-                                  <TableCell className="text-green-400 font-bold">${comp.salePrice?.toLocaleString()}</TableCell>
-                                  <TableCell className="text-gray-300">{comp.sqft}</TableCell>
-                                  <TableCell className="text-gray-300">{comp.beds} / {comp.baths}</TableCell>
-                                  <TableCell className="text-gray-300">{comp.dom}</TableCell>
-                                  <TableCell className="text-gray-300">{comp.saleDate}</TableCell>
+                                <TableRow key={i} className="border-border hover:bg-accent/50">
+                                  <TableCell className="font-medium text-foreground">{comp.address}</TableCell>
+                                  <TableCell className="text-green-600 font-bold">${comp.salePrice?.toLocaleString()}</TableCell>
+                                  <TableCell className="text-muted-foreground">{comp.sqft}</TableCell>
+                                  <TableCell className="text-muted-foreground">{comp.beds} / {comp.baths}</TableCell>
+                                  <TableCell className="text-muted-foreground">{comp.dom}</TableCell>
+                                  <TableCell className="text-muted-foreground">{comp.saleDate}</TableCell>
                                 </TableRow>
                               ))
                             ) : (
                               <TableRow className="hover:bg-transparent">
-                                <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                                   No comparable sales found.
                                 </TableCell>
                               </TableRow>

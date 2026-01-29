@@ -27,7 +27,7 @@ const IMPORTANT_STYLES = [
 	'grid-template-columns',
 ];
 
-const PRIMARY_400_COLOR = '#7B68EE';
+const PRIMARY_400_COLOR = '#3FB4E0';
 const TEXT_CONTEXT_MAX_LENGTH = 500;
 const DATA_SELECTION_MODE_ENABLED_ATTRIBUTE = 'data-selection-mode-enabled';
 const MESSAGE_TYPE_ENABLE_SELECTION_MODE = 'enableSelectionMode';

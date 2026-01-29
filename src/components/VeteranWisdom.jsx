@@ -49,7 +49,7 @@ const VeteranWisdom = () => {
         {quotes.map((_, i) => (
           <div 
             key={i} 
-            className={`w-2 h-2 rounded-full transition-all ${i === index ? 'bg-gold-400 w-6' : 'bg-white/20'}`} 
+            className={`w-2 h-2 rounded-full transition-all ${i === index ? 'bg-primary w-6' : 'bg-white/20'}`} 
           />
         ))}
       </div>

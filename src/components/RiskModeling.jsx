@@ -68,7 +68,7 @@ const RiskModeling = ({ deal, metrics }) => {
                   key={val}
                   onClick={() => setRehabOverrun(val)}
                   className={`flex-1 py-2 rounded-lg text-sm transition-all ${
-                    rehabOverrun === val ? 'bg-gold-500 text-white' : 'bg-slate-800 text-gray-400'
+                    rehabOverrun === val ? 'bg-primary text-primary-foreground' : 'bg-slate-800 text-muted-foreground'
                   }`}
                 >
                   {val}%

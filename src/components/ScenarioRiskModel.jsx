@@ -274,36 +274,36 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Shield className="text-purple-600" />
+          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Shield className="text-primary" />
             Scenario Risk Model
           </h2>
-          <p className="text-gray-600 text-sm mt-1">
+          <p className="text-muted-foreground text-sm mt-1">
             Dynamic probability-weighted risk analysis with market shock scenarios
           </p>
         </div>
       </div>
 
       {/* 1. ARV Solver - At Top */}
-      <Card className="bg-white border-purple-200 shadow-sm">
+      <Card className="bg-card border-border shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-gray-900 flex items-center gap-2">
-            <Target className="text-purple-600" />
+          <CardTitle className="text-foreground flex items-center gap-2">
+            <Target className="text-primary" />
             Minimum ARV Calculator
           </CardTitle>
           <Button 
             variant="ghost"
             size="sm"
             onClick={() => setShowARVSolver(!showARVSolver)}
-            className="text-gray-600 hover:text-gray-900"
+            className="text-muted-foreground hover:text-foreground"
           >
             {showARVSolver ? 'Hide' : 'Show'}
           </Button>
         </CardHeader>
         {showARVSolver && (
           <CardContent className="space-y-4">
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <p className="text-sm text-gray-700 mb-2">Target Profit</p>
+            <div className="bg-muted p-4 rounded-lg border border-border">
+              <p className="text-sm text-foreground mb-2">Target Profit</p>
               <Slider
                 value={[targetProfit]}
                 onValueChange={([val]) => setTargetProfit(val)}
@@ -312,17 +312,17 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                 step={5000}
                 className="mb-2"
               />
-              <p className="text-lg font-bold text-gray-900">${targetProfit.toLocaleString()}</p>
+              <p className="text-lg font-bold text-foreground">${targetProfit.toLocaleString()}</p>
             </div>
-            <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg">
-              <p className="text-sm text-gray-700 mb-1">Minimum ARV Needed</p>
-              <p className="text-3xl font-bold text-purple-600">{minARV.toLocaleString()}</p>
-              <p className="text-xs text-gray-600 mt-2">
+            <div className="bg-primary/10 border border-primary/30 p-4 rounded-lg">
+              <p className="text-sm text-foreground mb-1">Minimum ARV Needed</p>
+              <p className="text-3xl font-bold text-primary">{minARV.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground mt-2">
                 Current ARV: {(metrics?.arv || 0).toLocaleString()} | 
                 Difference: {((metrics?.arv || 0) - minARV).toLocaleString()}
               </p>
             </div>
-            <div className="text-sm text-gray-300 space-y-1">
+            <div className="text-sm text-muted-foreground space-y-1">
               <p>• Purchase Price: {(deal.purchasePrice || deal.purchase_price || 0).toLocaleString()}</p>
               <p>• Rehab (with {rehabOverrun}% overrun): {Math.round((metrics?.rehab?.total || 0) * (1 + rehabOverrun/100)).toLocaleString()}</p>
               <p>• Holding ({holdTime} months): {Math.round((metrics?.holding?.total || 0) * (holdTime / (deal.holdingMonths || 6))).toLocaleString()}</p>
@@ -336,16 +336,16 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* LEFT PANEL: Assumption Sliders */}
         <div className="space-y-4">
-          <Card className="bg-white border-gray-200 shadow-sm">
+          <Card className="bg-card border-border shadow-sm">
             <CardHeader>
-              <CardTitle className="text-gray-900 text-lg">Adjust Assumptions</CardTitle>
+              <CardTitle className="text-foreground text-lg">Adjust Assumptions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Rehab Overrun Slider */}
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <label className="text-sm font-medium text-gray-700">Rehab Overrun %</label>
-                  <span className="text-lg font-bold text-gray-900">{rehabOverrun}%</span>
+                  <label className="text-sm font-medium text-foreground">Rehab Overrun %</label>
+                  <span className="text-lg font-bold text-foreground">{rehabOverrun}%</span>
                 </div>
                 <Slider
                   value={[rehabOverrun]}
@@ -360,7 +360,7 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                   step={1}
                   className="mb-2"
                 />
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-muted-foreground">
                   Estimated cost overrun: +{Math.round((metrics?.rehab?.total || 0) * (rehabOverrun / 100)).toLocaleString()}
                 </p>
               </div>
@@ -368,8 +368,8 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
               {/* Hold Time Slider */}
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <label className="text-sm font-medium text-gray-700">Hold Time (Months)</label>
-                  <span className="text-lg font-bold text-gray-900">{holdTime} months</span>
+                  <label className="text-sm font-medium text-foreground">Hold Time (Months)</label>
+                  <span className="text-lg font-bold text-foreground">{holdTime} months</span>
                 </div>
                 <Slider
                   value={[holdTime]}
@@ -384,7 +384,7 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                   step={1}
                   className="mb-2"
                 />
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-muted-foreground">
                   Additional holding cost: {Math.round((metrics?.holding?.total || 0) * ((holdTime - (deal.holdingMonths || 6)) / (deal.holdingMonths || 6))).toLocaleString()}
                 </p>
               </div>
@@ -392,7 +392,7 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
               {/* ARV Shift Slider */}
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <label className="text-sm font-medium text-gray-700">ARV Shift %</label>
+                  <label className="text-sm font-medium text-foreground">ARV Shift %</label>
                   <span className={`text-lg font-bold ${arvShift >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {arvShift >= 0 ? '+' : ''}{arvShift}%
                   </span>
@@ -410,44 +410,44 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                   step={1}
                   className="mb-2"
                 />
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-muted-foreground">
                   ARV impact: {arvShift >= 0 ? '+' : ''}{Math.round((metrics?.arv || 0) * (arvShift / 100)).toLocaleString()}
                 </p>
               </div>
 
               {/* Most Likely Outcome Summary */}
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mt-6">
-                <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-blue-600" />
+              <div className="bg-muted p-4 rounded-lg border border-border mt-6">
+                <h4 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-primary" />
                   Most Likely Outcome
                 </h4>
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-xs text-gray-600">Expected Net Profit</span>
+                    <span className="text-xs text-muted-foreground">Expected Net Profit</span>
                     <span className={`text-sm font-bold ${expectedProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       ${Math.round(expectedProfit).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-xs text-gray-600">Adjusted Profit (with risks)</span>
+                    <span className="text-xs text-muted-foreground">Adjusted Profit (with risks)</span>
                     <span className={`text-sm font-bold ${calculateAdjustedProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       ${Math.round(calculateAdjustedProfit).toLocaleString()}
                     </span>
                   </div>
                   {Math.abs(calculateAdjustedProfit - expectedProfit) > 100 && (
-                    <div className="flex justify-between pt-1 border-t border-gray-200">
-                      <span className="text-xs text-gray-600">Risk Impact</span>
+                    <div className="flex justify-between pt-1 border-t border-border">
+                      <span className="text-xs text-muted-foreground">Risk Impact</span>
                       <span className={`text-xs font-bold ${(calculateAdjustedProfit - expectedProfit) < 0 ? 'text-red-600' : 'text-green-600'}`}>
                         {calculateAdjustedProfit - expectedProfit >= 0 ? '+' : ''}${Math.round(calculateAdjustedProfit - expectedProfit).toLocaleString()}
                       </span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-xs text-gray-600">Probability of Loss</span>
+                    <span className="text-xs text-muted-foreground">Probability of Loss</span>
                     <span className="text-sm font-bold text-red-600">{lossProb.toFixed(1)}%</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-xs text-gray-600">Break-Even Confidence</span>
+                    <span className="text-xs text-muted-foreground">Break-Even Confidence</span>
                     <span className="text-sm font-bold text-green-600">{breakEvenConf.toFixed(1)}%</span>
                   </div>
                 </div>
@@ -462,10 +462,10 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
         {/* RIGHT PANEL: Visualizations */}
         <div className="space-y-4">
           {/* Probability Curve */}
-          <Card className="bg-white border-gray-200 shadow-sm">
+          <Card className="bg-card border-border shadow-sm">
             <CardHeader>
-              <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
-                <TrendingUp className="text-blue-600" />
+              <CardTitle className="text-foreground text-lg flex items-center gap-2">
+                <TrendingUp className="text-primary" />
                 Probability Curve: % Chance of Profit &gt; X
               </CardTitle>
             </CardHeader>
@@ -493,23 +493,23 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                     <Area 
                       type="monotone" 
                       dataKey="probability" 
-                      stroke="#3b82f6" 
-                      fill="#3b82f6" 
+                      stroke="#3FB4E0" 
+                      fill="#3FB4E0" 
                       fillOpacity={0.3}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
-              <div className="mt-4 text-xs text-gray-600">
+              <div className="mt-4 text-xs text-muted-foreground">
                 Based on {scenarios.length} scenarios with probability-weighted outcomes
               </div>
             </CardContent>
           </Card>
 
           {/* Top 3 Threats */}
-          <Card className="bg-white border-gray-200 shadow-sm">
+          <Card className="bg-card border-border shadow-sm">
             <CardHeader>
-              <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
+              <CardTitle className="text-foreground text-lg flex items-center gap-2">
                 <AlertTriangle className="text-red-600" />
                 Top 3 Threats
               </CardTitle>
@@ -526,20 +526,20 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                     }`}
                   >
                     <div className="flex justify-between items-start mb-1">
-                      <span className="text-sm font-bold text-gray-900">
+                      <span className="text-sm font-bold text-foreground">
                         {idx + 1}. {threat.name}
                       </span>
                       <span className="text-xs font-bold text-red-600">
                         {threat.probability.toFixed(0)}% prob
                       </span>
                     </div>
-                    <p className="text-xs text-gray-700">
+                    <p className="text-xs text-foreground">
                       → {threat.impact}
                     </p>
                   </div>
                 ))}
                 {topThreats.length === 0 && (
-                  <p className="text-sm text-gray-600 text-center py-4">
+                  <p className="text-sm text-muted-foreground text-center py-4">
                     No significant threats identified
                   </p>
                 )}
@@ -553,26 +553,26 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
       {/* 3. Adjustable Risk Factors: Market Shocks, Hidden Costs, Timeline Collision */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Market Shock Scenarios - Adjustable */}
-        <Card className="bg-white border-gray-200 shadow-sm">
+        <Card className="bg-card border-border shadow-sm">
           <CardHeader>
-            <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
+            <CardTitle className="text-foreground text-lg flex items-center gap-2">
               <Zap className="text-yellow-600" />
               Market Shock Scenarios
             </CardTitle>
-            <p className="text-xs text-gray-600 mt-1">Toggle to apply to profit calculation</p>
+            <p className="text-xs text-muted-foreground mt-1">Toggle to apply to profit calculation</p>
           </CardHeader>
           <CardContent className="space-y-3">
             {marketShocks && Object.entries(marketShocks).filter(([key]) => key !== 'aiInsight').map(([key, shock]) => (
-              <div key={key} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+              <div key={key} className="bg-muted p-3 rounded-lg border border-border">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       checked={marketShockEnabled[key] || false}
                       onChange={(e) => setMarketShockEnabled(prev => ({ ...prev, [key]: e.target.checked }))}
-                      className="w-4 h-4 rounded border-gray-300 bg-white text-blue-600 focus:ring-blue-500"
+                      className="w-4 h-4 rounded border-border bg-background text-primary focus:ring-ring"
                     />
-                    <span className="text-sm font-bold text-gray-900 capitalize">
+                    <span className="text-sm font-bold text-foreground capitalize">
                       {key.replace(/([A-Z])/g, ' $1').trim()}
                     </span>
                   </div>
@@ -581,53 +581,53 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                   </span>
                 </div>
                 {shock.impactHoldingCost && (
-                  <p className="text-xs text-gray-600">Holding cost: +{shock.impactHoldingCost}%</p>
+                  <p className="text-xs text-muted-foreground">Holding cost: +{shock.impactHoldingCost}%</p>
                 )}
                 {shock.impactROI && (
-                  <p className="text-xs text-gray-600">ROI impact: {shock.impactROI > 0 ? '+' : ''}{shock.impactROI}%</p>
+                  <p className="text-xs text-muted-foreground">ROI impact: {shock.impactROI > 0 ? '+' : ''}{shock.impactROI}%</p>
                 )}
                 {shock.impactDOM && (
-                  <p className="text-xs text-gray-600">DOM: +{shock.impactDOM} days</p>
+                  <p className="text-xs text-muted-foreground">DOM: +{shock.impactDOM} days</p>
                 )}
                 {shock.impactSalePrice && (
-                  <p className="text-xs text-gray-600">Sale price: {shock.impactSalePrice}%</p>
+                  <p className="text-xs text-muted-foreground">Sale price: {shock.impactSalePrice}%</p>
                 )}
                 {marketShockEnabled[key] && (
                   <p className="text-xs text-red-600 mt-1">⚠️ Applied to profit calculation</p>
                 )}
-                <p className="text-xs text-gray-500 mt-1">Source: {shock.dataSource}</p>
+                <p className="text-xs text-muted-foreground mt-1">Source: {shock.dataSource}</p>
               </div>
             ))}
           </CardContent>
         </Card>
 
         {/* Hidden Cost Radar - Adjustable */}
-        <Card className="bg-white border-gray-200 shadow-sm">
+        <Card className="bg-card border-border shadow-sm">
           <CardHeader>
-            <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
-              <DollarSign className="text-purple-600" />
+            <CardTitle className="text-foreground text-lg flex items-center gap-2">
+              <DollarSign className="text-primary" />
               Hidden Cost Radar
             </CardTitle>
-            <p className="text-xs text-gray-600 mt-1">Toggle to apply to profit calculation</p>
+            <p className="text-xs text-muted-foreground mt-1">Toggle to apply to profit calculation</p>
           </CardHeader>
           <CardContent className="space-y-3">
             {hiddenCosts.map((cost, idx) => (
-              <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+              <div key={idx} className="bg-muted p-3 rounded-lg border border-border">
                 <div className="flex justify-between items-start mb-1">
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       checked={hiddenCostEnabled[cost.name] || false}
                       onChange={(e) => setHiddenCostEnabled(prev => ({ ...prev, [cost.name]: e.target.checked }))}
-                      className="w-4 h-4 rounded border-gray-300 bg-white text-purple-600 focus:ring-purple-500"
+                      className="w-4 h-4 rounded border-border bg-background text-primary focus:ring-ring"
                     />
-                    <span className="text-sm font-medium text-gray-900">{cost.name}</span>
+                    <span className="text-sm font-medium text-foreground">{cost.name}</span>
                   </div>
-                  <span className="text-xs font-bold text-purple-600">
+                  <span className="text-xs font-bold text-primary">
                     {cost.probability.toFixed(1)}%
                   </span>
                 </div>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-muted-foreground">
                   Impact: +${cost.impact.toLocaleString()}
                 </p>
                 {cost.probability > cost.baseProb && (
@@ -644,40 +644,40 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
         </Card>
 
         {/* Timeline Collision Analyzer - Adjustable */}
-        <Card className="bg-white border-gray-200 shadow-sm">
+        <Card className="bg-card border-border shadow-sm">
           <CardHeader>
-            <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
-              <Clock className="text-orange-600" />
+            <CardTitle className="text-foreground text-lg flex items-center gap-2">
+              <Clock className="text-accentBrand" />
               Timeline Collision Risk
             </CardTitle>
-            <p className="text-xs text-gray-600 mt-1">Toggle individual risks to apply to profit</p>
+            <p className="text-xs text-muted-foreground mt-1">Toggle individual risks to apply to profit</p>
           </CardHeader>
           <CardContent>
             {timelineCollision ? (
               <div className="space-y-3">
-                <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                  <p className="text-xs text-gray-600 mb-1">30+ Day Delay Probability</p>
-                  <p className="text-lg font-bold text-orange-600">
+                <div className="bg-muted p-3 rounded-lg border border-border">
+                  <p className="text-xs text-muted-foreground mb-1">30+ Day Delay Probability</p>
+                  <p className="text-lg font-bold text-accentBrand">
                     {timelineCollision.probability30Plus.toFixed(1)}%
                   </p>
                 </div>
                 {timelineRisks && Object.entries(timelineRisks).map(([key, risk]) => (
-                  <div key={key} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                  <div key={key} className="bg-muted p-3 rounded-lg border border-border">
                     <div className="flex items-center gap-2 mb-2">
                       <input
                         type="checkbox"
                         checked={timelineRiskEnabled[key] || false}
                         onChange={(e) => setTimelineRiskEnabled(prev => ({ ...prev, [key]: e.target.checked }))}
-                        className="w-4 h-4 rounded border-gray-300 bg-white text-orange-600 focus:ring-orange-500"
+                        className="w-4 h-4 rounded border-border bg-background text-accentBrand focus:ring-ring"
                       />
-                      <span className="text-sm font-medium text-gray-900 capitalize">
+                      <span className="text-sm font-medium text-foreground capitalize">
                         {key.replace(/([A-Z])/g, ' $1').trim()}
                       </span>
-                      <span className="text-xs font-bold text-orange-600 ml-auto">
+                      <span className="text-xs font-bold text-accentBrand ml-auto">
                         {risk.probability}% prob
                       </span>
                     </div>
-                    <p className="text-xs text-gray-600">
+                    <p className="text-xs text-muted-foreground">
                       +{risk.days} days, +${Math.round(risk.cost).toLocaleString()}
                     </p>
                     {timelineRiskEnabled[key] && (
@@ -686,11 +686,11 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                   </div>
                 ))}
                 <div className="bg-red-500/10 border border-red-500/30 p-3 rounded-lg">
-                  <p className="text-xs text-gray-400 mb-1">Total ROI Impact</p>
+                  <p className="text-xs text-muted-foreground mb-1">Total ROI Impact</p>
                   <p className="text-sm font-bold text-red-400">
                     -{timelineCollision.roiImpact.toFixed(1)}%
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {timelineCollision.probability30Plus > 40 
                       ? "⚠️ High risk of significant delays"
                       : "✅ Manageable delay risk"}
@@ -698,7 +698,7 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-gray-400 text-center py-4">
+              <p className="text-sm text-muted-foreground text-center py-4">
                 Calculating timeline risks...
               </p>
             )}

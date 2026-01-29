@@ -234,7 +234,7 @@ const LoanProposalGenerator = () => {
                     <Button 
                         onClick={handleDownload} 
                         disabled={generating}
-                        className="w-full bg-gold-500 hover:bg-gold-600 text-slate-900 font-bold py-6 text-lg"
+                        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-6 text-lg"
                     >
                         {generating ? 'Generating PDF...' : <><Download className="mr-2" /> Download Proposal PDF</>}
                     </Button>

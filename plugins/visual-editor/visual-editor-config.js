@@ -61,7 +61,7 @@ export const POPUP_STYLES = `
 }
 
 #inline-editor-popup .save-button {
-	background: #673de6;
+	background: #3FB4E0;
 	color: white;
 }
 
@@ -89,7 +89,7 @@ export function getPopupHTMLTemplate(saveLabel, cancelLabel) {
 export const EDIT_MODE_STYLES = `
 	#root[data-edit-mode-enabled="true"] [data-edit-id] {
 		cursor: pointer; 
-		outline: 2px dashed #357DF9; 
+		outline: 2px dashed #3FB4E0; 
 		outline-offset: 2px;
 		min-height: 1em;
 	}
@@ -100,8 +100,8 @@ export const EDIT_MODE_STYLES = `
 		cursor: pointer;
 	}
 	#root[data-edit-mode-enabled="true"] [data-edit-id]:hover {
-		background-color: #357DF933;
-		outline-color: #357DF9; 
+		background-color: #3FB4E033;
+		outline-color: #3FB4E0; 
 	}
 
 	@keyframes fadeInTooltip {

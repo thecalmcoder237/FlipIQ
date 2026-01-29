@@ -42,13 +42,13 @@ const ARVSensitivityHeatmap = ({ deal, metrics }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-xl">
-          <p className="text-sm font-bold text-gray-900 mb-2">ARV Change: {data.arvChangeLabel}</p>
+        <div className="bg-card border border-border rounded-lg p-3 shadow-xl">
+          <p className="text-sm font-bold text-foreground mb-2">ARV Change: {data.arvChangeLabel}</p>
           <div className="space-y-1 text-xs">
-            <p className="text-gray-600">Adjusted ARV: <span className="font-bold text-gray-900">${data.adjustedARV.toLocaleString()}</span></p>
-            <p className="text-gray-600">Net Profit: <span className={`font-bold ${data.isProfitable ? 'text-green-600' : 'text-red-600'}`}>${data.netProfit.toLocaleString()}</span></p>
-            <p className="text-gray-600">ROI: <span className={`font-bold ${data.isProfitable ? 'text-green-600' : 'text-red-600'}`}>{data.roi}%</span></p>
-            <p className="text-gray-600">Status: {data.isProfitable ? <span className="text-green-600">✅ Profitable</span> : <span className="text-red-600">❌ Loss</span>}</p>
+            <p className="text-muted-foreground">Adjusted ARV: <span className="font-bold text-foreground">${data.adjustedARV.toLocaleString()}</span></p>
+            <p className="text-muted-foreground">Net Profit: <span className={`font-bold ${data.isProfitable ? 'text-green-600' : 'text-red-600'}`}>${data.netProfit.toLocaleString()}</span></p>
+            <p className="text-muted-foreground">ROI: <span className={`font-bold ${data.isProfitable ? 'text-green-600' : 'text-red-600'}`}>{data.roi}%</span></p>
+            <p className="text-muted-foreground">Status: {data.isProfitable ? <span className="text-green-600">Profitable</span> : <span className="text-red-600">Loss</span>}</p>
           </div>
         </div>
       );
@@ -57,13 +57,13 @@ const ARVSensitivityHeatmap = ({ deal, metrics }) => {
   };
 
   return (
-    <Card className="bg-white border-gray-200 shadow-sm">
+    <Card className="bg-card border-border shadow-sm">
       <CardHeader>
-        <CardTitle className="text-gray-900 flex items-center gap-2">
-          <TrendingUp className="text-blue-600" />
+        <CardTitle className="text-foreground flex items-center gap-2">
+          <TrendingUp className="text-primary" />
           ARV Sensitivity Heatmap
         </CardTitle>
-        <p className="text-sm text-gray-600 mt-1">How fragile is your profit to ARV changes?</p>
+        <p className="text-sm text-muted-foreground mt-1">How fragile is your profit to ARV changes?</p>
       </CardHeader>
       <CardContent>
         {/* Interactive Bar Chart */}
@@ -97,20 +97,20 @@ const ARVSensitivityHeatmap = ({ deal, metrics }) => {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-2 px-3 text-gray-700 font-medium">ARV Change</th>
-                <th className="text-right py-2 px-3 text-gray-700 font-medium">Net Profit</th>
-                <th className="text-right py-2 px-3 text-gray-700 font-medium">ROI</th>
-                <th className="text-center py-2 px-3 text-gray-700 font-medium">Profitable?</th>
+              <tr className="border-b border-border">
+                <th className="text-left py-2 px-3 text-foreground font-medium">ARV Change</th>
+                <th className="text-right py-2 px-3 text-foreground font-medium">Net Profit</th>
+                <th className="text-right py-2 px-3 text-foreground font-medium">ROI</th>
+                <th className="text-center py-2 px-3 text-foreground font-medium">Profitable?</th>
               </tr>
             </thead>
             <tbody>
               {sensitivityData.map((row, idx) => (
                 <tr 
                   key={idx}
-                  className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                  className="border-b border-border hover:bg-accent transition-colors"
                 >
-                  <td className="py-2 px-3 text-gray-900 font-medium">{row.arvChangeLabel}</td>
+                  <td className="py-2 px-3 text-foreground font-medium">{row.arvChangeLabel}</td>
                   <td className={`py-2 px-3 text-right font-mono ${row.isProfitable ? 'text-green-400' : 'text-red-400'}`}>
                     ${row.netProfit.toLocaleString()}
                   </td>
@@ -131,8 +131,8 @@ const ARVSensitivityHeatmap = ({ deal, metrics }) => {
         </div>
 
         {/* Insight */}
-        <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-          <p className="text-xs text-blue-200">
+        <div className="mt-4 p-3 bg-primary/10 border border-primary/30 rounded-lg">
+          <p className="text-xs text-foreground">
             💡 <strong>Threshold Analysis:</strong> Your deal remains profitable even with a {Math.abs(sensitivityData.find(r => !r.isProfitable)?.arvChange || -10)}% ARV drop, 
             showing {sensitivityData.filter(r => r.isProfitable).length === sensitivityData.length ? 'strong' : 'moderate'} resilience to market fluctuations.
           </p>

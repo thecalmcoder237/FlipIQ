@@ -118,7 +118,7 @@ const ScenarioToggle = ({ deal, originalMetrics, onScenarioUpdate }) => {
               {activeScenarioId !== 'base' && activeScenarioId !== 'best' && activeScenarioId !== 'worst' && (
                  <Button size="icon" variant="ghost" onClick={(e) => handleDelete(e, activeScenarioId)} className="text-red-400 hover:text-red-300"><Trash2 size={16}/></Button>
               )}
-              <Button size="sm" onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white"><Save size={16} className="mr-2"/> Save</Button>
+              <Button size="sm" onClick={handleSave} className="bg-primary hover:bg-primary/90 text-primary-foreground"><Save size={16} className="mr-2"/> Save</Button>
            </div>
         )}
       </div>

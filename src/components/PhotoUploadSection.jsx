@@ -106,10 +106,10 @@ const PhotoUploadSection = ({ deal, onPhotosUpdated }) => {
   };
 
   return (
-    <div className="bg-slate-800/50 p-6 rounded-2xl border border-white/10 mb-6">
+    <div className="bg-card p-6 rounded-2xl border border-border mb-6 shadow-sm">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-bold text-white flex items-center gap-2">
-           <Camera className="w-5 h-5 text-gold-400" /> Site Photos & AI Analysis
+        <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+           <Camera className="w-5 h-5 text-primary" /> Site Photos & AI Analysis
         </h3>
         <div className="relative">
            <input 
@@ -120,7 +120,7 @@ const PhotoUploadSection = ({ deal, onPhotosUpdated }) => {
              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
              disabled={uploading}
            />
-           <Button disabled={uploading} className="bg-white/10 hover:bg-white/20 text-white">
+           <Button disabled={uploading} className="bg-primary hover:bg-primary/90 text-primary-foreground">
               {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
               {uploading ? 'Analyzing...' : 'Upload Photos'}
            </Button>
@@ -128,29 +128,29 @@ const PhotoUploadSection = ({ deal, onPhotosUpdated }) => {
       </div>
 
       {photos.length === 0 ? (
-        <div className="text-center py-8 border-2 border-dashed border-white/10 rounded-xl">
-           <p className="text-gray-500">Upload photos to detect damages and estimate repair needs automatically.</p>
+        <div className="text-center py-8 border-2 border-dashed border-border rounded-xl">
+           <p className="text-muted-foreground">Upload photos to detect damages and estimate repair needs automatically.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
            {photos.map((photo, idx) => (
-             <div key={idx} className="bg-slate-900 rounded-lg overflow-hidden border border-white/10 group relative">
+             <div key={idx} className="bg-muted/50 rounded-lg overflow-hidden border border-border group relative">
                 <img src={photo.url} alt="Property" className="w-full h-40 object-cover" />
                 <button 
                   onClick={() => handleDelete(photo.path)}
-                  className="absolute top-2 right-2 bg-black/50 p-1 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80"
+                  className="absolute top-2 right-2 bg-background/80 p-1 rounded-full text-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-destructive-foreground"
                 >
                   <X size={14} />
                 </button>
                 <div className="p-3">
                    <div className="flex justify-between items-start mb-1">
                       <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                         photo.analysis?.condition === 'Needs Repair' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'
+                         photo.analysis?.condition === 'Needs Repair' ? 'bg-destructive/20 text-destructive' : 'bg-green-500/20 text-green-600'
                       }`}>
                          {photo.analysis?.condition || 'Analyzed'}
                       </span>
                    </div>
-                   <p className="text-xs text-gray-400 line-clamp-2">{photo.analysis?.observations}</p>
+                   <p className="text-xs text-muted-foreground line-clamp-2">{photo.analysis?.observations}</p>
                 </div>
              </div>
            ))}

@@ -24,12 +24,12 @@ const NavigationButtons = ({ backPath, nextPath, onBack, onNext, backLabel = "Ba
   };
 
   return (
-    <div className="flex justify-between mt-8 pt-6 border-t border-white/10">
+    <div className="flex justify-between mt-8 pt-6 border-t border-border">
       {backPath || onBack ? (
         <Button
           onClick={handleBack}
           variant="outline"
-          className="border-white/20 text-white hover:bg-white/10"
+          className="border-border text-foreground hover:bg-accent"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           {backLabel}
@@ -40,7 +40,7 @@ const NavigationButtons = ({ backPath, nextPath, onBack, onNext, backLabel = "Ba
         <Button
           onClick={handleNext}
           disabled={loading}
-          className="bg-gold-500 hover:bg-gold-600 text-slate-900 font-bold"
+          className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold"
         >
           {loading ? (
              <span className="flex items-center">

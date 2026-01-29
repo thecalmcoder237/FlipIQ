@@ -44,7 +44,7 @@ const DealComparison = () => {
         
         <div className="flex justify-between items-center mb-8">
            <h1 className="text-3xl font-bold text-gray-900">Compare Deals</h1>
-           <Button onClick={() => setIsSelectionOpen(!isSelectionOpen)} className="bg-blue-600 text-white font-bold hover:bg-blue-700">
+           <Button onClick={() => setIsSelectionOpen(!isSelectionOpen)} className="bg-primary text-primary-foreground font-bold hover:bg-primary/90">
              {isSelectionOpen ? 'Close Selection' : 'Select Deals'}
            </Button>
         </div>
@@ -62,8 +62,8 @@ const DealComparison = () => {
                   onClick={() => toggleDealSelection(deal.id)}
                   className={`p-3 rounded-lg border cursor-pointer transition-all ${
                     selectedDealIds.includes(deal.id) 
-                      ? 'bg-blue-100 border-blue-500' 
-                      : 'bg-white border-gray-300 hover:border-blue-300'
+                      ? 'bg-primary/10 border-primary' 
+                      : 'bg-card border-border hover:border-primary/50'
                   }`}
                 >
                   <p className="text-gray-900 font-medium text-sm truncate">{deal.address}</p>
@@ -135,11 +135,11 @@ const ComparisonRow = ({ label, data, field, format, highlightMax, highlightMin 
        {values.map((val, i) => {
          const isBest = (highlightMax && val === max) || (highlightMin && val === min);
          return (
-           <td key={i} className={`p-4 border-r border-gray-200 ${isBest ? 'bg-blue-50' : ''}`}>
-             <span className={`font-bold ${isBest ? 'text-blue-600' : 'text-gray-900'}`}>
+           <td key={i} className={`p-4 border-r border-border ${isBest ? 'bg-primary/10' : ''}`}>
+             <span className={`font-bold ${isBest ? 'text-primary' : 'text-foreground'}`}>
                {format(val)}
              </span>
-             {isBest && <span className="ml-2 text-[10px] bg-blue-600 text-white px-1 rounded font-bold">BEST</span>}
+             {isBest && <span className="ml-2 text-[10px] bg-primary text-primary-foreground px-1 rounded font-bold">BEST</span>}
            </td>
          );
        })}

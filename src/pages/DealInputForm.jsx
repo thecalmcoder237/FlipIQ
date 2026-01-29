@@ -14,18 +14,18 @@ import { logDataFlow, validateInputs } from '@/utils/dataFlowDebug';
 const InputSection = ({ title, icon: Icon, children, total }) => {
   const [isOpen, setIsOpen] = useState(true);
   return (
-    <div className="bg-white backdrop-blur-sm rounded-xl shadow-sm border border-gray-200 mb-4 overflow-hidden">
+    <div className="bg-card backdrop-blur-sm rounded-xl shadow-sm border border-border mb-4 overflow-hidden">
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+        className="flex items-center justify-between p-4 cursor-pointer hover:bg-accent transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className="bg-blue-100 p-2 rounded-lg text-blue-600"><Icon size={20} /></div>
-          <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+          <div className="bg-primary/10 p-2 rounded-lg"><Icon size={20} className="text-primary" /></div>
+          <h2 className="text-lg font-bold text-foreground">{title}</h2>
         </div>
         <div className="flex items-center gap-4">
           {total !== undefined && <span className="text-sm font-mono text-green-600 font-bold">Total: ${total.toLocaleString()}</span>}
-          {isOpen ? <ChevronDown size={20} className="text-gray-600"/> : <ChevronRight size={20} className="text-gray-600"/>}
+          {isOpen ? <ChevronDown size={20} className="text-muted-foreground"/> : <ChevronRight size={20} className="text-muted-foreground"/>}
         </div>
       </div>
       <AnimatePresence>
@@ -172,44 +172,44 @@ const DealInputForm = () => {
                        (parseFloat(formData.stagingCost)||0) + (parseFloat(formData.marketingCost)||0);
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-8 max-w-5xl mx-auto">
+    <div className="min-h-screen bg-muted px-4 py-8 max-w-5xl mx-auto">
       <Helmet><title>New Deal Input | FlipIQ</title></Helmet>
       <Breadcrumb />
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Property Analysis Input</h1>
+      <h1 className="text-3xl font-bold text-foreground mb-6">Property Analysis Input</h1>
       
       <form onSubmit={handleSubmit}>
         <InputSection title="A. Property Details" icon={Home}>
             <div className="md:col-span-2">
-               <label className="text-gray-700 text-xs">Address</label>
-               <input name="address" value={formData.address} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" placeholder="123 Main St" required />
+               <label className="text-foreground text-xs">Address</label>
+               <input name="address" value={formData.address} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" placeholder="123 Main St" required />
             </div>
-            <div><label className="text-gray-400 text-xs">Zip Code</label><input name="zipCode" value={formData.zipCode} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Sqft</label><input name="sqft" type="number" value={formData.sqft} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Beds</label><input name="bedrooms" type="number" value={formData.bedrooms} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Baths</label><input name="bathrooms" type="number" value={formData.bathrooms} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Year Built</label><input name="yearBuilt" type="number" value={formData.yearBuilt} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
+            <div><label className="text-muted-foreground text-xs">Zip Code</label><input name="zipCode" value={formData.zipCode} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Sqft</label><input name="sqft" type="number" value={formData.sqft} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Beds</label><input name="bedrooms" type="number" value={formData.bedrooms} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Baths</label><input name="bathrooms" type="number" value={formData.bathrooms} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Year Built</label><input name="yearBuilt" type="number" value={formData.yearBuilt} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
         </InputSection>
 
         <InputSection title="B. Purchase & Acquisition" icon={DollarSign} total={acqTotal}>
-            <div><label className="text-gray-700 text-xs">Purchase Price ($)</label><input name="purchasePrice" type="number" value={formData.purchasePrice} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">ARV ($)</label><input name="arv" type="number" value={formData.arv} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Down Payment (%)</label><input name="downPaymentPercent" type="number" value={formData.downPaymentPercent} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Closing Costs ($)</label><input name="closingCostsBuying" type="number" value={formData.closingCostsBuying} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Inspection ($)</label><input name="inspectionCost" type="number" value={formData.inspectionCost} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Appraisal/Title ($)</label><input name="titleInsurance" type="number" value={formData.titleInsurance} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Transfer Tax Rate (%)</label><input name="transferTaxRate" type="number" value={formData.transferTaxRate} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
+            <div><label className="text-foreground text-xs">Purchase Price ($)</label><input name="purchasePrice" type="number" value={formData.purchasePrice} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">ARV ($)</label><input name="arv" type="number" value={formData.arv} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Down Payment (%)</label><input name="downPaymentPercent" type="number" value={formData.downPaymentPercent} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Closing Costs ($)</label><input name="closingCostsBuying" type="number" value={formData.closingCostsBuying} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Inspection ($)</label><input name="inspectionCost" type="number" value={formData.inspectionCost} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Appraisal/Title ($)</label><input name="titleInsurance" type="number" value={formData.titleInsurance} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Transfer Tax Rate (%)</label><input name="transferTaxRate" type="number" value={formData.transferTaxRate} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
         </InputSection>
 
         <InputSection title="C. Financing (Hard Money)" icon={Calculator}>
-            <div><label className="text-gray-400 text-xs">Interest Rate (%)</label><input name="hardMoneyRate" type="number" value={formData.hardMoneyRate} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Points (%)</label><input name="hardMoneyPoints" type="number" value={formData.hardMoneyPoints} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Fallthrough Risk (%)</label><input name="buyerFinancingFallthrough" type="number" value={formData.buyerFinancingFallthrough} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
+            <div><label className="text-muted-foreground text-xs">Interest Rate (%)</label><input name="hardMoneyRate" type="number" value={formData.hardMoneyRate} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Points (%)</label><input name="hardMoneyPoints" type="number" value={formData.hardMoneyPoints} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Fallthrough Risk (%)</label><input name="buyerFinancingFallthrough" type="number" value={formData.buyerFinancingFallthrough} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
         </InputSection>
 
         <InputSection title="D. Rehab Costs" icon={Hammer} total={rehabTotal}>
              <div>
-                <label className="text-gray-700 text-xs">Category</label>
-                <select name="rehabCategory" value={formData.rehabCategory} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900">
+                <label className="text-foreground text-xs">Category</label>
+                <select name="rehabCategory" value={formData.rehabCategory} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground">
                    <option value="Cosmetic">Cosmetic ($25/sf)</option>
                    <option value="Moderate">Moderate ($50/sf)</option>
                    <option value="Heavy">Heavy ($85/sf)</option>
@@ -217,35 +217,35 @@ const DealInputForm = () => {
              </div>
              <div className="flex items-end gap-2">
                  <div className="flex-1">
-                    <label className="text-gray-700 text-xs">Total Budget ($)</label>
-                    <input name="rehabCosts" type="number" value={formData.rehabCosts} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" />
+                    <label className="text-foreground text-xs">Total Budget ($)</label>
+                    <input name="rehabCosts" type="number" value={formData.rehabCosts} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" />
                  </div>
-                 <Button type="button" size="sm" onClick={handleRehabCalc} className="mb-1"><Calculator size={16}/></Button>
+                 <Button type="button" size="sm" onClick={handleRehabCalc} className="mb-1 bg-primary text-primary-foreground hover:bg-primary/90"><Calculator size={16}/></Button>
              </div>
-             <div><label className="text-gray-400 text-xs">Contingency (%)</label><input name="contingencyPercent" type="number" value={formData.contingencyPercent} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-             <div><label className="text-gray-400 text-xs">Overrun Risk (%)</label><input name="rehabOverrunPercent" type="number" value={formData.rehabOverrunPercent} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-             <div><label className="text-gray-400 text-xs">Permit Fees ($)</label><input name="permitFees" type="number" value={formData.permitFees} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-             <div><label className="text-gray-400 text-xs">Permit Delay (Mo)</label><input name="permitDelayMonths" type="number" value={formData.permitDelayMonths} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
+             <div><label className="text-muted-foreground text-xs">Contingency (%)</label><input name="contingencyPercent" type="number" value={formData.contingencyPercent} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+             <div><label className="text-muted-foreground text-xs">Overrun Risk (%)</label><input name="rehabOverrunPercent" type="number" value={formData.rehabOverrunPercent} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+             <div><label className="text-muted-foreground text-xs">Permit Fees ($)</label><input name="permitFees" type="number" value={formData.permitFees} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+             <div><label className="text-muted-foreground text-xs">Permit Delay (Mo)</label><input name="permitDelayMonths" type="number" value={formData.permitDelayMonths} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
         </InputSection>
 
         <InputSection title="E. Holding & Timeline" icon={RefreshCw}>
-            <div><label className="text-gray-400 text-xs">Holding (Months)</label><input name="holdingMonths" type="number" value={formData.holdingMonths} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Prop Tax (Mo)</label><input name="propertyTax" type="number" value={formData.propertyTax} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Insurance (Mo)</label><input name="insurance" type="number" value={formData.insurance} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Utilities/HOA (Mo)</label><input name="utilities" type="number" value={formData.utilities} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
+            <div><label className="text-muted-foreground text-xs">Holding (Months)</label><input name="holdingMonths" type="number" value={formData.holdingMonths} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Prop Tax (Mo)</label><input name="propertyTax" type="number" value={formData.propertyTax} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Insurance (Mo)</label><input name="insurance" type="number" value={formData.insurance} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Utilities/HOA (Mo)</label><input name="utilities" type="number" value={formData.utilities} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
         </InputSection>
 
         <InputSection title="F. Selling Costs" icon={DollarSign} total={sellingTotal}>
-            <div><label className="text-gray-400 text-xs">Agent Comm (%)</label><input name="realtorCommission" type="number" value={formData.realtorCommission} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Closing Costs (%)</label><input name="closingCostsSelling" type="number" value={formData.closingCostsSelling} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Staging ($)</label><input name="stagingCost" type="number" value={formData.stagingCost} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Marketing ($)</label><input name="marketingCost" type="number" value={formData.marketingCost} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
-            <div><label className="text-gray-400 text-xs">Market Appreciation (%)</label><input name="marketAppreciationPercent" type="number" value={formData.marketAppreciationPercent} onChange={handleChange} className="w-full bg-white border border-gray-300 p-2 rounded text-gray-900" /></div>
+            <div><label className="text-muted-foreground text-xs">Agent Comm (%)</label><input name="realtorCommission" type="number" value={formData.realtorCommission} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Closing Costs (%)</label><input name="closingCostsSelling" type="number" value={formData.closingCostsSelling} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Staging ($)</label><input name="stagingCost" type="number" value={formData.stagingCost} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Marketing ($)</label><input name="marketingCost" type="number" value={formData.marketingCost} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Market Appreciation (%)</label><input name="marketAppreciationPercent" type="number" value={formData.marketAppreciationPercent} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
         </InputSection>
 
         <div className="flex justify-end gap-4 mt-8 pb-12">
-            <Button type="button" variant="ghost" onClick={() => navigate(-1)} className="text-gray-700">Cancel</Button>
-            <Button type="submit" disabled={isLoading} className="bg-gold-500 text-slate-900 font-bold px-8">
+            <Button type="button" variant="ghost" onClick={() => navigate(-1)} className="text-foreground hover:bg-accent">Cancel</Button>
+            <Button type="submit" disabled={isLoading} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-8">
                {isLoading ? 'Processing...' : 'Analyze Deal'}
             </Button>
         </div>

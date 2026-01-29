@@ -36,7 +36,7 @@ const Navbar = () => {
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 ${
-          scrolled ? 'bg-white/95 backdrop-blur-md shadow-lg border-b border-gray-200' : 'bg-white/80'
+          scrolled ? 'bg-background/95 backdrop-blur-md shadow-lg border-b border-border' : 'bg-background/80'
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -54,12 +54,12 @@ const Navbar = () => {
                   e.target.nextElementSibling.style.display = 'block';
                 }}
               />
-              <div className="bg-gradient-to-br from-blue-600 to-orange-500 p-2 rounded-xl shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform hidden">
+              <div className="bg-gradient-to-br from-primary to-accentBrand p-2 rounded-xl shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform hidden">
                 <TrendingUp className="w-6 h-6 text-white" />
               </div>
               <div className="hidden sm:block">
-                <h1 className="text-xl font-bold text-gray-900 tracking-tight">FlipIQ</h1>
-                <p className="text-xs text-gray-500 -mt-1">powered by PAVEL REI</p>
+                <h1 className="text-xl font-bold text-foreground tracking-tight">FlipIQ</h1>
+                <p className="text-xs text-muted-foreground -mt-1">powered by PAVEL REI</p>
               </div>
             </Link>
 
@@ -70,18 +70,18 @@ const Navbar = () => {
                 <NavLink to="/deal-history" icon={History} label="History" active={location.pathname === '/deal-history'} />
                 <NavLink to="/portfolio-dashboard" icon={PieChart} label="Portfolio" active={location.pathname === '/portfolio-dashboard'} />
                 
-                <div className="h-6 w-px bg-white/10 mx-2" />
+                <div className="h-6 w-px bg-border mx-2" />
                 
                 <div className="flex items-center gap-3 ml-2">
                    <div className="text-right hidden xl:block">
-                      <p className="text-sm font-bold text-gray-900">{currentUser.email?.split('@')[0]}</p>
-                      <p className="text-xs text-gray-600">Pro Member</p>
+                      <p className="text-sm font-bold text-foreground">{currentUser.email?.split('@')[0]}</p>
+                      <p className="text-xs text-muted-foreground">Pro Member</p>
                    </div>
                    <Button
                     onClick={handleSignOut}
                     variant="ghost"
                     size="icon"
-                    className="text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                    className="text-muted-foreground hover:text-foreground hover:bg-accent"
                     title="Sign Out"
                   >
                     <LogOut size={20} />
@@ -97,7 +97,7 @@ const Navbar = () => {
                   variant="ghost"
                   size="icon"
                   onClick={() => setIsOpen(!isOpen)}
-                  className="text-gray-700 hover:bg-gray-100"
+                  className="text-foreground hover:bg-accent"
                 >
                   {isOpen ? <X size={24} /> : <Menu size={24} />}
                 </Button>
@@ -113,16 +113,16 @@ const Navbar = () => {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="lg:hidden bg-white border-t border-gray-200 overflow-hidden"
+              className="lg:hidden bg-background border-t border-border overflow-hidden"
             >
               <div className="px-4 py-4 space-y-2">
                 <MobileNavLink to="/deal-input" icon={Home} label="New Deal" onClick={() => setIsOpen(false)} />
                 <MobileNavLink to="/deal-history" icon={History} label="History" onClick={() => setIsOpen(false)} />
                 <MobileNavLink to="/portfolio-dashboard" icon={PieChart} label="Portfolio" onClick={() => setIsOpen(false)} />
-                <hr className="border-gray-200 my-2" />
+                <hr className="border-border my-2" />
                 <button
                   onClick={() => { handleSignOut(); setIsOpen(false); }}
-                  className="flex items-center space-x-3 px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 w-full transition-all"
+                  className="flex items-center space-x-3 px-4 py-3 rounded-lg text-destructive hover:bg-destructive/10 w-full transition-all"
                 >
                   <LogOut size={20} />
                   <span>Sign Out</span>
@@ -141,11 +141,11 @@ const NavLink = ({ to, icon: Icon, label, active }) => (
     to={to}
     className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${
       active 
-        ? 'bg-blue-100 text-blue-700' 
-        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+        ? 'bg-primary/10 text-primary' 
+        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
     }`}
   >
-    <Icon size={16} className={active ? "text-blue-600" : "text-gray-500"} />
+    <Icon size={16} className={active ? "text-primary" : "text-muted-foreground"} />
     <span>{label}</span>
   </Link>
 );
@@ -154,7 +154,7 @@ const MobileNavLink = ({ to, icon: Icon, label, onClick }) => (
   <Link
     to={to}
     onClick={onClick}
-    className="flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all"
+    className="flex items-center space-x-3 px-4 py-3 rounded-lg text-foreground hover:bg-accent transition-all"
   >
     <Icon size={20} />
     <span>{label}</span>

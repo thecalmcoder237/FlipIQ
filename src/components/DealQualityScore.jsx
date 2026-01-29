@@ -14,10 +14,10 @@ const DealQualityScore = ({ score, riskLevel }) => {
   
   if (score === null || score === undefined) {
       return (
-          <Card className="bg-slate-900 border-white/10 h-full">
+          <Card className="bg-card border-border h-full shadow-sm">
             <CardContent className="flex flex-col items-center justify-center h-full py-8">
-               <AlertTriangle className="text-yellow-500 w-8 h-8 mb-2" />
-               <p className="text-gray-400 text-sm">Score unavailable</p>
+               <AlertTriangle className="text-accentMinimal w-8 h-8 mb-2" />
+               <p className="text-muted-foreground text-sm">Score unavailable</p>
             </CardContent>
           </Card>
       );
@@ -44,32 +44,32 @@ const DealQualityScore = ({ score, riskLevel }) => {
   }
 
   return (
-    <Card className="bg-slate-900 border-white/10 h-full overflow-hidden relative">
+    <Card className="bg-card border-border h-full overflow-hidden relative shadow-sm">
       <div className={`absolute top-0 left-0 w-full h-1 ${bgClass} ${colorClass}`}></div>
       <CardContent className="p-6">
         <div className="flex items-center gap-2 mb-6">
-          <Award className="w-5 h-5 text-gold-400" />
-          <h3 className="text-lg font-bold text-white">Deal Quality Score</h3>
+          <Award className="w-5 h-5 text-primary" />
+          <h3 className="text-lg font-bold text-foreground">Deal Quality Score</h3>
         </div>
 
         <div className="flex flex-col items-center justify-center">
-          <div className={`relative w-32 h-32 rounded-full border-8 ${ringColor} flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(0,0,0,0.3)] bg-slate-900/50`}>
+          <div className={`relative w-32 h-32 rounded-full border-8 ${ringColor} flex items-center justify-center mb-4 shadow-sm bg-muted/50`}>
             <div className="text-center">
               <span className={`text-3xl font-bold ${colorClass}`}>{score}</span>
-              <span className="block text-gray-500 text-[10px]">/ 100</span>
+              <span className="block text-muted-foreground text-[10px]">/ 100</span>
             </div>
           </div>
 
           <h4 className={`text-xl font-bold mb-2 ${colorClass}`}>{recommendation}</h4>
           
           <div className="flex items-center gap-4 mt-2 w-full justify-center">
-             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800 border border-white/5">
-                <ShieldCheck className="w-3 h-3 text-blue-400" />
-                <span className="text-xs text-gray-300">Risk: <span className="text-white font-semibold">{riskLevel || 'Medium'}</span></span>
+             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted border border-border">
+                <ShieldCheck className="w-3 h-3 text-primary" />
+                <span className="text-xs text-muted-foreground">Risk: <span className="text-foreground font-semibold">{riskLevel || 'Medium'}</span></span>
              </div>
           </div>
           
-          <p className="text-gray-500 text-center text-xs mt-4 px-2">
+          <p className="text-muted-foreground text-center text-xs mt-4 px-2">
             Weighted analysis of ROI, Cash Flow, Market, and Risk factors.
           </p>
         </div>

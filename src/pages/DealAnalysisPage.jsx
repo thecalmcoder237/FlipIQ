@@ -171,31 +171,31 @@ const DealAnalysisPage = () => {
     setMetrics(calculateDealMetrics(updatedDeal));
   };
 
-  if (loading) return <div className="text-gray-900 text-center p-10">Loading analysis...</div>;
-  if (!deal) return <div className="text-gray-900 text-center p-10">Deal not found.</div>;
+  if (loading) return <div className="min-h-[40vh] flex items-center justify-center bg-muted"><p className="text-foreground">Loading analysis...</p></div>;
+  if (!deal) return <div className="min-h-[40vh] flex items-center justify-center bg-muted"><p className="text-foreground">Deal not found.</p></div>;
 
   // We display the Base Metrics in the top cards, but the Scenario section below allows comparison.
   // The summary card usually shows "Current Plan".
   const displayMetrics = metrics || {};
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-8 max-w-7xl mx-auto mb-20">
+    <div className="min-h-screen bg-muted px-4 py-8 max-w-7xl mx-auto mb-20">
       <Helmet><title>Deal Analysis - {deal.address} | FlipIQ</title></Helmet>
       <Breadcrumb />
       <ProgressIndicator />
 
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Deal Analysis</h1>
+        <h1 className="text-3xl font-bold text-foreground">Deal Analysis</h1>
         <div className="flex gap-2">
             <Button 
               variant="outline" 
-              className="text-gray-700 border-blue-500 hover:bg-blue-50"
+              className="text-foreground border-primary hover:bg-primary/10"
               onClick={() => navigate(`/deal/action?id=${dealId}`)}
             >
               <Sparkles className="w-4 h-4 mr-2" />
               Action Hub
             </Button>
-            <Button variant="ghost" size="icon" className="text-gray-700 hover:bg-gray-100"><Share2/></Button>
+            <Button variant="ghost" size="icon" className="text-foreground hover:bg-accent"><Share2/></Button>
             <ExportAnalysisButton 
                deal={deal} 
                metrics={displayMetrics} 
@@ -208,12 +208,12 @@ const DealAnalysisPage = () => {
       <DealSummaryCard deal={deal} metrics={displayMetrics} onEdit={() => setIsEditModalOpen(true)} />
 
       <Tabs defaultValue="intelligence" className="mt-8">
-         <TabsList className="bg-white border border-gray-200 p-1 mb-6 flex flex-wrap h-auto shadow-sm">
-            <TabsTrigger value="intelligence" className="gap-2"><BarChart3 size={16}/> Intelligence</TabsTrigger>
-            <TabsTrigger value="rehab-insights" className="gap-2"><Sparkles size={16}/> Rehab Insights</TabsTrigger>
-            <TabsTrigger value="comps" className="gap-2"><Home size={16}/> Comps</TabsTrigger>
-            <TabsTrigger value="scenario-risk" className="gap-2"><Shield size={16}/> Scenario Risk Model</TabsTrigger>
-            <TabsTrigger value="notes" className="gap-2"><FileText size={16}/> Notes</TabsTrigger>
+         <TabsList className="bg-muted border border-border p-1 mb-6 flex flex-wrap h-auto shadow-sm">
+            <TabsTrigger value="intelligence" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-sm"><BarChart3 size={16}/> Intelligence</TabsTrigger>
+            <TabsTrigger value="rehab-insights" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-sm"><Sparkles size={16}/> Rehab Insights</TabsTrigger>
+            <TabsTrigger value="comps" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-sm"><Home size={16}/> Comps</TabsTrigger>
+            <TabsTrigger value="scenario-risk" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-sm"><Shield size={16}/> Scenario Risk Model</TabsTrigger>
+            <TabsTrigger value="notes" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-sm"><FileText size={16}/> Notes</TabsTrigger>
          </TabsList>
 
          <TabsContent value="intelligence" className="space-y-8 animate-in fade-in">
@@ -243,7 +243,7 @@ const DealAnalysisPage = () => {
              </div>
 
              {/* 3. 70% Rule Analysis */}
-             <Card className="bg-white border-gray-200 shadow-sm">
+             <Card className="bg-card border-border shadow-sm">
                <CardContent className="pt-6">
                  <SeventyPercentRule 
                    deal={{
@@ -267,17 +267,17 @@ const DealAnalysisPage = () => {
              </div>
 
             {/* Always Visible Scenario Section */}
-            <div className="pt-8 border-t border-gray-200 mt-8">
-                <Card className="bg-white border-gray-200 shadow-sm">
+            <div className="pt-8 border-t border-border mt-8">
+                <Card className="bg-card border-border shadow-sm">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                            <Settings2 className="text-purple-600" /> Scenario Modeling
+                        <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+                            <Settings2 className="text-primary" /> Scenario Modeling
                         </CardTitle>
                         <Select value={scenarioMode} onValueChange={setScenarioMode}>
-                          <SelectTrigger className="w-[180px] bg-white border-gray-300 text-gray-900">
+                          <SelectTrigger className="w-[180px] bg-background border-input text-foreground">
                             <SelectValue placeholder="Select Scenario" />
                           </SelectTrigger>
-                          <SelectContent className="bg-white border-gray-200 text-gray-900">
+                          <SelectContent className="bg-card border-border text-foreground">
                             <SelectItem value="base">Base Case</SelectItem>
                             <SelectItem value="best">Best Case</SelectItem>
                             <SelectItem value="worst">Worst Case</SelectItem>
@@ -299,7 +299,7 @@ const DealAnalysisPage = () => {
 
          <TabsContent value="rehab-insights" className="space-y-8">
              <div className="flex justify-between items-center">
-               <h2 className="text-2xl font-bold text-gray-900">Rehab & Property Insights</h2>
+               <h2 className="text-2xl font-bold text-foreground">Rehab & Property Insights</h2>
                <RehabInsightsExportButton 
                   deal={deal} 
                   metrics={displayMetrics} 
@@ -311,19 +311,19 @@ const DealAnalysisPage = () => {
              
              {/* 1. Property Specifications - First Section */}
              {inputs.propertyIntelligence && (
-               <Card className="bg-white border-gray-200 shadow-sm">
+               <Card className="bg-card border-border shadow-sm">
                  <CardHeader>
-                   <CardTitle className="flex gap-2 items-center text-gray-900">
-                     <Building2 className="text-blue-600"/> Property Specifications
+                   <CardTitle className="flex gap-2 items-center text-foreground">
+                     <Building2 className="text-primary"/> Property Specifications
                    </CardTitle>
                  </CardHeader>
                  <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {Object.entries(inputs.propertyIntelligence).map(([key, val]) => {
                        if(key === 'recentComps' || typeof val === 'object' || val === null) return null;
                        return (
-                         <div key={key} className="p-3 bg-gray-50 rounded border border-gray-200">
-                            <p className="text-xs text-gray-600 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-                            <p className="text-sm font-bold text-gray-900">{val}</p>
+                         <div key={key} className="p-3 bg-card rounded-lg border border-border shadow-sm">
+                            <p className="text-xs font-medium text-foreground uppercase tracking-wide mb-0.5">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                            <p className="text-sm font-bold text-foreground">{String(val)}</p>
                          </div>
                        );
                     })}

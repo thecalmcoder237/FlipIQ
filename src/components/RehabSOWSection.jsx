@@ -112,22 +112,22 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
     if (!text) return null;
     return text.split('\n').map((line, i) => {
       if (line.startsWith('## ')) {
-        return <h3 key={i} className="text-xl font-bold text-blue-600 mt-6 mb-3 border-b border-gray-200 pb-2">{line.replace('## ', '')}</h3>;
+        return <h3 key={i} className="text-xl font-bold text-primary mt-6 mb-3 border-b border-border pb-2">{line.replace('## ', '')}</h3>;
       }
       if (line.trim().startsWith('|')) {
         const cols = line.split('|').filter(c => c.trim() !== '');
         if (line.includes('---')) return null;
         return (
-           <div key={i} className="grid grid-cols-3 gap-2 py-2 border-b border-gray-200 text-sm hover:bg-gray-50 px-2">
-              {cols.map((c, idx) => <span key={idx} className={idx === 2 ? "text-right font-mono text-green-600 font-medium" : "text-gray-700"}>{c.trim()}</span>)}
+           <div key={i} className="grid grid-cols-3 gap-2 py-2 border-b border-border text-sm hover:bg-accent px-2">
+              {cols.map((c, idx) => <span key={idx} className={idx === 2 ? "text-right font-mono text-green-600 font-medium" : "text-foreground"}>{c.trim()}</span>)}
            </div>
         );
       }
       if (line.trim().startsWith('- ')) {
-         return <li key={i} className="ml-4 text-gray-700 mb-1 list-disc pl-2">{line.replace('- ', '')}</li>
+         return <li key={i} className="ml-4 text-foreground mb-1 list-disc pl-2">{line.replace('- ', '')}</li>
       }
       if (line.trim() === '') return <br key={i}/>;
-      return <p key={i} className="text-gray-700 mb-1 leading-relaxed">{line}</p>;
+      return <p key={i} className="text-foreground mb-1 leading-relaxed">{line}</p>;
     });
   };
 
@@ -135,13 +135,13 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
     <ErrorBoundary>
        <div className="space-y-6">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4 flex flex-col items-start gap-2 mb-4">
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-lg p-4 flex flex-col items-start gap-2 mb-4">
                 <div className="flex items-center gap-2 font-bold">
                     <AlertTriangle className="h-5 w-5"/>
                     <span>Error Generating SOW</span>
                 </div>
                 <p className="text-sm">{error}</p>
-                <Button variant="outline" size="sm" onClick={() => setError(null)} className="mt-2 border-red-300 text-red-800 hover:bg-red-100">
+                <Button variant="outline" size="sm" onClick={() => setError(null)} className="mt-2 border-destructive/30 text-destructive hover:bg-destructive/10">
                     Try Again
                 </Button>
             </div>
@@ -149,51 +149,51 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
 
           {/* Locked State - Requirements not met */}
           {!isUnlocked && !savedSow && !loading && !error && (
-            <Card className="bg-white border-gray-200 border-dashed shadow-sm">
+            <Card className="bg-card border-border border-dashed shadow-sm">
               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="p-4 bg-gray-100 rounded-full mb-4 relative">
-                  <Lock className="w-8 h-8 text-gray-500" />
-                  <div className="absolute top-0 right-0 bg-gold-500 p-1 rounded-full">
-                    <Sparkles size={12} className="text-black"/>
+                <div className="p-4 bg-muted rounded-full mb-4 relative">
+                  <Lock className="w-8 h-8 text-muted-foreground" />
+                  <div className="absolute top-0 right-0 bg-primary p-1 rounded-full">
+                    <Sparkles size={12} className="text-primary-foreground"/>
                   </div>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Advanced Rehab Analysis Locked</h3>
-                <p className="text-gray-600 max-w-md mb-6">
+                <h3 className="text-xl font-bold text-foreground mb-2">Advanced Rehab Analysis Locked</h3>
+                <p className="text-muted-foreground max-w-md mb-6">
                   Complete the following requirements to unlock AI-powered rehab analysis:
                 </p>
                 <div className="space-y-2 mb-6 text-left w-full max-w-md">
-                  <div className={`flex items-center gap-3 p-3 rounded-lg ${isAdvancedUnlocked ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
-                    {isAdvancedUnlocked ? <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" /> : <Lock className="w-5 h-5 text-gray-400 shrink-0" />}
+                  <div className={`flex items-center gap-3 p-3 rounded-lg ${isAdvancedUnlocked ? 'bg-green-50 border border-green-200' : 'bg-muted border border-border'}`}>
+                    {isAdvancedUnlocked ? <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" /> : <Lock className="w-5 h-5 text-muted-foreground shrink-0" />}
                     <div className="flex-1">
-                      <p className={`text-sm font-medium ${isAdvancedUnlocked ? 'text-green-600' : 'text-gray-600'}`}>
+                      <p className={`text-sm font-medium ${isAdvancedUnlocked ? 'text-green-600' : 'text-muted-foreground'}`}>
                         Deal Score ≥ 70 (Advanced Analysis Unlocked)
                       </p>
-                      {!isAdvancedUnlocked && <p className="text-xs text-gray-500 mt-1">Current score: {dealScore}</p>}
+                      {!isAdvancedUnlocked && <p className="text-xs text-muted-foreground mt-1">Current score: {dealScore}</p>}
                     </div>
                   </div>
-                  <div className={`flex items-center gap-3 p-3 rounded-lg ${hasPhotos ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
-                    {hasPhotos ? <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" /> : <Camera className="w-5 h-5 text-gray-400 shrink-0" />}
+                  <div className={`flex items-center gap-3 p-3 rounded-lg ${hasPhotos ? 'bg-green-50 border border-green-200' : 'bg-muted border border-border'}`}>
+                    {hasPhotos ? <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" /> : <Camera className="w-5 h-5 text-muted-foreground shrink-0" />}
                     <div className="flex-1">
-                      <p className={`text-sm font-medium ${hasPhotos ? 'text-green-600' : 'text-gray-600'}`}>
+                      <p className={`text-sm font-medium ${hasPhotos ? 'text-green-600' : 'text-muted-foreground'}`}>
                         Upload Property Photos
                       </p>
-                      {hasPhotos && <p className="text-xs text-gray-500 mt-1">{deal.photos.length} photo(s) uploaded</p>}
+                      {hasPhotos && <p className="text-xs text-muted-foreground mt-1">{deal.photos.length} photo(s) uploaded</p>}
                     </div>
                   </div>
-                  <div className={`flex items-center gap-3 p-3 rounded-lg ${hasPropertyData ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
-                    {hasPropertyData ? <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" /> : <Building2 className="w-5 h-5 text-gray-400 shrink-0" />}
+                  <div className={`flex items-center gap-3 p-3 rounded-lg ${hasPropertyData ? 'bg-green-50 border border-green-200' : 'bg-muted border border-border'}`}>
+                    {hasPropertyData ? <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" /> : <Building2 className="w-5 h-5 text-muted-foreground shrink-0" />}
                     <div className="flex-1">
-                      <p className={`text-sm font-medium ${hasPropertyData ? 'text-green-600' : 'text-gray-600'}`}>
+                      <p className={`text-sm font-medium ${hasPropertyData ? 'text-green-600' : 'text-muted-foreground'}`}>
                         Fetch Property Intelligence Data
                       </p>
-                      {hasPropertyData && <p className="text-xs text-gray-500 mt-1">Property data loaded</p>}
+                      {hasPropertyData && <p className="text-xs text-muted-foreground mt-1">Property data loaded</p>}
                     </div>
                   </div>
                 </div>
                 <Button 
                   onClick={handleGenerateSOW} 
                   disabled={!isUnlocked}
-                  className="bg-gray-600 hover:bg-gray-700 text-white min-w-[200px] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground min-w-[200px] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isUnlocked ? "Generate SOW & Budget" : "Requirements Not Met"}
                 </Button>
@@ -203,18 +203,18 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
 
           {/* Unlocked State / CTA */}
           {isUnlocked && !savedSow && !loading && !error && (
-            <Card className="bg-white border-gray-200 border-dashed shadow-sm">
+            <Card className="bg-card border-border border-dashed shadow-sm">
               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="p-4 bg-orange-50 rounded-full mb-4">
-                  <Hammer className="w-8 h-8 text-orange-600" />
+                <div className="p-4 bg-primary/10 rounded-full mb-4">
+                  <Hammer className="w-8 h-8 text-primary" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Generate Professional SOW</h3>
-                <p className="text-gray-600 max-w-md mb-6">
+                <h3 className="text-xl font-bold text-foreground mb-2">Generate Professional SOW</h3>
+                <p className="text-muted-foreground max-w-md mb-6">
                   Create a detailed line-item budget and scope of work based on visual analysis of uploaded photos and comprehensive property data. Estimates will reflect actual work needed, not budget constraints.
                 </p>
                 <Button 
                   onClick={handleGenerateSOW} 
-                  className="bg-orange-600 hover:bg-orange-700 text-white min-w-[200px]"
+                  className="bg-gradient-to-r from-primary to-accentBrand hover:from-primary/90 hover:to-accentBrand/90 text-primary-foreground min-w-[200px]"
                 >
                   Generate SOW & Budget
                 </Button>
@@ -224,40 +224,40 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
 
           {/* Loading State */}
           {loading && (
-            <div className="space-y-4 p-12 border border-gray-200 rounded-xl bg-gray-50 text-center flex flex-col items-center justify-center">
-              <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-              <h3 className="text-lg text-gray-900 font-medium">Drafting Scope of Work...</h3>
-              <p className="text-sm text-gray-600">AI is analyzing local labor rates and material costs for 2025.</p>
+            <div className="space-y-4 p-12 border border-border rounded-xl bg-muted text-center flex flex-col items-center justify-center">
+              <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
+              <h3 className="text-lg text-foreground font-medium">Drafting Scope of Work...</h3>
+              <p className="text-sm text-muted-foreground">AI is analyzing local labor rates and material costs for 2025.</p>
             </div>
           )}
 
           {/* Result State */}
           {savedSow && !loading && (
-            <Card className="bg-white border-gray-200 shadow-xl overflow-hidden">
-              <CardHeader className="bg-gray-50 border-b border-gray-200 flex flex-row items-center justify-between">
-                <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                  <Hammer className="text-orange-600" /> 
+            <Card className="bg-card border-border shadow-xl overflow-hidden">
+              <CardHeader className="bg-muted border-b border-border flex flex-row items-center justify-between">
+                <CardTitle className="text-2xl font-bold text-foreground flex items-center gap-2">
+                  <Hammer className="text-primary" /> 
                   AI-Generated Scope of Work
                 </CardTitle>
                 <Button 
                   variant="outline" 
                   size="sm"
                   onClick={handleGenerateSOW}
-                  className="border-gray-200 hover:bg-gray-100 text-gray-700"
+                  className="border-border hover:bg-accent text-foreground"
                 >
                   <RefreshCw className="w-4 h-4 mr-2" /> Regenerate
                 </Button>
               </CardHeader>
-              <CardContent className="p-6 bg-white">
+              <CardContent className="p-6 bg-background">
                 <div className="prose max-w-none">
                    {renderContent(savedSow)}
                 </div>
                 
-                <div className="mt-8 bg-blue-900/20 border border-blue-500/30 p-4 rounded-lg flex items-start gap-3">
-                   <CheckCircle2 className="text-blue-400 shrink-0 mt-1" />
+                <div className="mt-8 bg-primary/20 border border-primary/30 p-4 rounded-lg flex items-start gap-3">
+                   <CheckCircle2 className="text-primary shrink-0 mt-1" />
                    <div>
-                      <p className="font-bold text-blue-100">Estimator's Note</p>
-                      <p className="text-xs text-blue-200/70">
+                      <p className="font-bold text-foreground">Estimator's Note</p>
+                      <p className="text-xs text-muted-foreground">
                          This SOW is based on standard 2025 market rates for the provided location. 
                          Always verify with local contractors before finalizing your budget.
                       </p>

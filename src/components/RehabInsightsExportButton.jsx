@@ -223,7 +223,7 @@ const RehabInsightsExportButton = ({ deal, metrics, propertyIntelligence, sowDat
   };
 
   return (
-    <Button onClick={handleExport} disabled={isExporting} className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg">
+    <Button onClick={handleExport} disabled={isExporting} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg">
       <Download className={`w-4 h-4 mr-2 ${isExporting ? 'animate-bounce' : ''}`} />
       {isExporting ? 'Generating PDF...' : 'Export Rehab Insights'}
     </Button>

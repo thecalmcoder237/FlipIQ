@@ -44,7 +44,7 @@ const ExportAnalysisButton = ({ deal, metrics, propertyIntelligence, sowData, sc
         head: [['Metric', 'Value']],
         body: summaryData,
         theme: 'striped',
-        headStyles: { fillColor: [41, 128, 185] }
+        headStyles: { fillColor: [63, 180, 224] }
       });
 
       // 3. Property Intelligence
@@ -100,11 +100,11 @@ const ExportAnalysisButton = ({ deal, metrics, propertyIntelligence, sowData, sc
 
   return (
     <div className="flex gap-3">
-       <Button onClick={handleExport} disabled={isExporting} className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg">
+       <Button onClick={handleExport} disabled={isExporting} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg">
           <Download className={`w-4 h-4 mr-2 ${isExporting ? 'animate-bounce' : ''}`} />
           {isExporting ? 'Generating PDF...' : 'Export Full Analysis'}
        </Button>
-       <Button variant="outline" className="text-gray-300 border-white/20 hover:bg-slate-800">
+       <Button variant="outline" className="border-border text-foreground hover:bg-accent">
           <Mail className="w-4 h-4 mr-2" /> Email
        </Button>
     </div>

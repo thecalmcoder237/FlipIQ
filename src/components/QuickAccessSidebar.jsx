@@ -46,11 +46,11 @@ const QuickAccessSidebar = ({ isOpen, toggle }) => {
         initial={{ x: -280 }}
         animate={{ x: isOpen ? 0 : -280 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="fixed top-0 left-0 bottom-0 w-64 bg-slate-900 border-r border-white/10 z-50 flex flex-col pt-20 shadow-2xl"
+        className="fixed top-0 left-0 bottom-0 w-64 bg-card border-r border-border z-50 flex flex-col pt-20 shadow-2xl"
       >
         <div className="p-4 flex items-center justify-between lg:hidden">
-          <span className="text-white font-bold">Menu</span>
-          <Button variant="ghost" size="icon" onClick={toggle} className="text-white">
+          <span className="text-foreground font-bold">Menu</span>
+          <Button variant="ghost" size="icon" onClick={toggle} className="text-foreground">
             <ChevronLeft />
           </Button>
         </div>
@@ -67,8 +67,8 @@ const QuickAccessSidebar = ({ isOpen, toggle }) => {
                 onClick={() => window.innerWidth < 1024 && toggle()}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
                   isActive 
-                    ? 'bg-gold-500 text-slate-900 font-bold shadow-lg shadow-gold-500/20' 
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    ? 'bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20' 
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
                 }`}
               >
                 <Icon className="w-5 h-5" />
@@ -78,11 +78,11 @@ const QuickAccessSidebar = ({ isOpen, toggle }) => {
           })}
         </nav>
 
-        <div className="p-4 border-t border-white/10">
-          <div className="bg-slate-800/50 rounded-xl p-4">
-            <p className="text-xs text-gray-500 mb-1">Pro Tip</p>
-            <p className="text-sm text-gray-300">
-              Use <span className="text-gold-400 font-mono bg-black/20 px-1 rounded">Ctrl+S</span> to save your deal instantly from anywhere.
+        <div className="p-4 border-t border-border">
+          <div className="bg-muted rounded-xl p-4">
+            <p className="text-xs text-muted-foreground mb-1">Pro Tip</p>
+            <p className="text-sm text-muted-foreground">
+              Use <span className="text-primary font-mono bg-primary/10 px-1 rounded">Ctrl+S</span> to save your deal instantly from anywhere.
             </p>
           </div>
         </div>
@@ -94,7 +94,7 @@ const QuickAccessSidebar = ({ isOpen, toggle }) => {
         animate={{ left: isOpen ? 256 : 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
         onClick={toggle}
-        className="fixed top-24 z-40 bg-slate-800 text-white p-2 rounded-r-lg border-y border-r border-white/20 shadow-lg hover:bg-slate-700 hidden lg:block"
+        className="fixed top-24 z-40 bg-muted text-foreground p-2 rounded-r-lg border-y border-r border-border shadow-lg hover:bg-accent hidden lg:block"
       >
         {isOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
       </motion.button>

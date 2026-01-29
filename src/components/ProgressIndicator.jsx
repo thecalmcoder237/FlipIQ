@@ -9,6 +9,9 @@ const steps = [
   { path: '/report', label: 'Report' },
 ];
 
+const PRIMARY_HEX = '#3FB4E0'; // primary from design system
+const INACTIVE_HEX = '#e2e8f0'; // border/muted
+
 const ProgressIndicator = () => {
   const location = useLocation();
   const currentStepIndex = steps.findIndex(step => location.pathname.includes(step.path));
@@ -25,27 +28,27 @@ const ProgressIndicator = () => {
               <motion.div
                 initial={false}
                 animate={{
-                  backgroundColor: index <= currentStepIndex ? '#fbbf24' : '#1e293b',
-                  borderColor: index <= currentStepIndex ? '#fbbf24' : '#4b5563',
+                  backgroundColor: index <= currentStepIndex ? PRIMARY_HEX : INACTIVE_HEX,
+                  borderColor: index <= currentStepIndex ? PRIMARY_HEX : INACTIVE_HEX,
                   scale: index === currentStepIndex ? 1.1 : 1,
                 }}
                 className={`w-8 h-8 rounded-full flex items-center justify-center border-2 text-xs font-bold transition-colors duration-300 ${
-                  index <= currentStepIndex ? 'text-slate-900' : 'text-gray-400'
+                  index <= currentStepIndex ? 'text-primary-foreground' : 'text-muted-foreground'
                 }`}
               >
                 {index + 1}
               </motion.div>
-              <span className={`text-xs mt-2 font-medium ${index <= currentStepIndex ? 'text-gold-400' : 'text-gray-500'}`}>
+              <span className={`text-xs mt-2 font-medium ${index <= currentStepIndex ? 'text-foreground' : 'text-muted-foreground'}`}>
                 {step.label}
               </span>
             </div>
             {index < steps.length - 1 && (
-              <div className="w-16 h-1 mx-2 bg-slate-800 rounded-full overflow-hidden">
+              <div className="w-16 h-1 mx-2 bg-muted rounded-full overflow-hidden">
                 <motion.div
                   initial={{ width: '0%' }}
                   animate={{ width: index < currentStepIndex ? '100%' : '0%' }}
                   transition={{ duration: 0.5 }}
-                  className="h-full bg-gold-400"
+                  className="h-full bg-primary"
                 />
               </div>
             )}

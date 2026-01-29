@@ -5,22 +5,21 @@ import { DollarSign, ChevronDown, ChevronRight, Check, AlertTriangle } from 'luc
 
 const BreakdownSection = ({ title, items, total, color, isOpen, onToggle, totalAllCosts }) => {
   const safeTotal = total || 0;
-  // Calculate percentage relative to Total All Costs (Project Cost + Selling Cost)
   const percentage = totalAllCosts > 0 ? ((safeTotal / totalAllCosts) * 100).toFixed(1) : 0;
 
   return (
-    <div className="border border-white/5 rounded-lg overflow-hidden mb-2 bg-slate-900/30">
+    <div className="border border-border rounded-lg overflow-hidden mb-2 bg-muted/50">
       <div 
         onClick={onToggle}
-        className={`flex items-center justify-between p-3 cursor-pointer hover:bg-slate-800/50 transition-colors border-l-4 ${color}`}
+        className={`flex items-center justify-between p-3 cursor-pointer hover:bg-accent transition-colors border-l-4 ${color}`}
       >
         <div className="flex items-center gap-3">
-          {isOpen ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />}
-          <span className="font-semibold text-white">{title}</span>
+          {isOpen ? <ChevronDown size={16} className="text-muted-foreground" /> : <ChevronRight size={16} className="text-muted-foreground" />}
+          <span className="font-semibold text-foreground">{title}</span>
         </div>
         <div className="flex items-center gap-4">
-           <span className="text-xs text-gray-500">{percentage}%</span>
-           <span className="font-bold text-white min-w-[80px] text-right">${safeTotal.toLocaleString()}</span>
+           <span className="text-xs text-muted-foreground">{percentage}%</span>
+           <span className="font-bold text-foreground min-w-[80px] text-right">${safeTotal.toLocaleString()}</span>
         </div>
       </div>
       <AnimatePresence>
@@ -29,12 +28,12 @@ const BreakdownSection = ({ title, items, total, color, isOpen, onToggle, totalA
             initial={{ height: 0 }} 
             animate={{ height: 'auto' }} 
             exit={{ height: 0 }}
-            className="bg-slate-950/30 overflow-hidden"
+            className="bg-background/50 overflow-hidden"
           >
             {items.map((item, idx) => (
-              <div key={idx} className="flex justify-between items-center px-4 py-2 text-sm border-t border-white/5 pl-10 hover:bg-white/5">
-                <span className="text-gray-400">{item.label}</span>
-                <span className="font-mono text-gray-300">${(item.value || 0).toLocaleString()}</span>
+              <div key={idx} className="flex justify-between items-center px-4 py-2 text-sm border-t border-border pl-10 hover:bg-accent/50">
+                <span className="text-foreground">{item.label}</span>
+                <span className="font-mono text-muted-foreground">${(item.value || 0).toLocaleString()}</span>
               </div>
             ))}
           </motion.div>
@@ -55,7 +54,7 @@ const ComprehensiveFinancialBreakdown = ({ deal, metrics }) => {
 
   const toggle = (sec) => setOpenSections(prev => ({ ...prev, [sec]: !prev[sec] }));
 
-  if (!metrics) return <div className="p-4 text-center text-gray-400">Loading breakdown...</div>;
+  if (!metrics) return <div className="p-4 text-center text-muted-foreground">Loading breakdown...</div>;
 
   const {
     acquisition,
@@ -105,16 +104,16 @@ const ComprehensiveFinancialBreakdown = ({ deal, metrics }) => {
 
   return (
     <div className="space-y-6">
-      <div className="bg-slate-900/50 border border-white/10 rounded-xl p-4">
-         <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-           <DollarSign className="text-gold-500" size={18} /> Detailed Cost Breakdown
+      <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+         <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
+           <DollarSign className="text-primary" size={18} /> Detailed Cost Breakdown
          </h3>
          
          <BreakdownSection 
            title="Acquisition Costs" 
            items={acquisitionItems} 
            total={acquisition.total} 
-           color="border-blue-500" 
+           color="border-primary" 
            isOpen={openSections.acquisition} 
            onToggle={() => toggle('acquisition')}
            totalAllCosts={totalAllCosts}
@@ -123,7 +122,7 @@ const ComprehensiveFinancialBreakdown = ({ deal, metrics }) => {
            title="Hard Money Costs" 
            items={hardMoneyItems} 
            total={hardMoney.total} 
-           color="border-orange-500" 
+           color="border-accentBrand" 
            isOpen={openSections.hardMoney} 
            onToggle={() => toggle('hardMoney')}
            totalAllCosts={totalAllCosts}
@@ -132,7 +131,7 @@ const ComprehensiveFinancialBreakdown = ({ deal, metrics }) => {
            title="Rehab Costs" 
            items={rehabItems} 
            total={rehab.total} 
-           color="border-green-500" 
+           color="border-green-500"
            isOpen={openSections.rehab} 
            onToggle={() => toggle('rehab')}
            totalAllCosts={totalAllCosts}

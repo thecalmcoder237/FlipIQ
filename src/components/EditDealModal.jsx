@@ -58,11 +58,11 @@ const EditDealModal = ({ isOpen, onClose, deal, onSave }) => {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-slate-900 border border-white/20 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
+          className="bg-card border border-border rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
         >
-          <div className="sticky top-0 bg-slate-900 border-b border-white/10 p-4 flex justify-between items-center z-10">
-            <h2 className="text-xl font-bold text-white">Edit Deal Details</h2>
-            <Button variant="ghost" size="icon" onClick={onClose} className="text-gray-400 hover:text-white">
+          <div className="sticky top-0 bg-card border-b border-border p-4 flex justify-between items-center z-10">
+            <h2 className="text-xl font-bold text-foreground">Edit Deal Details</h2>
+            <Button variant="ghost" size="icon" onClick={onClose} className="text-muted-foreground hover:text-foreground">
               <X className="w-5 h-5" />
             </Button>
           </div>
@@ -70,12 +70,12 @@ const EditDealModal = ({ isOpen, onClose, deal, onSave }) => {
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                 <label className="text-sm text-gray-400 block mb-1">Status</label>
+                 <label className="text-sm text-muted-foreground block mb-1">Status</label>
                  <select
                     name="status"
                     value={formData.status || 'Analyzing'}
                     onChange={handleChange}
-                    className="w-full bg-slate-800 border border-white/10 rounded-lg p-3 text-white focus:ring-2 focus:ring-gold-400 outline-none"
+                    className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
                  >
                     <option value="Analyzing">Analyzing</option>
                     <option value="Under Contract">Under Contract</option>
@@ -86,77 +86,77 @@ const EditDealModal = ({ isOpen, onClose, deal, onSave }) => {
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 block mb-1">Purchase Price</label>
+                <label className="text-sm text-muted-foreground block mb-1">Purchase Price</label>
                 <input
                   type="number"
                   name="purchasePrice"
                   value={formData.purchasePrice || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-800 border border-white/10 rounded-lg p-3 text-white focus:ring-2 focus:ring-gold-400 outline-none"
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
                 />
               </div>
               
               <div>
-                <label className="text-sm text-gray-400 block mb-1">ARV</label>
+                <label className="text-sm text-muted-foreground block mb-1">ARV</label>
                 <input
                   type="number"
                   name="arv"
                   value={formData.arv || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-800 border border-white/10 rounded-lg p-3 text-white focus:ring-2 focus:ring-gold-400 outline-none"
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
                 />
               </div>
 
                <div>
-                <label className="text-sm text-gray-400 block mb-1">Rehab Costs</label>
+                <label className="text-sm text-muted-foreground block mb-1">Rehab Costs</label>
                 <input
                   type="number"
                   name="rehabCosts"
                   value={formData.rehabCosts || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-800 border border-white/10 rounded-lg p-3 text-white focus:ring-2 focus:ring-gold-400 outline-none"
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
                 />
               </div>
 
                <div>
-                <label className="text-sm text-gray-400 block mb-1">Holding Months</label>
+                <label className="text-sm text-muted-foreground block mb-1">Holding Months</label>
                 <input
                   type="number"
                   name="holdingMonths"
                   value={formData.holdingMonths || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-800 border border-white/10 rounded-lg p-3 text-white focus:ring-2 focus:ring-gold-400 outline-none"
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
                 />
               </div>
 
                <div>
-                <label className="text-sm text-gray-400 block mb-1">Down Payment %</label>
+                <label className="text-sm text-muted-foreground block mb-1">Down Payment %</label>
                 <input
                   type="number"
                   name="downPaymentPercent"
                   value={formData.downPaymentPercent || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-800 border border-white/10 rounded-lg p-3 text-white focus:ring-2 focus:ring-gold-400 outline-none"
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
                 />
               </div>
 
                <div>
-                <label className="text-sm text-gray-400 block mb-1">Hard Money Rate %</label>
+                <label className="text-sm text-muted-foreground block mb-1">Hard Money Rate %</label>
                 <input
                   type="number"
                   name="hardMoneyRate"
                   value={formData.hardMoneyRate || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-800 border border-white/10 rounded-lg p-3 text-white focus:ring-2 focus:ring-gold-400 outline-none"
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-6 border-t border-white/10">
-              <Button type="button" variant="ghost" onClick={onClose} className="text-gray-400 hover:text-white">
+            <div className="flex justify-end gap-3 pt-6 border-t border-border">
+              <Button type="button" variant="ghost" onClick={onClose} className="text-muted-foreground hover:text-foreground">
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading} className="bg-gold-500 text-slate-900 hover:bg-gold-600 font-bold">
+              <Button type="submit" disabled={isLoading} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
                 {isLoading ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>

@@ -154,17 +154,17 @@ const MarketStrengthGauge = ({ deal, propertyIntelligence }) => {
   const offset = circumference - (hotnessScore / 10) * circumference;
 
   return (
-    <Card className="bg-white border-gray-200 shadow-sm">
+    <Card className="bg-card border-border shadow-sm">
       <CardHeader className="pb-3">
-        <CardTitle className="text-gray-900 text-sm flex items-center gap-2">
-          <Home className="text-blue-600" size={16} />
+        <CardTitle className="text-foreground text-sm flex items-center gap-2">
+          <Home className="text-primary" size={16} />
           Market Strength Gauge
         </CardTitle>
       </CardHeader>
       <CardContent>
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
           <>
@@ -200,7 +200,7 @@ const MarketStrengthGauge = ({ deal, propertyIntelligence }) => {
                   <span className={`text-2xl font-bold ${color.text}`}>
                     {hotnessScore.toFixed(1)}
                   </span>
-                  <span className="text-xs text-gray-400">/ 10</span>
+                  <span className="text-xs text-muted-foreground">/ 10</span>
                 </div>
               </div>
             </div>
@@ -208,31 +208,31 @@ const MarketStrengthGauge = ({ deal, propertyIntelligence }) => {
             {/* Mini Metrics */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1 text-gray-400">
+                <div className="flex items-center gap-1 text-muted-foreground">
                   <TrendingUp className="w-3 h-3" />
                   <span>Trend</span>
                 </div>
-                <span className={`font-bold ${marketData?.trendYoY >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                <span className={`font-bold ${marketData?.trendYoY >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {marketData?.trendYoY >= 0 ? '▲' : '▼'} {Math.abs(marketData?.trendYoY || 0).toFixed(1)}% YoY
                 </span>
               </div>
               
               <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1 text-gray-400">
+                <div className="flex items-center gap-1 text-muted-foreground">
                   <Home className="w-3 h-3" />
                   <span>Inventory</span>
                 </div>
-                <span className="font-bold text-gray-900">
+                <span className="font-bold text-foreground">
                   {marketData?.inventoryLevel || 'Medium'} ({marketData?.inventoryMonths?.toFixed(1) || 'N/A'} mo)
                 </span>
               </div>
               
               <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1 text-gray-600">
+                <div className="flex items-center gap-1 text-muted-foreground">
                   <Clock className="w-3 h-3" />
                   <span>DOM</span>
                 </div>
-                <span className="font-bold text-gray-900">
+                <span className="font-bold text-foreground">
                   {marketData?.dom || 'N/A'} days
                   {marketData?.domChangeMoM && (
                     <span className={`ml-1 ${marketData.domChangeMoM < 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -243,11 +243,11 @@ const MarketStrengthGauge = ({ deal, propertyIntelligence }) => {
               </div>
               
               <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1 text-gray-600">
+                <div className="flex items-center gap-1 text-muted-foreground">
                   <DollarSign className="w-3 h-3" />
                   <span>Median Price</span>
                 </div>
-                <span className="font-bold text-gray-900">
+                <span className="font-bold text-foreground">
                   ${(marketData?.medianSalePrice || 0).toLocaleString()}
                 </span>
               </div>
