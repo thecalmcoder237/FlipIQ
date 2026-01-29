@@ -49,15 +49,7 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
 
   // Calculate scenarios based on assumptions
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScenarioRiskModel.jsx:51',message:'useEffect: Calculate scenarios',data:{hasDeal:!!deal,hasMetrics:!!metrics,metricsType:typeof metrics,metricsKeys:metrics?Object.keys(metrics):[],rehabOverrun,holdTime,arvShift},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
-    if (!deal) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScenarioRiskModel.jsx:55',message:'useEffect: Early return - no deal',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
-      return;
-    }
+    if (!deal) return;
     
     // Ensure metrics exists, use empty object if not
     const safeMetrics = metrics || {};
@@ -93,10 +85,7 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
     ];
     
     setScenarios(newScenarios);
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScenarioRiskModel.jsx:126',message:'Scenarios set',data:{scenariosCount:newScenarios.length,scenarioProfits:newScenarios.map(s=>s.profit)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
-    
+
     // Calculate hidden costs
     const costs = calculateHiddenCosts(baseDeal, propertyIntelligence);
     setHiddenCosts(costs);
@@ -128,9 +117,6 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
       }
     };
     setTimelineRisks(timelineRisk);
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScenarioRiskModel.jsx:159',message:'useEffect completed',data:{scenariosSet:true,hiddenCostsCount:costs.length,timelineRisksSet:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
   }, [deal, metrics, rehabOverrun, holdTime, arvShift, propertyIntelligence]);
 
   // Fetch market shocks
@@ -163,51 +149,26 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
       holdingMonths: (baseDeal.holdingMonths || 6) + holdAdjust,
       arvShift: arvAdjust // Keep for reference
     };
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScenarioRiskModel.jsx:153',message:'Calculating scenario profit',data:{baseARV,adjustedARV,arvAdjust,overrun,holdAdjust,holdingMonths:adjustedDeal.holdingMonths},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-    // #endregion
     const adjustedMetrics = calculateDealMetrics(adjustedDeal);
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScenarioRiskModel.jsx:153',message:'Scenario profit calculated',data:{netProfit:adjustedMetrics?.netProfit,adjustedARV},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-    // #endregion
     return adjustedMetrics?.netProfit || 0;
   }
 
   // Calculate derived metrics
   const expectedProfit = useMemo(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScenarioRiskModel.jsx:142',message:'Calculating expectedProfit',data:{scenariosCount:scenarios.length,scenarios:scenarios.map(s=>({name:s.name,profit:s.profit,prob:s.probability}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
     if (!scenarios || scenarios.length === 0) return 0;
-    const result = calculateExpectedValue(scenarios);
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScenarioRiskModel.jsx:142',message:'expectedProfit calculated',data:{expectedProfit:result},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
-    return result || 0;
+    return calculateExpectedValue(scenarios) || 0;
   }, [scenarios]);
   const lossProb = useMemo(() => calculateLossProbability(scenarios), [scenarios]);
   const breakEvenConf = useMemo(() => calculateBreakEvenConfidence(scenarios), [scenarios]);
   const riskScore = useMemo(() => calculateRiskScore(deal, metrics, scenarios), [deal, metrics, scenarios]);
   const topThreats = useMemo(() => identifyTopThreats(deal, metrics, scenarios, hiddenCosts, timelineRisks), 
     [deal, metrics, scenarios, hiddenCosts, timelineRisks]);
-  const probabilityCurve = useMemo(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScenarioRiskModel.jsx:182',message:'Generating probability curve',data:{scenariosCount:scenarios.length,scenarios:scenarios.map(s=>({name:s.name,profit:s.profit,prob:s.probability}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I'})}).catch(()=>{});
-    // #endregion
-    const curve = generateProbabilityCurve(scenarios);
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScenarioRiskModel.jsx:182',message:'Probability curve generated',data:{curvePoints:curve.length,firstPoint:curve[0],lastPoint:curve[curve.length-1]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I'})}).catch(()=>{});
-    // #endregion
-    return curve;
-  }, [scenarios]);
+  const probabilityCurve = useMemo(() => generateProbabilityCurve(scenarios), [scenarios]);
   const timelineCollision = useMemo(() => calculateTimelineCollision(timelineRisks), [timelineRisks]);
   const minARV = useMemo(() => calculateMinARV(deal, metrics, targetProfit), [deal, metrics, targetProfit]);
 
   // Calculate adjusted profit with all risk factors (must be after expectedProfit is defined)
   const calculateAdjustedProfit = useMemo(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScenarioRiskModel.jsx:163',message:'Calculating adjusted profit',data:{expectedProfit,hasDeal:!!deal,hasMetrics:!!metrics,expectedProfitType:typeof expectedProfit,expectedProfitValue:expectedProfit},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
     if (!deal || !metrics) return 0;
     const baseProfit = expectedProfit || 0;
     
@@ -246,10 +207,7 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
         }
       });
     }
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScenarioRiskModel.jsx:201',message:'Adjusted profit calculated',data:{adjustedProfit},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
+
     return adjustedProfit;
   }, [deal, metrics, expectedProfit, marketShocks, marketShockEnabled, hiddenCosts, hiddenCostEnabled, timelineCollision, timelineRiskEnabled, timelineRisks]);
 
@@ -349,12 +307,7 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                 </div>
                 <Slider
                   value={[rehabOverrun]}
-                  onValueChange={([val]) => {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScenarioRiskModel.jsx:332',message:'Rehab Overrun slider changed',data:{oldValue:rehabOverrun,newValue:val},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
-                    // #endregion
-                    setRehabOverrun(val);
-                  }}
+                  onValueChange={([val]) => setRehabOverrun(val)}
                   min={0}
                   max={50}
                   step={1}
@@ -373,12 +326,7 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                 </div>
                 <Slider
                   value={[holdTime]}
-                  onValueChange={([val]) => {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScenarioRiskModel.jsx:351',message:'Hold Time slider changed',data:{oldValue:holdTime,newValue:val},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
-                    // #endregion
-                    setHoldTime(val);
-                  }}
+                  onValueChange={([val]) => setHoldTime(val)}
                   min={3}
                   max={12}
                   step={1}
@@ -399,12 +347,7 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                 </div>
                 <Slider
                   value={[arvShift]}
-                  onValueChange={([val]) => {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ScenarioRiskModel.jsx:372',message:'ARV Shift slider changed',data:{oldValue:arvShift,newValue:val},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
-                    // #endregion
-                    setArvShift(val);
-                  }}
+                  onValueChange={([val]) => setArvShift(val)}
                   min={-20}
                   max={10}
                   step={1}

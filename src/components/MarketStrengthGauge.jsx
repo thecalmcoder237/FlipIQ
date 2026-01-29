@@ -17,10 +17,6 @@ const MarketStrengthGauge = ({ deal, propertyIntelligence }) => {
   const fetchMarketStrength = async () => {
     setLoading(true);
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarketStrengthGauge.jsx:19',message:'Fetching market strength',data:{address:deal.address,zipCode:deal.zipCode},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-      
       // Try OpenAI function first, fallback to Claude if not available
       let data, error;
       let useFallback = false;
@@ -102,9 +98,6 @@ const MarketStrengthGauge = ({ deal, propertyIntelligence }) => {
         }
       }
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarketStrengthGauge.jsx:48',message:'Edge function response',data:{hasError:!!error,errorMessage:error?.message,hasData:!!data,dataType:typeof data},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       if (error) throw error;
       
       // Parse JSON from response
@@ -124,9 +117,6 @@ const MarketStrengthGauge = ({ deal, propertyIntelligence }) => {
       setMarketData(parsedData);
     } catch (error) {
       console.error('Market strength fetch error:', error);
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/2f41b995-a6ad-4446-a2d3-910377beb16b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MarketStrengthGauge.jsx:71',message:'Market strength fetch failed, using fallback',data:{errorMessage:error?.message,errorType:error?.constructor?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
       // Use default data on error (edge function not deployed or API error)
       setMarketData({
         hotnessScore: 7.5,
