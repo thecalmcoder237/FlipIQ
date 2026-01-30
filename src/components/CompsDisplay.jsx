@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Home, Bed, Bath, Maximize, Calendar, RefreshCw, AlertCircle, DollarSign, Activity } from 'lucide-react';
+import { Home, Bed, Bath, Maximize, Calendar, RefreshCw, AlertCircle, Car, Layers, Warehouse } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const CompsDisplay = ({ comps, loading, onRefresh, source = "AI" }) => {
@@ -85,6 +85,29 @@ const CompsDisplay = ({ comps, loading, onRefresh, source = "AI" }) => {
                      <span className="text-foreground font-bold">{comp.sqft}</span>
                   </div>
                </div>
+
+               {(comp.basement || comp.basementType || comp.parkingType || comp.parkingSpaces != null || comp.levels != null) && (
+                 <div className="flex flex-wrap gap-1.5 mb-3 text-xs">
+                   {comp.basementType && (
+                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted text-muted-foreground" title="Basement type">
+                       <Warehouse size={10}/> {comp.basementType}
+                     </span>
+                   )}
+                   {comp.basementCondition && !comp.basementType && (
+                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted text-muted-foreground">Basement: {comp.basementCondition}</span>
+                   )}
+                   {(comp.parkingType || comp.parkingSpaces != null) && (
+                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted text-muted-foreground" title="Parking">
+                       <Car size={10}/> {[comp.parkingType, comp.parkingSpaces != null ? String(comp.parkingSpaces) + ' space(s)' : null].filter(Boolean).join(' · ') || 'Parking'}
+                     </span>
+                   )}
+                   {comp.levels != null && (
+                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted text-muted-foreground" title="Levels">
+                       <Layers size={10}/> {comp.levels} level(s)
+                     </span>
+                   )}
+                 </div>
+               )}
                
                <div className="flex justify-between items-center text-xs">
                   <span className="text-muted-foreground flex items-center gap-1">

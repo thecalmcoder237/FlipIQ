@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { Award, Heart, Users, TrendingUp, Shield, Target } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';

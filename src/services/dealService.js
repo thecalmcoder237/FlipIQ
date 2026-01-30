@@ -2,6 +2,16 @@
 import { supabase } from '@/lib/customSupabaseClient';
 import { inputsToDatabase, databaseToInputs } from '@/utils/databaseMapping';
 
+/** Normalize address for duplicate comparison: lowercase, collapse spaces, remove commas. */
+export function normalizeAddressForComparison(address) {
+  if (!address || typeof address !== 'string') return '';
+  return address
+    .toLowerCase()
+    .replace(/,/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export const dealService = {
   /**
    * Saves a deal to the database (insert or update).
@@ -96,6 +106,32 @@ export const dealService = {
         console.error("dealService.loadUserDeals Error:", error);
         throw error;
      }
+  },
+
+  /**
+   * Find an existing deal for this user that matches the given address (normalized comparison).
+   * Used to avoid duplicate entries and offer "Load existing analysis".
+   * @param {string} userId
+   * @param {string} address - Canonical address (e.g. from geocode formatted_address)
+   * @param {string} [excludeDealId] - Ignore this deal ID (e.g. when editing)
+   * @returns {Promise<Object|null>} Matching deal in camelCase or null
+   */
+  async findDealByAddress(userId, address, excludeDealId) {
+    if (!userId) throw new Error('User ID is required.');
+    const normalized = normalizeAddressForComparison(address);
+    if (!normalized) return null;
+
+    try {
+      const deals = await this.loadUserDeals(userId);
+      const match = deals.find((d) => {
+        if (excludeDealId && d.id === excludeDealId) return false;
+        return normalizeAddressForComparison(d.address) === normalized;
+      });
+      return match || null;
+    } catch (error) {
+      console.error('dealService.findDealByAddress Error:', error);
+      return null;
+    }
   },
 
   /**

@@ -39,13 +39,54 @@ export const invokeEdgeFunction = async (functionName, payload) => {
   }
 };
 
-export const fetchPropertyIntelligence = async (address, zipCode, propertyType, arv) => {
-    return invokeEdgeFunction('fetch-property-intelligence', {
-        address,
-        zipCode,
-        propertyType,
-        arv
-    });
+/**
+ * Fetch property intelligence. Use normalized address (and optionally lat/lng) for more accurate results.
+ * @param {string} address - Property address (use geocode formattedAddress when available)
+ * @param {string} zipCode - 5-digit ZIP (use geocode postal when available for consistency)
+ * @param {string} [propertyType] - e.g. "Single-Family"
+ * @param {number} [arv] - After repair value
+ * @param {{ formattedAddress?: string, lat?: number, lng?: number, city?: string, county?: string, propertyId?: string, userId?: string }} [options] - Optional: normalized address, coordinates, city/county, propertyId, and userId for rate limits
+ */
+export const fetchPropertyIntelligence = async (address, zipCode, propertyType, arv, options = {}) => {
+    const body = {
+        address: options.formattedAddress ?? address,
+        zipCode: zipCode?.trim() || '',
+        propertyType: propertyType || 'Single-Family',
+        arv: Number(arv) || 0,
+    };
+    if (options.lat != null && options.lng != null && Number.isFinite(options.lat) && Number.isFinite(options.lng)) {
+        body.lat = options.lat;
+        body.lng = options.lng;
+    }
+    if (options.city) body.city = options.city;
+    if (options.county) body.county = options.county;
+    if (options.propertyId) body.propertyId = options.propertyId;
+    if (options.userId) body.userId = options.userId;
+    return invokeEdgeFunction('fetch-property-intelligence', body);
+};
+
+/**
+ * Get current month API usage for property/comps (Realie and RentCast limits).
+ * @param {string} userId - Authenticated user id
+ * @returns {{ realie_count: number, rentcast_count: number, realie_limit: number, rentcast_limit: number, year_month: string }}
+ */
+export const getPropertyApiUsage = async (userId) => {
+    if (!userId) return null;
+    // #region agent log
+    fetch('http://127.0.0.1:7245/ingest/d3874b50-fda2-4990-b7a4-de8818f92f9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'edgeFunctionService.js:getPropertyApiUsage',message:'invoke get-property-api-usage',data:{userId:userId?.slice(0,8)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+    try {
+      const result = await invokeEdgeFunction('get-property-api-usage', { userId });
+      // #region agent log
+      fetch('http://127.0.0.1:7245/ingest/d3874b50-fda2-4990-b7a4-de8818f92f9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'edgeFunctionService.js:getPropertyApiUsage',message:'get-property-api-usage success',data:{hasResult:!!result},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
+      return result;
+    } catch (err) {
+      // #region agent log
+      fetch('http://127.0.0.1:7245/ingest/d3874b50-fda2-4990-b7a4-de8818f92f9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'edgeFunctionService.js:getPropertyApiUsage',message:'get-property-api-usage failed',data:{name:err?.name,message:err?.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2,H5'})}).catch(()=>{});
+      // #endregion
+      throw err;
+    }
 };
 
 export const generateRehabSOW = async (address, budget, propertyDetails, images = []) => {

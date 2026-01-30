@@ -6,10 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { validatePropertyInput } from "@/utils/validationUtils";
+import { normalizePropertyIntelligenceResponse } from "@/utils/propertyIntelligenceSchema";
 import { useToast } from "@/components/ui/use-toast";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { logDataFlow } from "@/utils/dataFlowDebug";
-import { fetchPropertyIntelligence } from '@/services/edgeFunctionService';
+import { useAuth } from '@/contexts/AuthContext';
+import { addressValidationService, getPostalCodeFromComponents, getCityAndCountyFromComponents } from '@/services/addressValidationService';
+import { fetchPropertyIntelligence, getPropertyApiUsage } from '@/services/edgeFunctionService';
 
 const SpecItem = ({ icon: Icon, label, value }) => (
   <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border">
@@ -24,23 +27,33 @@ const SpecItem = ({ icon: Icon, label, value }) => (
 );
 
 const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch, propertyData }) => {
+  const { currentUser } = useAuth();
   const [isSpecsOpen, setIsSpecsOpen] = useState(true);
   const [isCompsOpen, setIsCompsOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState(null);
+  const [apiUsage, setApiUsage] = useState(null);
   const { toast } = useToast();
 
   useEffect(() => {
     logDataFlow('PROPERTY_INTELLIGENCE_PROPS', { inputs, calculations, hasData: !!propertyData }, new Date());
   }, [inputs, calculations, propertyData]);
 
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    // #region agent log
+    fetch('http://127.0.0.1:7245/ingest/d3874b50-fda2-4990-b7a4-de8818f92f9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PropertyIntelligenceSection.jsx:useEffect',message:'calling getPropertyApiUsage',data:{userId:currentUser?.id?.slice(0,8)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+    getPropertyApiUsage(currentUser.id)
+      .then((data) => data && setApiUsage(data))
+      .catch(() => {});
+  }, [currentUser?.id]);
+
   const handleFetchIntelligence = async () => {
     setFetchError(null);
     logDataFlow('FETCH_PROPERTY_CLICK', { inputs }, new Date());
 
-    // Validation
     const validation = validatePropertyInput(inputs?.address, inputs?.zipCode);
-    
     if (!validation.valid) {
       setFetchError(validation.error);
       toast({
@@ -52,51 +65,81 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
     }
 
     setLoading(true);
-    
-    const requestPayload = {
-      address: inputs.address, 
-      zipCode: inputs.zipCode, 
-      propertyType: inputs.propertyType || "Single-Family", 
-      arv: Number(inputs.arv) || 0
-    };
-
-    console.log('🤖 Claude request:', requestPayload);
 
     try {
+      // Geocode first so backend gets a normalized address (and optional lat/lng)
+      const geocodeResult = await addressValidationService.validateAndGeocode(inputs.address);
+      if (!geocodeResult.isValid) {
+        setFetchError(geocodeResult.error || "Address not found.");
+        toast({
+          variant: "destructive",
+          title: "Address Not Found",
+          description: geocodeResult.error || "Could not validate address. Check spelling and try again."
+        });
+        setLoading(false);
+        return;
+      }
+
+      const formattedAddress = geocodeResult.formattedAddress || inputs.address;
+      const zipFromGeocode = getPostalCodeFromComponents(geocodeResult.components);
+      const userZip5 = (inputs.zipCode || '').trim().replace(/\D/g, '').slice(0, 5);
+      const zipToSend = zipFromGeocode || userZip5 || inputs.zipCode?.trim() || '';
+      const { city: geocodeCity, county: geocodeCounty } = getCityAndCountyFromComponents(geocodeResult.components || []);
+
+      if (zipFromGeocode && userZip5 && zipFromGeocode !== userZip5) {
+        toast({
+          title: "ZIP mismatch",
+          description: `Geocoded ZIP (${zipFromGeocode}) differs from entered (${userZip5}). Using geocoded address for accuracy.`,
+          variant: "default"
+        });
+      }
+
       const data = await fetchPropertyIntelligence(
-        requestPayload.address,
-        requestPayload.zipCode,
-        requestPayload.propertyType,
-        requestPayload.arv
+        formattedAddress,
+        zipToSend,
+        inputs.propertyType || "Single-Family",
+        Number(inputs.arv) || 0,
+        {
+          formattedAddress,
+          lat: geocodeResult.location?.lat,
+          lng: geocodeResult.location?.lng,
+          city: geocodeCity || inputs.propertyIntelligence?.city,
+          county: geocodeCounty || inputs.propertyIntelligence?.county,
+          propertyId: inputs.propertyIntelligence?.propertyId,
+          userId: currentUser?.id,
+        }
       );
 
-      console.log('🤖 Claude response:', data);
+      console.log('🤖 Property intelligence response:', data);
 
-      // Simple validation of response
-      const requiredResponseFields = ['propertyType', 'yearBuilt', 'recentComps'];
-      const missing = requiredResponseFields.filter(f => !data[f]);
-      if (missing.length > 0) {
-          logDataFlow('FETCH_RESPONSE_INVALID', missing, new Date());
-          console.warn('Intelligence response missing fields:', missing);
-      }
-
-      if (data.recentComps) {
-        console.log('🏘️ Parsed comps:', data.recentComps);
+      const normalized = normalizePropertyIntelligenceResponse(data || {});
+      const compsDropped = Array.isArray(data?.recentComps) ? data.recentComps.length - (normalized.recentComps?.length || 0) : 0;
+      if (compsDropped > 0) {
+        logDataFlow('FETCH_COMPS_DROPPED', compsDropped, new Date());
+        toast({
+          title: "Success",
+          description: `Property intelligence retrieved. ${compsDropped} comp(s) excluded due to missing data.`,
+        });
       } else {
-        console.warn('⚠️ No comps found in response');
+        toast({
+          title: "Success",
+          description: "Property intelligence retrieved successfully.",
+        });
       }
-
-      toast({
-        title: "Success",
-        description: "Property intelligence retrieved successfully.",
-      });
 
       if (onPropertyDataFetch) {
-        onPropertyDataFetch(data);
+        onPropertyDataFetch(normalized);
       }
-
+      if (data?.usage && currentUser?.id) {
+        setApiUsage({
+          realie_count: data.usage.realie_count,
+          rentcast_count: data.usage.rentcast_count,
+          realie_limit: data.usage.realie_limit ?? 25,
+          rentcast_limit: data.usage.rentcast_limit ?? 45,
+        });
+      }
     } catch (err) {
-      console.error('❌ Comps error:', err);
+      console.error('❌ Property intelligence error:', err);
       logDataFlow('FETCH_ERROR', err.message, new Date());
       setFetchError(err.message || "Failed to fetch property data. Please try again.");
       toast({
@@ -111,6 +154,9 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
 
   const hasData = !!propertyData;
   const { recentComps, ...specs } = propertyData || {};
+  const realieAtLimit = apiUsage && apiUsage.realie_count >= (apiUsage.realie_limit ?? 25);
+  const rentcastAtLimit = apiUsage && apiUsage.rentcast_count >= (apiUsage.rentcast_limit ?? 45);
+  const fetchDisabled = realieAtLimit && rentcastAtLimit;
 
   return (
     <ErrorBoundary>
@@ -122,14 +168,20 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
               <div className="p-4 bg-primary/20 rounded-full mb-4">
                 <Sparkles className="w-8 h-8 text-primary" />
               </div>
-              <h3 className="text-xl font-bold text-foreground mb-2">Enhance with AI Intelligence</h3>
+              <h3 className="text-xl font-bold text-foreground mb-2">Property Data & Comps</h3>
               <p className="text-muted-foreground max-w-md mb-6">
-                Instantly retrieve specs, taxes, school info, and verified comps using live market data via Claude AI.
+                Retrieve property specs (Realie.ai) and verified comparable sales (RentCast).
               </p>
+              {apiUsage && (
+                <p className="text-xs text-muted-foreground mb-2">
+                  This month: Realie {apiUsage.realie_count}/{apiUsage.realie_limit ?? 25} · RentCast {apiUsage.rentcast_count}/{apiUsage.rentcast_limit ?? 45}
+                </p>
+              )}
               <Button 
                 onClick={handleFetchIntelligence} 
-                disabled={!inputs?.address || inputs.address.length < 3}
+                disabled={!inputs?.address || inputs.address.length < 3 || fetchDisabled}
                 className="bg-primary hover:bg-primary/90 text-primary-foreground min-w-[200px]"
+                title={fetchDisabled ? 'Monthly API limit reached. Resets next month.' : undefined}
               >
                 Fetch Property Data
               </Button>
@@ -170,12 +222,20 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
                 <CardTitle className="text-xl font-bold text-foreground flex items-center gap-2">
                   <Building2 className="text-primary" /> Property Intelligence
                 </CardTitle>
+                <p className="text-xs text-muted-foreground absolute right-4 top-14">Property data from Realie.ai; comps from RentCast.</p>
                 <div className="flex items-center gap-2">
+                   {apiUsage && (
+                     <span className="text-xs text-muted-foreground mr-2">
+                       Realie {apiUsage.realie_count}/{apiUsage.realie_limit ?? 25} · RentCast {apiUsage.rentcast_count}/{apiUsage.rentcast_limit ?? 45}
+                     </span>
+                   )}
                    <Button 
                      variant="ghost" 
                      size="sm" 
                      className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
                      onClick={(e) => { e.stopPropagation(); handleFetchIntelligence(); }}
+                     disabled={fetchDisabled}
+                     title={fetchDisabled ? 'Monthly API limit reached.' : undefined}
                    >
                      <RefreshCw className="h-4 w-4" />
                    </Button>

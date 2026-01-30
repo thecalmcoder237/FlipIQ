@@ -90,11 +90,12 @@ class ApiService {
     }
 
     try {
+      // GET requests: do not set Content-Type so cross-origin calls (e.g. Google Geocoding)
+      // remain "simple" and avoid CORS preflight; Google does not allow Content-Type in Allow-Headers.
       const data = await this._fetchWithRetry(url, {
         ...options,
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
           ...options.headers
         }
       });

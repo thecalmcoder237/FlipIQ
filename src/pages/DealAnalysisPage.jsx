@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { BarChart3, Hammer, Home, FileText, Share2, Sparkles, Building2, Table as TableIcon, Settings2, Shield } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -365,7 +365,7 @@ const DealAnalysisPage = () => {
                comps={inputs.propertyIntelligence?.recentComps || deal.comps} 
                loading={false}
                onRefresh={() => { /* Trigger refresh in child */ }}
-               source={inputs.propertyIntelligence ? "AI Intelligence" : "Manual/Legacy"}
+               source={inputs.propertyIntelligence?.recentComps?.length ? "RentCast" : "Manual/Legacy"}
             />
          </TabsContent>
 

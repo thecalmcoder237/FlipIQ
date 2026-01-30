@@ -1,14 +1,24 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, DollarSign, Hammer, RefreshCw, ChevronDown, ChevronRight, Calculator } from 'lucide-react';
+import { Home, DollarSign, Hammer, RefreshCw, ChevronDown, ChevronRight, Calculator, MapPin, CheckCircle2, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import Breadcrumb from '@/components/Breadcrumb';
 import { dealService } from '@/services/dealService';
+import { addressValidationService, getPostalCodeFromComponents, getPostalCodeFromPlaceAddressComponents } from '@/services/addressValidationService';
+import { useGooglePlacesScript } from '@/hooks/useGooglePlacesScript';
 import { logDataFlow, validateInputs } from '@/utils/dataFlowDebug';
 
 const InputSection = ({ title, icon: Icon, children, total }) => {
@@ -48,7 +58,16 @@ const DealInputForm = () => {
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [addressValidating, setAddressValidating] = useState(false);
+  const [addressValidated, setAddressValidated] = useState(false);
+  const [existingDealMatch, setExistingDealMatch] = useState(null);
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
+  const [pendingSubmitData, setPendingSubmitData] = useState(null);
   const editId = searchParams.get('id');
+  const addressInputRef = useRef(null);
+  const addressAutocompleteContainerRef = useRef(null);
+  const placeAutocompleteAttachedRef = useRef(false);
+  const { isReady: placesReady, error: placesError } = useGooglePlacesScript();
 
   const [formData, setFormData] = useState({
     address: '', status: 'Analyzing', zipCode: '', bedrooms: '', bathrooms: '', sqft: '', yearBuilt: '',
@@ -69,6 +88,57 @@ const DealInputForm = () => {
     }
   }, [editId, currentUser]);
 
+  // Mount PlaceAutocompleteElement (new API) when Places library is ready
+  useEffect(() => {
+    if (!placesReady || !addressAutocompleteContainerRef.current || placeAutocompleteAttachedRef.current) return;
+    const PlaceAutocompleteElement = window.google?.maps?.places?.PlaceAutocompleteElement;
+    if (typeof PlaceAutocompleteElement === 'undefined') return;
+    const container = addressAutocompleteContainerRef.current;
+    if (container.children.length > 0) return;
+    const placeAutocomplete = new PlaceAutocompleteElement({
+      includedRegionCodes: ['us']
+    });
+    placeAutocomplete.placeholder = 'Start typing for suggestions...';
+    const onSelect = async (e) => {
+      const placePrediction = e.placePrediction ?? e.detail?.placePrediction;
+      if (!placePrediction?.toPlace) return;
+      try {
+        const place = placePrediction.toPlace();
+        await place.fetchFields({ fields: ['formattedAddress', 'location', 'addressComponents'] });
+        const addr = place.formattedAddress;
+        const formattedAddress = typeof addr === 'string' ? addr : (addr?.text ?? '');
+        if (!formattedAddress) return;
+        const zip = getPostalCodeFromPlaceAddressComponents(place.addressComponents || []);
+        setFormData(prev => ({
+          ...prev,
+          address: formattedAddress,
+          zipCode: zip || prev.zipCode
+        }));
+        setAddressValidated(true);
+        setExistingDealMatch(null);
+        toast({ title: 'Address selected', description: 'Address and ZIP set for consistent storage.' });
+        if (currentUser?.id) {
+          const existing = await dealService.findDealByAddress(currentUser.id, formattedAddress, editId);
+          if (existing) {
+            setExistingDealMatch(existing);
+            setDuplicateDialogOpen(true);
+          }
+        }
+      } catch (err) {
+        console.error('Place fetch error:', err);
+        toast({ variant: 'destructive', title: 'Address error', description: err?.message || 'Could not get address details.' });
+      }
+    };
+    placeAutocomplete.addEventListener('gmp-select', onSelect);
+    container.appendChild(placeAutocomplete);
+    placeAutocompleteAttachedRef.current = true;
+    return () => {
+      placeAutocomplete.removeEventListener('gmp-select', onSelect);
+      placeAutocomplete.remove();
+      placeAutocompleteAttachedRef.current = false;
+    };
+  }, [placesReady, currentUser?.id, editId]);
+
   const loadDealData = async () => {
     try {
       logDataFlow('LOADING_DEAL_FOR_EDIT', { editId }, new Date());
@@ -84,6 +154,61 @@ const DealInputForm = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    if (name === 'address') setAddressValidated(false);
+  };
+
+  const handleValidateAddress = async () => {
+    const raw = (formData.address || '').trim();
+    if (raw.length < 4) {
+      toast({ variant: 'destructive', title: 'Address too short', description: 'Enter at least a street number and name.' });
+      return;
+    }
+    setAddressValidating(true);
+    setExistingDealMatch(null);
+    try {
+      const result = await addressValidationService.validateAndGeocode(raw);
+      if (!result.isValid) {
+        toast({ variant: 'destructive', title: 'Address not found', description: result.error || 'Could not validate address.' });
+        setAddressValidating(false);
+        return;
+      }
+      const formattedAddress = result.formattedAddress || raw;
+      const zipFromGeocode = getPostalCodeFromComponents(result.components);
+      setFormData(prev => ({
+        ...prev,
+        address: formattedAddress,
+        zipCode: zipFromGeocode || prev.zipCode,
+      }));
+      setAddressValidated(true);
+      toast({ title: 'Address validated', description: 'Address and ZIP updated for consistent storage.' });
+
+      if (!currentUser?.id) { setAddressValidating(false); return; }
+      const existing = await dealService.findDealByAddress(currentUser.id, formattedAddress, editId);
+      if (existing) {
+        setExistingDealMatch(existing);
+        setDuplicateDialogOpen(true);
+      }
+    } catch (err) {
+      console.error('Validate address error:', err);
+      toast({ variant: 'destructive', title: 'Validation failed', description: err.message || 'Could not validate address.' });
+    } finally {
+      setAddressValidating(false);
+    }
+  };
+
+  const handleLoadExistingDeal = () => {
+    setDuplicateDialogOpen(false);
+    if (existingDealMatch?.id) navigate(`/deal-analysis?id=${existingDealMatch.id}`);
+    setExistingDealMatch(null);
+  };
+
+  const handleContinueAsNew = () => {
+    setDuplicateDialogOpen(false);
+    if (pendingSubmitData) {
+      doSave(pendingSubmitData);
+      setPendingSubmitData(null);
+    }
+    setExistingDealMatch(null);
   };
 
   const handleRehabCalc = () => {
@@ -115,51 +240,71 @@ const DealInputForm = () => {
     return { valid: true };
   };
 
+  const doSave = async (dataToSave) => {
+    setIsLoading(true);
+    try {
+      const savedDeal = await dealService.saveDeal({ ...dataToSave, id: editId }, currentUser?.id);
+      logDataFlow('SAVED_TO_DB', savedDeal, new Date());
+      toast({ title: 'Success', description: 'Deal saved successfully.' });
+      navigate(`/deal-analysis?id=${savedDeal.id}`);
+    } catch (err) {
+      console.error(err);
+      logDataFlow('SAVE_ERROR', err.message, new Date());
+      toast({ variant: 'destructive', title: 'Error', description: err.message });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
-
-    console.log('Inputs to calculator:', formData);
-    logDataFlow('FORM_INPUTS_BEFORE_SAVE', formData, new Date());
-
-    // Validation
     const validation = validateForm(formData);
     if (!validation.valid) {
-        logDataFlow('VALIDATION_FAILED', validation.message, new Date());
-        toast({
-            variant: "destructive",
-            title: "Validation Error",
-            description: validation.message
-        });
-        setIsLoading(false);
-        return;
+      logDataFlow('VALIDATION_FAILED', validation.message, new Date());
+      toast({ variant: 'destructive', title: 'Validation Error', description: validation.message });
+      return;
     }
-
     const debugValidation = validateInputs(formData);
     if (!debugValidation.isValid) {
-        // Fallback to strict validation utils
-        toast({
-            variant: "destructive",
-            title: "Missing Required Fields",
-            description: debugValidation.issues.slice(0, 3).join(', ')
-        });
-        setIsLoading(false);
-        return;
+      toast({
+        variant: 'destructive',
+        title: 'Missing Required Fields',
+        description: debugValidation.issues.slice(0, 3).join(', '),
+      });
+      return;
     }
 
-    try {
-       // Save using service
-       const savedDeal = await dealService.saveDeal({ ...formData, id: editId }, currentUser?.id);
-       
-       logDataFlow('SAVED_TO_DB', savedDeal, new Date());
+    let addressToSave = formData.address;
+    let zipToSave = formData.zipCode;
 
-       toast({ title: "Success", description: "Deal saved successfully." });
-       navigate(`/deal-analysis?id=${savedDeal.id}`);
-    } catch(err) {
-       console.error(err);
-       logDataFlow('SAVE_ERROR', err.message, new Date());
-       toast({variant: "destructive", title: "Error", description: err.message});
-    } finally { setIsLoading(false); }
+    try {
+      const raw = (formData.address || '').trim();
+      if (raw.length >= 4) {
+        const geocodeResult = await addressValidationService.validateAndGeocode(raw);
+        if (geocodeResult.isValid && geocodeResult.formattedAddress) {
+          addressToSave = geocodeResult.formattedAddress;
+          zipToSave = getPostalCodeFromComponents(geocodeResult.components) || formData.zipCode;
+          setFormData(prev => ({ ...prev, address: addressToSave, zipCode: zipToSave }));
+        }
+      }
+    } catch (err) {
+      console.warn('Geocode before save failed, using form values:', err);
+    }
+
+    const dataToSave = { ...formData, address: addressToSave, zipCode: zipToSave };
+    logDataFlow('FORM_INPUTS_BEFORE_SAVE', dataToSave, new Date());
+
+    if (currentUser?.id) {
+      const existing = await dealService.findDealByAddress(currentUser.id, addressToSave, editId);
+      if (existing) {
+        setExistingDealMatch(existing);
+        setPendingSubmitData(dataToSave);
+        setDuplicateDialogOpen(true);
+        return;
+      }
+    }
+
+    doSave(dataToSave);
   };
 
   // Section Totals for Display
@@ -181,9 +326,44 @@ const DealInputForm = () => {
         <InputSection title="A. Property Details" icon={Home}>
             <div className="md:col-span-2">
                <label className="text-foreground text-xs">Address</label>
-               <input name="address" value={formData.address} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" placeholder="123 Main St" required />
+               <div className="flex gap-2 items-center">
+                 {placesReady ? (
+                   <div className="flex-1 min-w-0 flex flex-col">
+                     <div ref={addressAutocompleteContainerRef} className="[&_gmp-place-autocomplete]:w-full [&_gmp-place-autocomplete]:min-w-0" />
+                     <input type="hidden" name="address" value={formData.address} readOnly required aria-hidden />
+                   </div>
+                 ) : (
+                   <input
+                     ref={addressInputRef}
+                     name="address"
+                     value={formData.address}
+                     onChange={handleChange}
+                     className="flex-1 bg-background border border-input p-2 rounded text-foreground"
+                     placeholder="123 Main St, City, State ZIP"
+                     required
+                   />
+                 )}
+                 <Button type="button" variant="outline" size="sm" onClick={handleValidateAddress} disabled={addressValidating || (formData.address || '').trim().length < 4} className="shrink-0 border-border text-foreground hover:bg-accent" title="Validate typed address">
+                   {addressValidating ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+                   {addressValidating ? ' Validating...' : ' Validate'}
+                 </Button>
+               </div>
+               {placesReady && (
+                 <>
+                   <p className="text-xs text-muted-foreground mt-1">Select an address from the dropdown for consistent storage.</p>
+                   <p className="text-xs text-muted-foreground mt-0.5">If suggestions show &quot;blocked&quot; or 403, enable <strong>Places API (New)</strong> in Google Cloud Console → APIs &amp; Services → Enable APIs.</p>
+                 </>
+               )}
+               {placesError && (
+                 <p className="text-xs text-amber-600 mt-1" role="alert">{placesError}</p>
+               )}
+               {addressValidated && (
+                 <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                   <CheckCircle2 className="h-3.5 w-3.5" /> Address validated — stored consistently
+                 </p>
+               )}
             </div>
-            <div><label className="text-muted-foreground text-xs">Zip Code</label><input name="zipCode" value={formData.zipCode} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+            <div><label className="text-muted-foreground text-xs">Zip Code</label><input name="zipCode" value={formData.zipCode} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" placeholder="From geocode or enter" /></div>
             <div><label className="text-muted-foreground text-xs">Sqft</label><input name="sqft" type="number" value={formData.sqft} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
             <div><label className="text-muted-foreground text-xs">Beds</label><input name="bedrooms" type="number" value={formData.bedrooms} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
             <div><label className="text-muted-foreground text-xs">Baths</label><input name="bathrooms" type="number" value={formData.bathrooms} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
@@ -250,6 +430,25 @@ const DealInputForm = () => {
             </Button>
         </div>
       </form>
+
+      <Dialog open={duplicateDialogOpen} onOpenChange={(open) => { if (!open) { setPendingSubmitData(null); setExistingDealMatch(null); } setDuplicateDialogOpen(open); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>This property already has an analysis</DialogTitle>
+            <DialogDescription>
+              A deal for <strong>{existingDealMatch?.address}</strong> is already in your list. You can load that analysis or save this as a new entry.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={handleContinueAsNew} className="border-border text-foreground">
+              Save as new deal anyway
+            </Button>
+            <Button type="button" onClick={handleLoadExistingDeal} className="bg-primary text-primary-foreground hover:bg-primary/90">
+              Load existing analysis
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

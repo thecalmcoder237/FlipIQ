@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { Search, Eye, Edit, Trash2, Star } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';

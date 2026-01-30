@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import { MapPin, Phone, Mail, Send, MessageCircle, Building, Users, Loader2 } from 'lucide-react';
