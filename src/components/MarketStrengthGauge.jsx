@@ -134,9 +134,9 @@ const MarketStrengthGauge = ({ deal, propertyIntelligence }) => {
 
   const hotnessScore = marketData?.hotnessScore || 0;
   const getHotnessColor = (score) => {
-    if (score >= 8) return { bg: 'bg-green-500', text: 'text-green-400', ring: 'ring-green-500/30' };
-    if (score >= 6) return { bg: 'bg-yellow-500', text: 'text-yellow-400', ring: 'ring-yellow-500/30' };
-    return { bg: 'bg-red-500', text: 'text-red-400', ring: 'ring-red-500/30' };
+    if (score >= 8) return { bg: 'bg-green-500', text: 'text-green-400', ring: 'ring-green-500/30', strokeHex: '#22c55e' };
+    if (score >= 6) return { bg: 'bg-yellow-500', text: 'text-yellow-400', ring: 'ring-yellow-500/30', strokeHex: '#eab308' };
+    return { bg: 'bg-red-500', text: 'text-red-400', ring: 'ring-red-500/30', strokeHex: '#ef4444' };
   };
 
   const color = getHotnessColor(hotnessScore);
@@ -171,12 +171,12 @@ const MarketStrengthGauge = ({ deal, propertyIntelligence }) => {
                     strokeWidth="8"
                     fill="none"
                   />
-                  {/* Progress circle */}
+                  {/* Progress circle - ring color reflects score (green good, yellow neutral, red bad) */}
                   <motion.circle
                     cx="64"
                     cy="64"
                     r="45"
-                    stroke={color.bg.replace('bg-', '#').replace('-500', '')}
+                    stroke={color.strokeHex}
                     strokeWidth="8"
                     fill="none"
                     strokeLinecap="round"

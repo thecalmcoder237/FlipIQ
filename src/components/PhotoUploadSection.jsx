@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Camera, Upload, X, Loader2, Eye } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Camera, Upload, X, Loader2, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/customSupabaseClient';
 import { Button } from '@/components/ui/button';
 import { analyzePropertyPhoto } from '@/services/claudeVisionService';
@@ -9,9 +9,18 @@ import { useToast } from '@/components/ui/use-toast';
 
 const PhotoUploadSection = ({ deal, onPhotosUpdated }) => {
   const [uploading, setUploading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const [photos, setPhotos] = useState(deal.photos || []);
+
+  // Sync with deal when it loads or is updated (e.g. from DB) so we use stored scan results
+  useEffect(() => {
+    const stored = deal?.photos;
+    if (Array.isArray(stored) && stored.length >= 0) {
+      setPhotos(stored);
+    }
+  }, [deal?.photos]);
 
   const handleFileUpload = async (e) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -105,25 +114,71 @@ const PhotoUploadSection = ({ deal, onPhotosUpdated }) => {
      }
   };
 
+  const handleRefreshAnalysis = async () => {
+    if (!photos.length) return;
+    setRefreshing(true);
+    try {
+      const updatedPhotos = await Promise.all(
+        photos.map(async (photo) => {
+          const url = photo.url || photo;
+          const analysis = await analyzePropertyPhoto(url);
+          return {
+            ...photo,
+            analysis,
+            uploaded_at: photo.uploaded_at || new Date().toISOString()
+          };
+        })
+      );
+      const { error: dbError } = await supabase
+        .from('deals')
+        .update({ photos: updatedPhotos })
+        .eq('id', deal.id);
+      if (dbError) throw dbError;
+      setPhotos(updatedPhotos);
+      if (onPhotosUpdated) onPhotosUpdated(updatedPhotos);
+      toast({ title: "Analysis refreshed", description: "Scan results updated for all photos." });
+    } catch (error) {
+      console.error(error);
+      toast({ variant: "destructive", title: "Refresh failed", description: error.message });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <div className="bg-card p-6 rounded-2xl border border-border mb-6 shadow-sm">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
            <Camera className="w-5 h-5 text-primary" /> Site Photos & AI Analysis
         </h3>
-        <div className="relative">
-           <input 
-             type="file" 
-             multiple 
-             accept="image/*"
-             onChange={handleFileUpload}
-             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-             disabled={uploading}
-           />
-           <Button disabled={uploading} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
-              {uploading ? 'Analyzing...' : 'Upload Photos'}
-           </Button>
+        <div className="flex items-center gap-2">
+          {photos.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={uploading || refreshing}
+              onClick={handleRefreshAnalysis}
+              className="border-border text-foreground hover:bg-accent"
+            >
+              {refreshing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+              {refreshing ? 'Re-analyzing...' : 'Refresh analysis'}
+            </Button>
+          )}
+          <div className="relative">
+             <input 
+               type="file" 
+               multiple 
+               accept="image/*"
+               onChange={handleFileUpload}
+               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+               disabled={uploading}
+             />
+             <Button disabled={uploading} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
+                {uploading ? 'Analyzing...' : 'Upload Photos'}
+             </Button>
+          </div>
         </div>
       </div>
 

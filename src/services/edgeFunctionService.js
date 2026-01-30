@@ -57,6 +57,26 @@ export const generateRehabSOW = async (address, budget, propertyDetails, images 
     });
 };
 
+/**
+ * Vision-first Advanced Rehab Analysis: sends photos + per-photo analysis + deal context.
+ * Returns structured property_details for deal.property_details.
+ */
+export const runAdvancedRehabAnalysis = async (deal, photoUrls = [], perPhotoAnalysis = []) => {
+    return invokeEdgeFunction('generate-rehab-sow', {
+        action: 'analyze',
+        deal: {
+            address: deal?.address,
+            zipCode: deal?.zipCode ?? deal?.zip_code,
+            propertyType: deal?.propertyType ?? deal?.property_type ?? 'Single-Family',
+            arv: deal?.arv ?? 0,
+            id: deal?.id,
+            ...deal
+        },
+        images: Array.isArray(photoUrls) ? photoUrls : [],
+        perPhotoAnalysis: Array.isArray(perPhotoAnalysis) ? perPhotoAnalysis : []
+    });
+};
+
 export const calculateCostBreakdown = async (dealData) => {
     // This might be a future edge function, currently client-side or mocked
     // For now we just log that we would call it

@@ -14,9 +14,9 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
   const [error, setError] = useState(null);
   const { toast } = useToast();
 
-  // Check unlock conditions
+  // Check unlock conditions (advanced analysis unlocks at score ≥ 60)
   const dealScore = calculations?.score || 0;
-  const isAdvancedUnlocked = dealScore >= 70;
+  const isAdvancedUnlocked = dealScore >= 60;
   const hasPhotos = deal?.photos && Array.isArray(deal.photos) && deal.photos.length > 0;
   const hasPropertyData = !!propertyData;
   
@@ -32,7 +32,7 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
     // Check unlock conditions before proceeding
     if (!isUnlocked) {
       const missingRequirements = [];
-      if (!isAdvancedUnlocked) missingRequirements.push("Deal score must be ≥ 70 (Advanced Analysis unlocked)");
+      if (!isAdvancedUnlocked) missingRequirements.push("Deal score must be ≥ 60 (Advanced Analysis unlocked)");
       if (!hasPhotos) missingRequirements.push("Upload property photos");
       if (!hasPropertyData) missingRequirements.push("Fetch property intelligence data");
       
@@ -166,7 +166,7 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
                     {isAdvancedUnlocked ? <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" /> : <Lock className="w-5 h-5 text-muted-foreground shrink-0" />}
                     <div className="flex-1">
                       <p className={`text-sm font-medium ${isAdvancedUnlocked ? 'text-green-600' : 'text-muted-foreground'}`}>
-                        Deal Score ≥ 70 (Advanced Analysis Unlocked)
+                        Deal Score ≥ 60 (Advanced Analysis Unlocked)
                       </p>
                       {!isAdvancedUnlocked && <p className="text-xs text-muted-foreground mt-1">Current score: {dealScore}</p>}
                     </div>

@@ -44,6 +44,8 @@ export const calculateDealMetrics = (deal) => {
 
   // 3. Calculate Totals
   const totalCashInvested = acq.total + rehab.total;
+  // Total Cash Needed (acquisition only): down payment + points + fees (what you need at closing)
+  const totalCashNeeded = acq.total;
   // Project Cost = Purchase + Fees + Interest + Rehab + Holding
   const totalProjectCost = inputs.purchasePrice + acq.feesOnly + hm.total + rehab.total + holding.total;
   
@@ -109,6 +111,7 @@ export const calculateDealMetrics = (deal) => {
 
     // Totals
     totalCashInvested,
+    totalCashNeeded,
     totalProjectCost,
     grossProfit,
     netProfit,

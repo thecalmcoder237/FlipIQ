@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, DollarSign, TrendingUp, Star, Edit2, User, Mail, Wallet, Building, ArrowRight } from 'lucide-react';
+import { MapPin, DollarSign, TrendingUp, Star, Edit2, User, Mail, Wallet, Building, ArrowRight, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { dealService } from '@/services/dealService';
@@ -17,7 +17,16 @@ const DealSummaryCard = ({ deal, metrics, onEdit }) => {
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
-  if (!deal || !metrics) return null;
+  // #region agent log
+  const _log = (message, data, hypothesisId) => {
+    fetch('http://127.0.0.1:7245/ingest/d3874b50-fda2-4990-b7a4-de8818f92f9c', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DealSummaryCard.jsx', message, data: data ?? {}, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId }) }).catch(() => {});
+  };
+  if (!deal || !metrics) {
+    _log('DealSummaryCard: return null', { hasDeal: !!deal, hasMetrics: !!metrics }, 'H5');
+    return null;
+  }
+  _log('DealSummaryCard: rendering', { hasDeal: true, hasMetrics: true }, 'H5');
+  // #endregion
 
   const handleToggleFavorite = async () => {
     try {
@@ -54,9 +63,9 @@ const DealSummaryCard = ({ deal, metrics, onEdit }) => {
             )}
           </div>
           <div className="flex items-center gap-4 text-primary-foreground text-base font-semibold">
-             <span className="flex items-center gap-1.5"><DollarSign size={16}/> Purchase: <span className="font-bold">${metrics.purchasePrice?.toLocaleString()}</span></span>
+             <span className="flex items-center gap-1.5"><DollarSign size={16}/> Purchase: <span className="font-bold text-orange-400">${metrics.purchasePrice?.toLocaleString()}</span></span>
              <ArrowRight size={16} className="text-primary-foreground/80"/>
-             <span className="flex items-center gap-1.5"><Building size={16}/> ARV: <span className="font-bold">${metrics.arv?.toLocaleString()}</span></span>
+             <span className="flex items-center gap-1.5"><Building size={16}/> ARV: <span className="font-bold text-orange-400">${metrics.arv?.toLocaleString()}</span></span>
           </div>
         </div>
 
@@ -82,17 +91,38 @@ const DealSummaryCard = ({ deal, metrics, onEdit }) => {
         </div>
       </div>
 
+      <TooltipProvider delayDuration={300}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-primary/20">
           <div className="p-3 bg-muted rounded-lg border border-border">
-             <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Total Cash Needed</p>
+             <Tooltip>
+               <TooltipTrigger asChild>
+                 <p className="text-xs text-muted-foreground uppercase font-bold mb-1 cursor-help inline-flex items-center gap-1.5">
+                   Total Cash Needed <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-hidden />
+                 </p>
+               </TooltipTrigger>
+               <TooltipContent side="top" className="max-w-xs">
+                 <p className="font-semibold">Acquisition costs only</p>
+                 <p className="text-xs mt-1">Down payment + loan points + inspection + appraisal + title + closing costs (buy) + transfer tax. Cash required at closing.</p>
+               </TooltipContent>
+             </Tooltip>
              <div className="text-xl font-bold text-foreground flex items-center gap-1">
-                <Wallet size={16} className="text-primary"/> ${metrics.totalCashInvested?.toLocaleString()}
+                <Wallet size={16} className="text-primary"/> ${(metrics.totalCashNeeded ?? metrics.acquisition?.total)?.toLocaleString()}
              </div>
-             <p className="text-[10px] text-muted-foreground mt-1">Initial Capital + Rehab</p>
+             <p className="text-[10px] text-muted-foreground mt-1">Acquisition only (at closing)</p>
           </div>
 
           <div className="p-3 bg-muted rounded-lg border border-border">
-             <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Total Project Cost</p>
+             <Tooltip>
+               <TooltipTrigger asChild>
+                 <p className="text-xs text-muted-foreground uppercase font-bold mb-1 cursor-help inline-flex items-center gap-1.5">
+                   Total Project Cost <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-hidden />
+                 </p>
+               </TooltipTrigger>
+               <TooltipContent side="top" className="max-w-xs">
+                 <p className="font-semibold">All pre-sale costs</p>
+                 <p className="text-xs mt-1">Purchase price + acquisition fees + interest + rehab + holding (tax, insurance, utilities). Does not include selling costs.</p>
+               </TooltipContent>
+             </Tooltip>
              <div className="text-xl font-bold text-foreground">
                 ${metrics.totalProjectCost?.toLocaleString()}
              </div>
@@ -100,15 +130,35 @@ const DealSummaryCard = ({ deal, metrics, onEdit }) => {
           </div>
 
           <div className="p-3 bg-muted rounded-lg border border-border">
-             <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Gross Profit</p>
+             <Tooltip>
+               <TooltipTrigger asChild>
+                 <p className="text-xs text-muted-foreground uppercase font-bold mb-1 cursor-help inline-flex items-center gap-1.5">
+                   Gross Profit <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-hidden />
+                 </p>
+               </TooltipTrigger>
+               <TooltipContent side="top" className="max-w-xs">
+                 <p className="font-semibold">Before selling costs</p>
+                 <p className="text-xs mt-1">Formula: ARV − Total Project Cost</p>
+               </TooltipContent>
+             </Tooltip>
              <div className="text-xl font-bold text-foreground">
                 ${metrics.grossProfit?.toLocaleString()}
              </div>
-             <p className="text-[10px] text-muted-foreground mt-1">ARV - Project Cost</p>
+             <p className="text-[10px] text-muted-foreground mt-1">ARV − Project Cost</p>
           </div>
 
           <div className="p-3 bg-muted rounded-lg border border-border">
-             <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Net Profit</p>
+             <Tooltip>
+               <TooltipTrigger asChild>
+                 <p className="text-xs text-muted-foreground uppercase font-bold mb-1 cursor-help inline-flex items-center gap-1.5">
+                   Net Profit <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-hidden />
+                 </p>
+               </TooltipTrigger>
+               <TooltipContent side="top" className="max-w-xs">
+                 <p className="font-semibold">After selling costs</p>
+                 <p className="text-xs mt-1">Formula: Gross Profit − Selling Costs (realtor commission, closing, staging, marketing).</p>
+               </TooltipContent>
+             </Tooltip>
              <div className={`text-xl font-bold ${isProfitable ? 'text-green-600' : 'text-destructive'}`}>
                 ${metrics.netProfit?.toLocaleString()}
              </div>
@@ -117,6 +167,7 @@ const DealSummaryCard = ({ deal, metrics, onEdit }) => {
              </p>
           </div>
       </div>
+      </TooltipProvider>
     </motion.div>
   );
 };

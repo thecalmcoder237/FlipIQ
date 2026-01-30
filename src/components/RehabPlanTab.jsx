@@ -5,10 +5,12 @@ import { Hammer, Sparkles, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PhotoUploadSection from '@/components/PhotoUploadSection';
 import RehabBudgetReport from '@/components/RehabBudgetReport';
+import RehabSOWSection from '@/components/RehabSOWSection';
+import SOWBudgetComparison from '@/components/SOWBudgetComparison';
 import AdvancedAnalysisModal from '@/components/AdvancedAnalysisModal';
 import { useToast } from '@/components/ui/use-toast';
 
-const RehabPlanTab = ({ deal, setDeal, isHighPotential }) => {
+const RehabPlanTab = ({ deal, setDeal, isHighPotential, inputs, calculations, propertyData, onSowGenerated }) => {
   const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
   const { toast } = useToast();
 
@@ -34,7 +36,7 @@ const RehabPlanTab = ({ deal, setDeal, isHighPotential }) => {
            </div>
            <h3 className="text-2xl font-bold text-foreground mb-2">Advanced Analysis Locked</h3>
            <p className="text-muted-foreground max-w-md mb-6">
-              This deal currently has a score below 75. Improve the deal metrics or override manually to unlock AI-powered rehab planning, vision analysis, and budget generation.
+              This deal currently has a score below 60. Improve the deal metrics or override manually to unlock AI-powered rehab planning, vision analysis, and budget generation.
            </p>
            <Button variant="outline" onClick={() => setIsAdvancedModalOpen(true)} className="border-border text-foreground hover:bg-accent">
               Override & Unlock Anyway
@@ -51,22 +53,27 @@ const RehabPlanTab = ({ deal, setDeal, isHighPotential }) => {
 
   return (
     <div className="space-y-8">
-       {/* 1. Header & Actions */}
-       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-             <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-                <Hammer className="text-primary" /> Rehab Planning Center
-             </h2>
-             <p className="text-muted-foreground text-sm">Manage renovations, analyze photos, and track budget.</p>
-          </div>
-          {!deal.property_details && (
+       {/* 1. Header */}
+       <div>
+          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+             <Hammer className="text-primary" /> Rehab Planning Center
+          </h2>
+          <p className="text-muted-foreground text-sm">Manage renovations, analyze photos, and track budget.</p>
+       </div>
+
+       {/* 2. Photo Upload first (vision-first flow) */}
+       <PhotoUploadSection deal={deal} onPhotosUpdated={handlePhotosUpdated} />
+
+       {/* 3. Start AI Analysis (enabled when photos uploaded) */}
+       {!deal.property_details && (
+          <div className="flex justify-end">
              <Button onClick={() => setIsAdvancedModalOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
                 <Sparkles className="w-4 h-4 mr-2" /> Start AI Analysis
              </Button>
-          )}
-       </div>
+          </div>
+       )}
 
-       {/* 2. Property Details Extraction */}
+       {/* 4. Property Details (after analysis) */}
        {deal.property_details && (
           <motion.div initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} className="bg-card p-6 rounded-xl border border-border shadow-sm">
              <h3 className="text-foreground font-bold mb-4">Property Specifications</h3>
@@ -74,17 +81,35 @@ const RehabPlanTab = ({ deal, setDeal, isHighPotential }) => {
                 {Object.entries(deal.property_details).slice(0, 8).map(([key, value]) => (
                    <div key={key} className="bg-muted/50 p-3 rounded-lg border border-border">
                       <p className="text-xs text-muted-foreground uppercase">{key.replace(/_/g, ' ')}</p>
-                      <p className="text-foreground font-medium truncate" title={value}>{value}</p>
+                      <p className="text-foreground font-medium truncate" title={typeof value === 'object' ? JSON.stringify(value) : String(value)}>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</p>
                    </div>
                 ))}
              </div>
           </motion.div>
        )}
 
-       {/* 3. Photo Upload & Vision Analysis */}
-       <PhotoUploadSection deal={deal} onPhotosUpdated={handlePhotosUpdated} />
+       {/* 5. Scope of Work generation */}
+       {inputs && (
+          <>
+             <RehabSOWSection 
+                inputs={inputs}
+                deal={deal}
+                calculations={calculations}
+                propertyData={propertyData}
+                savedSow={inputs.rehabSow}
+                onSowGenerated={onSowGenerated}
+             />
+             {inputs.rehabSow && onSowGenerated && (
+                <SOWBudgetComparison 
+                  sowText={inputs.rehabSow}
+                  currentBudget={inputs.rehabCosts}
+                  deal={deal}
+                />
+             )}
+          </>
+       )}
 
-       {/* 4. Budget & Scope of Work */}
+       {/* 6. Budget & Scope of Work */}
        <RehabBudgetReport 
           deal={deal} 
           propertyDetails={deal.property_details} 

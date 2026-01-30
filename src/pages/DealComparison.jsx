@@ -107,7 +107,7 @@ const DealComparison = () => {
                  <ComparisonRow label="Rehab Costs" data={selectedDeals} field="rehabCosts" format={(v) => `$${v?.toLocaleString()}`} />
                  <ComparisonRow label="Net Profit" data={selectedDeals} field="metrics.netProfit" format={(v) => `$${Math.round(v)?.toLocaleString()}`} highlightMax />
                  <ComparisonRow label="ROI" data={selectedDeals} field="metrics.roi" format={(v) => `${v?.toFixed(2)}%`} highlightMax />
-                 <ComparisonRow label="Total Cash Needed" data={selectedDeals} field="metrics.totalInvestment" format={(v) => `$${Math.round(v)?.toLocaleString()}`} highlightMin />
+                 <ComparisonRow label="Total Cash Needed" data={selectedDeals} field="metrics.totalCashNeeded" format={(v) => `$${Math.round((v ?? 0)).toLocaleString()}`} highlightMin />
                  <ComparisonRow label="Holding Time" data={selectedDeals} field="holdingMonths" format={(v) => `${v} Months`} />
                </tbody>
              </table>

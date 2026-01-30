@@ -2,11 +2,20 @@
 import React from 'react';
 import { Award, AlertTriangle, TrendingUp, ShieldCheck } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 const DealQualityScore = ({ score, riskLevel }) => {
   console.log('DealQualityScore Render:', { score, riskLevel });
+  // #region agent log
+  fetch('http://127.0.0.1:7245/ingest/d3874b50-fda2-4990-b7a4-de8818f92f9c', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DealQualityScore.jsx', message: 'DealQualityScore: render', data: { score, riskLevel }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H5' }) }).catch(() => {});
+  // #endregion
 
-  let recommendation = "Pass";
+  let recommendation = "Buy at risk";
   let colorClass = "text-red-500";
   let bgClass = "bg-red-500/10";
   let borderClass = "border-red-500/30";
@@ -35,8 +44,8 @@ const DealQualityScore = ({ score, riskLevel }) => {
     bgClass = "bg-emerald-400/10";
     borderClass = "border-emerald-400/30";
     ringColor = "border-emerald-400";
-  } else if (score >= 40) {
-    recommendation = "Hold / Negotiate";
+  } else {
+    recommendation = "Buy at risk";
     colorClass = "text-yellow-400";
     bgClass = "bg-yellow-400/10";
     borderClass = "border-yellow-400/30";
@@ -69,9 +78,19 @@ const DealQualityScore = ({ score, riskLevel }) => {
              </div>
           </div>
           
-          <p className="text-muted-foreground text-center text-xs mt-4 px-2">
-            Weighted analysis of ROI, Cash Flow, Market, and Risk factors.
-          </p>
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <p className="text-muted-foreground text-center text-xs mt-4 px-2 cursor-help">
+                  Weighted analysis of ROI, Cash Flow, Market, and Risk factors.
+                </p>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                <p className="font-semibold">Deal Quality Score (0–100)</p>
+                <p className="text-xs mt-1">Combines ROI, cash flow, market strength, and risk. 60+ = Buy; below 60 = Buy at risk; 80+ = Strong Buy.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </CardContent>
     </Card>

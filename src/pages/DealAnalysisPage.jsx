@@ -61,6 +61,12 @@ const DealAnalysisPage = () => {
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+  // #region agent log
+  const _log = (message, data, hypothesisId) => {
+    fetch('http://127.0.0.1:7245/ingest/d3874b50-fda2-4990-b7a4-de8818f92f9c', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DealAnalysisPage.jsx', message, data: data ?? {}, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId }) }).catch(() => {});
+  };
+  // #endregion
+
   useEffect(() => {
     if (!dealId) {
        logDataFlow('ERROR_MISSING_DEAL_ID', {}, new Date());
@@ -69,6 +75,9 @@ const DealAnalysisPage = () => {
     }
     
     logDataFlow('DEAL_ID_FROM_URL', dealId, new Date());
+    // #region agent log
+    _log('effect: dealId and currentUser', { hasDealId: !!dealId, hasCurrentUser: !!currentUser }, 'H3');
+    // #endregion
     
     if (currentUser) {
        fetchDeal();
@@ -78,10 +87,16 @@ const DealAnalysisPage = () => {
   const fetchDeal = async () => {
     try {
       setLoading(true);
+      // #region agent log
+      _log('fetchDeal: start', { dealId }, 'H2');
+      // #endregion
       const loadedInputs = await dealService.loadDeal(dealId, currentUser.id);
       
       logDataFlow('LOADED_FROM_DB', loadedInputs, new Date());
       setLoadedData(loadedInputs);
+      // #region agent log
+      _log('fetchDeal: loaded', { hasLoadedInputs: !!loadedInputs }, 'H2');
+      // #endregion
 
       if (!loadedInputs) {
         throw new Error("Deal data could not be loaded");
@@ -92,6 +107,9 @@ const DealAnalysisPage = () => {
       logDataFlow('INPUTS_STATE_SET', loadedInputs, new Date());
       
       const calculatedMetrics = calculateDealMetrics(loadedInputs);
+      // #region agent log
+      _log('fetchDeal: after calculateDealMetrics', { hasMetrics: !!calculatedMetrics, metricsKeys: calculatedMetrics ? Object.keys(calculatedMetrics) : [] }, 'H1');
+      // #endregion
       logDataFlow('CALCULATION_RESULTS', calculatedMetrics, new Date());
       
       const calcValidation = validateCalculations(calculatedMetrics);
@@ -103,6 +121,9 @@ const DealAnalysisPage = () => {
       
     } catch (err) {
       console.error(err);
+      // #region agent log
+      _log('fetchDeal: catch', { message: err?.message, name: err?.name }, 'H2');
+      // #endregion
       logDataFlow('LOAD_ERROR', err.message, new Date());
       toast({ variant: "destructive", title: "Error fetching deal", description: err.message });
     } finally {
@@ -171,12 +192,32 @@ const DealAnalysisPage = () => {
     setMetrics(calculateDealMetrics(updatedDeal));
   };
 
-  if (loading) return <div className="min-h-[40vh] flex items-center justify-center bg-muted"><p className="text-foreground">Loading analysis...</p></div>;
-  if (!deal) return <div className="min-h-[40vh] flex items-center justify-center bg-muted"><p className="text-foreground">Deal not found.</p></div>;
+  const handleRehabDealUpdate = (updater) => {
+    const next = typeof updater === 'function' ? updater(deal) : updater;
+    setDeal(next);
+    setInputs(next);
+    dealService.saveDeal(next, currentUser.id).catch((err) => console.error('Failed to save rehab updates', err));
+  };
+
+  if (loading) {
+    // #region agent log
+    _log('render: early return loading', { loading: true }, 'H3');
+    // #endregion
+    return <div className="min-h-[40vh] flex items-center justify-center bg-muted"><p className="text-foreground">Loading analysis...</p></div>;
+  }
+  if (!deal) {
+    // #region agent log
+    _log('render: early return !deal', { deal: null }, 'H3');
+    // #endregion
+    return <div className="min-h-[40vh] flex items-center justify-center bg-muted"><p className="text-foreground">Deal not found.</p></div>;
+  }
 
   // We display the Base Metrics in the top cards, but the Scenario section below allows comparison.
   // The summary card usually shows "Current Plan".
   const displayMetrics = metrics || {};
+  // #region agent log
+  _log('render: main content', { hasDeal: !!deal, hasMetrics: !!metrics, displayMetricsKeys: Object.keys(displayMetrics), hasAcquisition: !!(displayMetrics && displayMetrics.acquisition) }, 'H1');
+  // #endregion
 
   return (
     <div className="min-h-screen bg-muted px-4 py-8 max-w-7xl mx-auto mb-20">
@@ -209,11 +250,11 @@ const DealAnalysisPage = () => {
 
       <Tabs defaultValue="intelligence" className="mt-8">
          <TabsList className="bg-muted border border-border p-1 mb-6 flex flex-wrap h-auto shadow-sm">
-            <TabsTrigger value="intelligence" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-sm"><BarChart3 size={16}/> Intelligence</TabsTrigger>
-            <TabsTrigger value="rehab-insights" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-sm"><Sparkles size={16}/> Rehab Insights</TabsTrigger>
-            <TabsTrigger value="comps" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-sm"><Home size={16}/> Comps</TabsTrigger>
-            <TabsTrigger value="scenario-risk" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-sm"><Shield size={16}/> Scenario Risk Model</TabsTrigger>
-            <TabsTrigger value="notes" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-sm"><FileText size={16}/> Notes</TabsTrigger>
+            <TabsTrigger value="intelligence" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-orange-600 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-sm"><BarChart3 size={16}/> Intelligence</TabsTrigger>
+            <TabsTrigger value="rehab-insights" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-orange-600 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-sm"><Sparkles size={16}/> Rehab Insights</TabsTrigger>
+            <TabsTrigger value="comps" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-orange-600 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-sm"><Home size={16}/> Comps</TabsTrigger>
+            <TabsTrigger value="scenario-risk" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-orange-600 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-sm"><Shield size={16}/> Scenario Risk Model</TabsTrigger>
+            <TabsTrigger value="notes" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-orange-600 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-sm"><FileText size={16}/> Notes</TabsTrigger>
          </TabsList>
 
          <TabsContent value="intelligence" className="space-y-8 animate-in fade-in">
@@ -308,54 +349,15 @@ const DealAnalysisPage = () => {
                   photos={deal.photos}
                />
              </div>
-             
-             {/* 1. Property Specifications - First Section */}
-             {inputs.propertyIntelligence && (
-               <Card className="bg-card border-border shadow-sm">
-                 <CardHeader>
-                   <CardTitle className="flex gap-2 items-center text-foreground">
-                     <Building2 className="text-primary"/> Property Specifications
-                   </CardTitle>
-                 </CardHeader>
-                 <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {Object.entries(inputs.propertyIntelligence).map(([key, val]) => {
-                       if(key === 'recentComps' || typeof val === 'object' || val === null) return null;
-                       return (
-                         <div key={key} className="p-3 bg-card rounded-lg border border-border shadow-sm">
-                            <p className="text-xs font-medium text-foreground uppercase tracking-wide mb-0.5">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-                            <p className="text-sm font-bold text-foreground">{String(val)}</p>
-                         </div>
-                       );
-                    })}
-                 </CardContent>
-               </Card>
-             )}
-
-             {/* 2. Site Upload Pictures - Second Section */}
-             <PhotoUploadSection deal={deal} onPhotosUpdated={(newPhotos) => {
-               const updatedDeal = { ...deal, photos: newPhotos };
-               setDeal(updatedDeal);
-               setInputs(updatedDeal);
-             }} />
-
-             {/* 3. Generated SOW - Third Section */}
-             <RehabSOWSection 
-                 inputs={inputs}
-                 deal={deal}
-                 calculations={metrics}
-                 propertyData={inputs.propertyIntelligence}
-                 savedSow={inputs.rehabSow}
-                 onSowGenerated={handleSowGenerated}
+             <RehabPlanTab 
+                deal={deal} 
+                setDeal={handleRehabDealUpdate} 
+                isHighPotential={(metrics?.score ?? 0) >= 60}
+                inputs={inputs}
+                calculations={metrics}
+                propertyData={inputs?.propertyIntelligence}
+                onSowGenerated={handleSowGenerated}
              />
-
-             {/* 4. SOW vs Budget Comparison */}
-             {inputs.rehabSow && (
-               <SOWBudgetComparison 
-                 sowText={inputs.rehabSow}
-                 currentBudget={inputs.rehabCosts}
-                 deal={deal}
-               />
-             )}
          </TabsContent>
 
          <TabsContent value="comps">

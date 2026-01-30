@@ -80,6 +80,10 @@ export const inputsToDatabase = (inputs) => {
     property_intelligence: inputs.propertyIntelligence || null,
     rehab_sow: inputs.rehabSow || null,
     recent_comps: inputs.recentComps || [],
+
+    // Photos and scan results (stored per deal to avoid repeated API calls)
+    photos: Array.isArray(inputs.photos) ? inputs.photos : [],
+    property_details: inputs.property_details ?? inputs.propertyDetails ?? null,
     
     // Scenarios Handling
     // CRITICAL: Do NOT map 'scenarios' array here. Scenarios are stored in a separate table.
@@ -179,6 +183,10 @@ export const databaseToInputs = (dbRecord) => {
     propertyIntelligence: dbRecord.property_intelligence || null,
     rehabSow: dbRecord.rehab_sow || null,
     recentComps: dbRecord.recent_comps || [],
+
+    // Photos and scan results (loaded with deal)
+    photos: Array.isArray(dbRecord.photos) ? dbRecord.photos : [],
+    property_details: dbRecord.property_details ?? null,
 
     // Scenarios
     // Map the joined scenarios array if it exists (from select('*, scenarios(*)'))

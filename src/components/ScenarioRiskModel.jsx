@@ -135,22 +135,19 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
       });
   }, [deal]);
 
-  // Helper function to calculate scenario profit (moved outside useEffect for reuse)
+  // Single helper: apply rehab overrun, hold adjustment, and ARV % shift; recalc metrics and return net profit
   function calculateScenarioProfit(baseDeal, baseMetrics, overrun, holdAdjust, arvAdjust) {
-    if (!baseMetrics) return 0;
-    // Apply ARV shift to the actual ARV value
-    const baseARV = baseDeal.arv || metrics?.arv || 0;
+    if (!baseDeal) return 0;
+    const baseARV = baseDeal.arv ?? baseMetrics?.arv ?? 0;
     const adjustedARV = baseARV * (1 + (arvAdjust / 100));
-    
     const adjustedDeal = {
       ...baseDeal,
-      arv: adjustedARV, // Apply ARV shift directly to ARV
+      arv: adjustedARV,
       rehabOverrunPercent: overrun,
-      holdingMonths: (baseDeal.holdingMonths || 6) + holdAdjust,
-      arvShift: arvAdjust // Keep for reference
+      holdingMonths: Math.max(1, (baseDeal.holdingMonths || 6) + holdAdjust),
     };
     const adjustedMetrics = calculateDealMetrics(adjustedDeal);
-    return adjustedMetrics?.netProfit || 0;
+    return adjustedMetrics?.netProfit ?? 0;
   }
 
   // Calculate derived metrics
@@ -210,19 +207,6 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
 
     return adjustedProfit;
   }, [deal, metrics, expectedProfit, marketShocks, marketShockEnabled, hiddenCosts, hiddenCostEnabled, timelineCollision, timelineRiskEnabled, timelineRisks]);
-
-  // Helper function to calculate scenario profit
-  function calculateScenarioProfit(baseDeal, baseMetrics, overrun, holdAdjust, arvAdjust) {
-    const adjustedDeal = {
-      ...baseDeal,
-      rehabOverrunPercent: overrun,
-      holdingMonths: (baseDeal.holdingMonths || 6) + holdAdjust,
-      arvShift: arvAdjust
-    };
-    
-    const adjustedMetrics = calculateDealMetrics(adjustedDeal);
-    return adjustedMetrics?.netProfit || 0;
-  }
 
   const riskColor = riskScore < 30 ? 'text-green-400' : riskScore < 60 ? 'text-yellow-400' : 'text-red-400';
   const riskBgColor = riskScore < 30 ? 'bg-green-500/20' : riskScore < 60 ? 'bg-yellow-500/20' : 'bg-red-500/20';

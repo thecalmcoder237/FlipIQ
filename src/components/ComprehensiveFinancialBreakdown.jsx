@@ -1,11 +1,18 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DollarSign, ChevronDown, ChevronRight, Check, AlertTriangle } from 'lucide-react';
+import { DollarSign, ChevronDown, ChevronRight, Check, AlertTriangle, HelpCircle } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
-const BreakdownSection = ({ title, items, total, color, isOpen, onToggle, totalAllCosts }) => {
+const BreakdownSection = ({ title, items, total, color, isOpen, onToggle, totalAllCosts, tooltip }) => {
   const safeTotal = total || 0;
   const percentage = totalAllCosts > 0 ? ((safeTotal / totalAllCosts) * 100).toFixed(1) : 0;
+  const titleEl = <span className="font-semibold text-foreground">{title}</span>;
 
   return (
     <div className="border border-border rounded-lg overflow-hidden mb-2 bg-muted/50">
@@ -15,7 +22,17 @@ const BreakdownSection = ({ title, items, total, color, isOpen, onToggle, totalA
       >
         <div className="flex items-center gap-3">
           {isOpen ? <ChevronDown size={16} className="text-muted-foreground" /> : <ChevronRight size={16} className="text-muted-foreground" />}
-          <span className="font-semibold text-foreground">{title}</span>
+          {tooltip ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="cursor-help inline-flex items-center gap-1.5">
+                  {titleEl}
+                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-hidden />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs"><p className="text-xs">{tooltip}</p></TooltipContent>
+            </Tooltip>
+          ) : titleEl}
         </div>
         <div className="flex items-center gap-4">
            <span className="text-xs text-muted-foreground">{percentage}%</span>
@@ -53,6 +70,13 @@ const ComprehensiveFinancialBreakdown = ({ deal, metrics }) => {
   });
 
   const toggle = (sec) => setOpenSections(prev => ({ ...prev, [sec]: !prev[sec] }));
+
+  // #region agent log
+  const _log = (message, data, hypothesisId) => {
+    fetch('http://127.0.0.1:7245/ingest/d3874b50-fda2-4990-b7a4-de8818f92f9c', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'ComprehensiveFinancialBreakdown.jsx', message, data: data ?? {}, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId }) }).catch(() => {});
+  };
+  _log('ComprehensiveFinancialBreakdown: render', { hasMetrics: !!metrics, metricsKeys: metrics ? Object.keys(metrics) : [], hasAcquisition: !!(metrics && metrics.acquisition) }, 'H4');
+  // #endregion
 
   if (!metrics) return <div className="p-4 text-center text-muted-foreground">Loading breakdown...</div>;
 
@@ -105,10 +129,20 @@ const ComprehensiveFinancialBreakdown = ({ deal, metrics }) => {
   return (
     <div className="space-y-6">
       <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
-         <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
-           <DollarSign className="text-primary" size={18} /> Detailed Cost Breakdown
-         </h3>
-         
+         <TooltipProvider delayDuration={300}>
+           <Tooltip>
+             <TooltipTrigger asChild>
+               <h3 className="font-bold text-foreground mb-4 flex items-center gap-2 cursor-help w-fit">
+                 <DollarSign className="text-primary" size={18} /> Detailed Cost Breakdown
+                 <HelpCircle className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden />
+               </h3>
+             </TooltipTrigger>
+             <TooltipContent side="top" className="max-w-xs">
+               <p className="font-semibold">Cost categories</p>
+               <p className="text-xs mt-1">Acquisition = cash at closing. Project cost = purchase + fees + interest + rehab + holding. Net profit = ARV − project cost − selling.</p>
+             </TooltipContent>
+           </Tooltip>
+
          <BreakdownSection 
            title="Acquisition Costs" 
            items={acquisitionItems} 
@@ -117,6 +151,7 @@ const ComprehensiveFinancialBreakdown = ({ deal, metrics }) => {
            isOpen={openSections.acquisition} 
            onToggle={() => toggle('acquisition')}
            totalAllCosts={totalAllCosts}
+           tooltip="Cash at closing: down payment + loan points + inspection + appraisal + title + closing (buy) + transfer tax. Same as Total Cash Needed."
          />
          <BreakdownSection 
            title="Hard Money Costs" 
@@ -126,6 +161,7 @@ const ComprehensiveFinancialBreakdown = ({ deal, metrics }) => {
            isOpen={openSections.hardMoney} 
            onToggle={() => toggle('hardMoney')}
            totalAllCosts={totalAllCosts}
+           tooltip="Interest on loan: monthly interest × holding months. Formula: Loan Amount × (Rate/100/12) × Months."
          />
          <BreakdownSection 
            title="Rehab Costs" 
@@ -135,6 +171,7 @@ const ComprehensiveFinancialBreakdown = ({ deal, metrics }) => {
            isOpen={openSections.rehab} 
            onToggle={() => toggle('rehab')}
            totalAllCosts={totalAllCosts}
+           tooltip="Base budget + contingency % + overrun % + permit fees."
          />
          <BreakdownSection 
            title="Holding Costs" 
@@ -144,6 +181,7 @@ const ComprehensiveFinancialBreakdown = ({ deal, metrics }) => {
            isOpen={openSections.holding} 
            onToggle={() => toggle('holding')} 
            totalAllCosts={totalAllCosts}
+           tooltip="Monthly costs × holding months: property tax + insurance + utilities + HOA."
          />
          <BreakdownSection 
            title="Selling Costs" 
@@ -153,7 +191,9 @@ const ComprehensiveFinancialBreakdown = ({ deal, metrics }) => {
            isOpen={openSections.selling} 
            onToggle={() => toggle('selling')}
            totalAllCosts={totalAllCosts}
+           tooltip="Realtor commission + closing (sell) + staging + marketing + fallthrough reserve. Deducted from sale proceeds."
          />
+         </TooltipProvider>
       </div>
     </div>
   );
