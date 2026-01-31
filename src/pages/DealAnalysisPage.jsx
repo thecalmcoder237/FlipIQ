@@ -61,12 +61,6 @@ const DealAnalysisPage = () => {
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  // #region agent log
-  const _log = (message, data, hypothesisId) => {
-    fetch('http://127.0.0.1:7245/ingest/d3874b50-fda2-4990-b7a4-de8818f92f9c', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DealAnalysisPage.jsx', message, data: data ?? {}, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId }) }).catch(() => {});
-  };
-  // #endregion
-
   useEffect(() => {
     if (!dealId) {
        logDataFlow('ERROR_MISSING_DEAL_ID', {}, new Date());
@@ -75,10 +69,7 @@ const DealAnalysisPage = () => {
     }
     
     logDataFlow('DEAL_ID_FROM_URL', dealId, new Date());
-    // #region agent log
-    _log('effect: dealId and currentUser', { hasDealId: !!dealId, hasCurrentUser: !!currentUser }, 'H3');
-    // #endregion
-    
+
     if (currentUser) {
        fetchDeal();
     }
@@ -87,16 +78,10 @@ const DealAnalysisPage = () => {
   const fetchDeal = async () => {
     try {
       setLoading(true);
-      // #region agent log
-      _log('fetchDeal: start', { dealId }, 'H2');
-      // #endregion
       const loadedInputs = await dealService.loadDeal(dealId, currentUser.id);
       
       logDataFlow('LOADED_FROM_DB', loadedInputs, new Date());
       setLoadedData(loadedInputs);
-      // #region agent log
-      _log('fetchDeal: loaded', { hasLoadedInputs: !!loadedInputs }, 'H2');
-      // #endregion
 
       if (!loadedInputs) {
         setDeal(null);
@@ -112,9 +97,6 @@ const DealAnalysisPage = () => {
       logDataFlow('INPUTS_STATE_SET', loadedInputs, new Date());
       
       const calculatedMetrics = calculateDealMetrics(loadedInputs);
-      // #region agent log
-      _log('fetchDeal: after calculateDealMetrics', { hasMetrics: !!calculatedMetrics, metricsKeys: calculatedMetrics ? Object.keys(calculatedMetrics) : [] }, 'H1');
-      // #endregion
       logDataFlow('CALCULATION_RESULTS', calculatedMetrics, new Date());
       
       const calcValidation = validateCalculations(calculatedMetrics);
@@ -126,9 +108,6 @@ const DealAnalysisPage = () => {
       
     } catch (err) {
       console.error(err);
-      // #region agent log
-      _log('fetchDeal: catch', { message: err?.message, name: err?.name }, 'H2');
-      // #endregion
       logDataFlow('LOAD_ERROR', err.message, new Date());
       toast({ variant: "destructive", title: "Error fetching deal", description: err.message });
     } finally {
@@ -157,12 +136,6 @@ const DealAnalysisPage = () => {
     }
 
     const results = applyScenarioAdjustments(deal, adjustments);
-    
-    // Add risk label based on recalculated score (if applyScenarioAdjustments calculated it, otherwise approximate)
-    // The util returns basic props. We can add a simple risk label.
-    // Ideally calculateDealQualityScore should be called here too, but for now we trust the basic props.
-    results.risk = results.roi < 10 ? 'High' : results.roi < 15 ? 'Medium' : 'Low';
-    
     setActiveScenarioMetrics(results);
 
   }, [deal, metrics, scenarioMode]);
@@ -205,24 +178,15 @@ const DealAnalysisPage = () => {
   };
 
   if (loading) {
-    // #region agent log
-    _log('render: early return loading', { loading: true }, 'H3');
-    // #endregion
     return <div className="min-h-[40vh] flex items-center justify-center bg-muted"><p className="text-foreground">Loading analysis...</p></div>;
   }
   if (!deal) {
-    // #region agent log
-    _log('render: early return !deal', { deal: null }, 'H3');
-    // #endregion
     return <div className="min-h-[40vh] flex items-center justify-center bg-muted"><p className="text-foreground">Deal not found.</p></div>;
   }
 
   // We display the Base Metrics in the top cards, but the Scenario section below allows comparison.
   // The summary card usually shows "Current Plan".
   const displayMetrics = metrics || {};
-  // #region agent log
-  _log('render: main content', { hasDeal: !!deal, hasMetrics: !!metrics, displayMetricsKeys: Object.keys(displayMetrics), hasAcquisition: !!(displayMetrics && displayMetrics.acquisition) }, 'H1');
-  // #endregion
 
   return (
     <div className="min-h-screen bg-muted px-4 py-8 max-w-7xl mx-auto mb-20">
@@ -335,7 +299,7 @@ const DealAnalysisPage = () => {
                           <ScenarioComparison 
                              baseMetrics={metrics} 
                              scenarioMetrics={activeScenarioMetrics} 
-                             scenarioName={scenarioMode === 'worst' ? 'Stress Test' : scenarioMode} 
+                             scenarioName={scenarioMode === 'worst' ? 'Stress Test' : scenarioMode === 'base' ? 'Base Case' : scenarioMode === 'best' ? 'Best Case' : scenarioMode} 
                           />
                        )}
                     </CardContent>

@@ -40,9 +40,6 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
 
   useEffect(() => {
     if (!currentUser?.id) return;
-    // #region agent log
-    fetch('http://127.0.0.1:7245/ingest/d3874b50-fda2-4990-b7a4-de8818f92f9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PropertyIntelligenceSection.jsx:useEffect',message:'calling getPropertyApiUsage',data:{userId:currentUser?.id?.slice(0,8)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-    // #endregion
     getPropertyApiUsage(currentUser.id)
       .then((data) => data && setApiUsage(data))
       .catch(() => {});

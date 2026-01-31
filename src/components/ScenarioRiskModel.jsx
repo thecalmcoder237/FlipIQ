@@ -68,10 +68,10 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
       {
         name: 'Most Likely',
         probability: 50,
-        profit: calculateScenarioProfit(baseDeal, safeMetrics, rehabOverrun, 0, 0),
+        profit: calculateScenarioProfit(baseDeal, safeMetrics, rehabOverrun, 0, arvShift),
         rehabOverrun: rehabOverrun,
         holdTime: 0,
-        arvShift: 0
+        arvShift: arvShift
       },
       {
         name: 'Worst Case',
@@ -162,14 +162,15 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
   const timelineCollision = useMemo(() => calculateTimelineCollision(timelineRisks), [timelineRisks]);
   const minARV = useMemo(() => calculateMinARV(deal, metrics, targetProfit), [deal, metrics, targetProfit]);
 
-  // Adjusted profit = Expected profit minus probability-weighted impact of ALL risks (not just toggles)
+  // Adjusted profit = Expected profit minus impact of risks that are TOGGLED ON only
   const adjustedProfit = useMemo(() => {
     const baseProfit = expectedProfit || 0;
     let drag = 0;
 
-    // Market shocks: always include all shocks (convert impactROI % to dollar drag)
+    // Market shocks: only include when toggle is ON
     if (marketShocks) {
-      Object.values(marketShocks).forEach((shock) => {
+      Object.entries(marketShocks).forEach(([key, shock]) => {
+        if (!marketShockEnabled[key]) return;
         if (shock && typeof shock === 'object' && shock.probability != null && shock.impactROI != null) {
           const probPct = (shock.probability || 0) / 100;
           const roiImpactPct = (shock.impactROI || 0) / 100;
@@ -178,14 +179,16 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
       });
     }
 
-    // Hidden costs: always include all (expected cost = impact * probability)
+    // Hidden costs: only include when toggle is ON
     (hiddenCosts || []).forEach((cost) => {
+      if (!hiddenCostEnabled[cost.name]) return;
       drag += (cost.impact || 0) * ((cost.probability || 0) / 100);
     });
 
-    // Timeline risks: always include all (expected cost)
+    // Timeline risks: only include when toggle is ON
     if (timelineRisks) {
-      Object.values(timelineRisks).forEach((risk) => {
+      Object.entries(timelineRisks).forEach(([key, risk]) => {
+        if (!timelineRiskEnabled[key]) return;
         if (risk && risk.cost != null && risk.probability != null) {
           drag += (risk.cost || 0) * ((risk.probability || 0) / 100);
         }
@@ -193,7 +196,7 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
     }
 
     return baseProfit - drag;
-  }, [expectedProfit, marketShocks, hiddenCosts, timelineRisks]);
+  }, [expectedProfit, marketShocks, hiddenCosts, timelineRisks, marketShockEnabled, hiddenCostEnabled, timelineRiskEnabled]);
 
   // Display: break-even confidence = 100 - probability of loss (aligned)
   const breakEvenDisplay = useMemo(() => Math.round((100 - lossProb) * 10) / 10, [lossProb]);
@@ -253,11 +256,14 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                 Current ARV: {(metrics?.arv || 0).toLocaleString()} | 
                 Difference: {((metrics?.arv || 0) - minARV).toLocaleString()}
               </p>
+              <p className="text-xs text-muted-foreground mt-1 italic">
+                Based on base deal only — not linked to sliders below
+              </p>
             </div>
             <div className="text-sm text-muted-foreground space-y-1">
               <p>• Purchase Price: {(deal.purchasePrice || deal.purchase_price || 0).toLocaleString()}</p>
-              <p>• Rehab (with {rehabOverrun}% overrun): {Math.round((metrics?.rehab?.total || 0) * (1 + rehabOverrun/100)).toLocaleString()}</p>
-              <p>• Holding ({holdTime} months): {Math.round((metrics?.holding?.total || 0) * (holdTime / (deal.holdingMonths || 6))).toLocaleString()}</p>
+              <p>• Rehab (base): {Math.round(metrics?.rehab?.total || 0).toLocaleString()}</p>
+              <p>• Holding ({deal.holdingMonths || deal.holding_months || 6} months): {Math.round(metrics?.holding?.total || 0).toLocaleString()}</p>
               <p>• All Costs + Target Profit = {minARV.toLocaleString()}</p>
             </div>
           </CardContent>
@@ -332,8 +338,12 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                 </p>
               </div>
 
-              {/* Most Likely Outcome Summary */}
-              <div className="bg-muted p-4 rounded-lg border border-border mt-6">
+              <p className="text-xs text-muted-foreground mt-2 italic">
+                Sliders above affect scenario profit only — not Minimum ARV
+              </p>
+
+              {/* Most Likely Outcome */}
+              <div className="bg-muted p-4 rounded-lg border border-border mt-4">
                 <h4 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-primary" />
                   Most Likely Outcome
@@ -345,19 +355,21 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                       ${Math.round(expectedProfit).toLocaleString()}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-xs text-muted-foreground">Adjusted Profit (with risks)</span>
-                    <span className={`text-sm font-bold ${adjustedProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      ${Math.round(adjustedProfit).toLocaleString()}
-                    </span>
-                  </div>
-                  {Math.abs(adjustedProfit - expectedProfit) > 100 && (
-                    <div className="flex justify-between pt-1 border-t border-border">
-                      <span className="text-xs text-muted-foreground">Risk Impact</span>
-                      <span className={`text-xs font-bold ${(adjustedProfit - expectedProfit) < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {adjustedProfit - expectedProfit >= 0 ? '+' : ''}${Math.round(adjustedProfit - expectedProfit).toLocaleString()}
-                      </span>
-                    </div>
+                  {Math.abs(adjustedProfit - expectedProfit) > 1 && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-xs text-muted-foreground">Adjusted Profit (toggled risks)</span>
+                        <span className={`text-sm font-bold ${adjustedProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          ${Math.round(adjustedProfit).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between pt-1 border-t border-border">
+                        <span className="text-xs text-muted-foreground">Difference</span>
+                        <span className={`text-xs font-bold ${(adjustedProfit - expectedProfit) < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {(adjustedProfit - expectedProfit) >= 0 ? '+' : ''}${Math.round(adjustedProfit - expectedProfit).toLocaleString()}
+                        </span>
+                      </div>
+                    </>
                   )}
                   <div className="flex justify-between">
                     <span className="text-xs text-muted-foreground">Probability of Loss</span>

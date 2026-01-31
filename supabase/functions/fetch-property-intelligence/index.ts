@@ -194,17 +194,31 @@ function mapRealieToProperty(p: Record<string, unknown> | null): Record<string, 
   };
 }
 
+/** Parse ISO date string to timestamp for comparison; returns 0 if invalid. */
+function parseSaleDate(val: unknown): number {
+  if (!val) return 0;
+  const s = String(val).trim().slice(0, 10);
+  const d = new Date(s);
+  return Number.isFinite(d.getTime()) ? d.getTime() : 0;
+}
+
+/** Fetch 5 comps from RentCast: sold within 12 months, most recent first. */
 async function fetchRentCastComps(
   address: string,
   zipCode: string,
-  limit: number = 10
+  limit: number = 5
 ): Promise<Array<Record<string, unknown>>> {
   const apiKey = getRentCastKey();
   if (!apiKey) return [];
+
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+  const cutoffMs = twelveMonthsAgo.getTime();
+
   const params = new URLSearchParams();
   if (address) params.set("address", address);
   if (zipCode) params.set("zipCode", zipCode);
-  params.set("limit", String(Math.min(limit, 20)));
+  params.set("limit", "20");
 
   const url = `${RENTCAST_BASE}/listings/sale?${params.toString()}`;
   const res = await fetch(url, {
@@ -213,7 +227,13 @@ async function fetchRentCastComps(
   if (!res.ok) return [];
   const data = await res.json();
   const list = Array.isArray(data) ? data : data?.listings ?? data?.comps ?? [];
-  return list.slice(0, limit).map(mapRentCastToComp).filter(Boolean) as Array<Record<string, unknown>>;
+  const mapped = list.map(mapRentCastToComp).filter(Boolean) as Array<Record<string, unknown>>;
+  const within12mo = mapped.filter((c) => {
+    const ts = parseSaleDate(c.saleDate ?? c.soldDate);
+    return ts >= cutoffMs;
+  });
+  within12mo.sort((a, b) => parseSaleDate(b.saleDate ?? b.soldDate) - parseSaleDate(a.saleDate ?? a.soldDate));
+  return within12mo.slice(0, limit);
 }
 
 function mapRentCastToComp(item: Record<string, unknown>): Record<string, unknown> | null {
@@ -312,7 +332,7 @@ Deno.serve(async (req) => {
 
     if (getRentCastKey() && rentcastAllowed) {
       try {
-        recentComps = await fetchRentCastComps(compAddress, compZip, 10);
+        recentComps = await fetchRentCastComps(compAddress, compZip, 5);
         if (userId && recentComps.length >= 0) {
           await incrementUsage(supabase, userId, ym, "rentcast");
         }

@@ -10,11 +10,6 @@ import {
 } from '@/components/ui/tooltip';
 
 const DealQualityScore = ({ score, riskLevel }) => {
-  console.log('DealQualityScore Render:', { score, riskLevel });
-  // #region agent log
-  fetch('http://127.0.0.1:7245/ingest/d3874b50-fda2-4990-b7a4-de8818f92f9c', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DealQualityScore.jsx', message: 'DealQualityScore: render', data: { score, riskLevel }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H5' }) }).catch(() => {});
-  // #endregion
-
   let recommendation = "Buy at risk";
   let colorClass = "text-red-500";
   let bgClass = "bg-red-500/10";

@@ -76,19 +76,10 @@ export const fetchPropertyIntelligence = async (address, zipCode, propertyType, 
  */
 export const getPropertyApiUsage = async (userId) => {
     if (!userId) return null;
-    // #region agent log
-    fetch('http://127.0.0.1:7245/ingest/d3874b50-fda2-4990-b7a4-de8818f92f9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'edgeFunctionService.js:getPropertyApiUsage',message:'invoke get-property-api-usage',data:{userId:userId?.slice(0,8)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-    // #endregion
     try {
       const result = await invokeEdgeFunction('get-property-api-usage', { userId });
-      // #region agent log
-      fetch('http://127.0.0.1:7245/ingest/d3874b50-fda2-4990-b7a4-de8818f92f9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'edgeFunctionService.js:getPropertyApiUsage',message:'get-property-api-usage success',data:{hasResult:!!result},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
-      // #endregion
       return result;
     } catch (err) {
-      // #region agent log
-      fetch('http://127.0.0.1:7245/ingest/d3874b50-fda2-4990-b7a4-de8818f92f9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'edgeFunctionService.js:getPropertyApiUsage',message:'get-property-api-usage failed',data:{name:err?.name,message:err?.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2,H5'})}).catch(()=>{});
-      // #endregion
       return null;
     }
 };

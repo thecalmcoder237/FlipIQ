@@ -163,34 +163,35 @@ export function identifyTopThreats(deal, metrics, scenarios, hiddenCosts, timeli
 }
 
 /**
- * Calculate minimum ARV needed for profitability
+ * Calculate minimum ARV needed for profitability.
+ * Uses BASE deal assumptions only (no stress overrun, base hold time) so it is independent
+ * of the "Adjust Assumptions" sliders. Sliders affect scenario profit, not this target.
  */
 export function calculateMinARV(deal, metrics, targetProfit = 0) {
   const purchasePrice = Number(deal.purchasePrice || deal.purchase_price) || 0;
   const rehabCosts = Number(metrics.rehab?.total || deal.rehabCosts || 0);
-  const rehabOverrun = (deal.rehabOverrunPercent || 0) / 100;
-  const holdingMonths = Number(deal.holdingMonths || 6);
+  const holdingMonths = Number(deal.holdingMonths || deal.holding_months || 6);
   const holdingCosts = Number(metrics.holding?.total || 0);
   const sellingCosts = Number(metrics.selling?.total || 0);
-  const acquisitionCosts = Number(metrics.acquisition?.feesOnly || 0);
-  const hardMoneyCosts = Number(metrics.hardMoney?.total || 0);
-  
-  // Calculate total costs with overrun
-  const totalRehab = rehabCosts * (1 + rehabOverrun);
-  
-  // Estimate holding costs for extended period
-  const monthlyHolding = holdingCosts / (deal.holdingMonths || 6);
+  const acquisitionCosts = Number(metrics.acquisition?.feesOnly || metrics.closingCosts || 0);
+  const hardMoneyCosts = Number(metrics.hardMoney?.total || metrics.totalInterest || 0);
+
+  // Base case only: no rehab overrun for "minimum ARV needed"
+  const totalRehab = rehabCosts;
+
+  // Base holding period from deal (not slider)
+  const baseMonths = Number(deal.holdingMonths || deal.holding_months || 6);
+  const monthlyHolding = baseMonths > 0 ? holdingCosts / baseMonths : 0;
   const extendedHolding = monthlyHolding * holdingMonths;
-  
-  // Minimum ARV = All costs + target profit
-  const minARV = purchasePrice + 
-                 acquisitionCosts + 
-                 hardMoneyCosts + 
-                 totalRehab + 
-                 extendedHolding + 
-                 sellingCosts + 
-                 targetProfit;
-  
+
+  const minARV = purchasePrice +
+    acquisitionCosts +
+    hardMoneyCosts +
+    totalRehab +
+    extendedHolding +
+    sellingCosts +
+    targetProfit;
+
   return Math.round(minARV);
 }
 

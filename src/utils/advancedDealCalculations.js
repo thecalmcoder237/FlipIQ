@@ -287,17 +287,27 @@ export const applyScenarioAdjustments = (deal, adjustments) => {
   const acquisitionCosts = acqCalc.total;
   const buyingCosts = acqCalc.feesOnly;
 
-  // 7. Selling Costs
+  // 7. Selling Costs (based on scenario ARV; not included in totalProjectCost to match base metrics)
   const sellingCalc = calculateSellingCosts(deal, marketAppreciationPercent);
   const sellingCosts = sellingCalc.total;
 
-  // 8. Total Project Cost
+  // 8. Total Project Cost — match dealCalculations: purchase + fees + interest + rehab + holding (exclude selling)
   const purchasePrice = Number(deal.purchasePrice || deal.purchase_price) || 0;
-  const totalProjectCost = purchasePrice + buyingCosts + rehabCosts + holdingCosts + hardMoneyCosts + sellingCosts;
+  const totalProjectCost = purchasePrice + buyingCosts + rehabCosts + holdingCosts + hardMoneyCosts;
 
-  // 9. Profit
-  const netProfit = arv - totalProjectCost;
-  const roi = totalProjectCost > 0 ? (netProfit / totalProjectCost) * 100 : 0;
+  // 9. Profit — match base: netProfit = (arv - totalProjectCost) - sellingCosts
+  const netProfit = arv - totalProjectCost - sellingCosts;
+
+  // 10. ROI — match base: netProfit / totalCashInvested (acq.total + rehab), not totalProjectCost
+  const totalCashInvested = acquisitionCosts + rehabCosts;
+  const roi = totalCashInvested > 0 ? (netProfit / totalCashInvested) * 100 : 0;
+
+  // 11. Deal score and risk — so scenario comparison shows accurate score change
+  const proxyCashFlow = netProfit > 0 ? netProfit / 12 : 0;
+  const riskScore = deal.riskScore ?? 50;
+  const marketScore = deal.marketScore ?? 70;
+  const score = calculateDealQualityScore(roi, proxyCashFlow, riskScore, marketScore);
+  const risk = roi < 10 ? 'High' : roi < 15 ? 'Medium' : 'Low';
 
   return {
     arv,
@@ -307,7 +317,9 @@ export const applyScenarioAdjustments = (deal, adjustments) => {
     totalProjectCost,
     netProfit,
     roi,
-    holdingMonths: totalMonths
+    holdingMonths: totalMonths,
+    score,
+    risk
   };
 };
 

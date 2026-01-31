@@ -20,8 +20,8 @@ const EditDealModal = ({ isOpen, onClose, deal, onSave }) => {
   }, [deal]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleSubmit = async (e) => {
@@ -106,10 +106,35 @@ const EditDealModal = ({ isOpen, onClose, deal, onSave }) => {
                   <option value="Analyzing">Analyzing</option>
                   <option value="Under Contract">Under Contract</option>
                   <option value="In Progress">In Progress</option>
+                  <option value="Funded">Funded</option>
+                  <option value="Closed">Closed</option>
                   <option value="Completed">Completed</option>
                   <option value="Abandoned">Abandoned</option>
                 </select>
               </div>
+              <div className="md:col-span-2 flex flex-wrap gap-6 items-center">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="isClosed" checked={!!formData.isClosed} onChange={handleChange} className="rounded border-input" />
+                  <span className="text-sm text-foreground">Mark as closed</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="isFunded" checked={!!formData.isFunded} onChange={handleChange} className="rounded border-input" />
+                  <span className="text-sm text-foreground">Mark as funded</span>
+                </label>
+              </div>
+              {formData.isFunded && (
+                <div className="md:col-span-2">
+                  <label className="text-sm text-muted-foreground block mb-1">Funded terms (on what terms?)</label>
+                  <textarea
+                    name="fundedTerms"
+                    value={formData.fundedTerms || ''}
+                    onChange={handleChange}
+                    placeholder="e.g. 12% rate, 12 months, 70% LTV"
+                    rows={2}
+                    className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none resize-none"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="text-sm text-muted-foreground block mb-1">Purchase Price ($)</label>
@@ -268,6 +293,61 @@ const EditDealModal = ({ isOpen, onClose, deal, onSave }) => {
                   onChange={handleChange}
                   className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
                 />
+              </div>
+            </div>
+
+            {/* Funding Approved */}
+            <div className="border border-border rounded-lg p-4 bg-muted/30 space-y-4">
+              <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">Funding Approved</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-1">Amount approved ($)</label>
+                  <input type="number" name="amountApproved" value={formData.amountApproved ?? ''} onChange={handleChange} placeholder="e.g. 250000" className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none" />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-1">LTV (%)</label>
+                  <input type="number" name="ltvPercent" value={formData.ltvPercent ?? ''} onChange={handleChange} placeholder="e.g. 70" className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none" />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-1">Rate (%)</label>
+                  <input type="number" name="fundingRatePercent" value={formData.fundingRatePercent ?? ''} onChange={handleChange} placeholder="e.g. 10" className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none" />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-1">Term (months)</label>
+                  <input type="number" name="fundingTermMonths" value={formData.fundingTermMonths ?? ''} onChange={handleChange} placeholder="e.g. 12" className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-sm text-muted-foreground block mb-1">Funding source (lender / product)</label>
+                  <input type="text" name="fundingSource" value={formData.fundingSource ?? ''} onChange={handleChange} placeholder="e.g. ABC Lending" className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none" />
+                </div>
+              </div>
+            </div>
+
+            {/* Deal contact / source */}
+            <div className="border border-border rounded-lg p-4 bg-muted/30 space-y-4">
+              <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">Deal contact / source (agent or owner)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-1">Agent / owner name</label>
+                  <input type="text" name="dealAgentName" value={formData.dealAgentName ?? ''} onChange={handleChange} placeholder="Name" className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none" />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-1">Phone</label>
+                  <input type="tel" name="dealAgentPhone" value={formData.dealAgentPhone ?? ''} onChange={handleChange} placeholder="Phone" className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none" />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-1">Email</label>
+                  <input type="email" name="dealAgentEmail" value={formData.dealAgentEmail ?? ''} onChange={handleChange} placeholder="Email" className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none" />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-1">Source type</label>
+                  <select name="dealSourceType" value={formData.dealSourceType ?? ''} onChange={handleChange} className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none">
+                    <option value="">—</option>
+                    <option value="Agent">Agent</option>
+                    <option value="Wholesaler">Wholesaler</option>
+                    <option value="Direct">Direct</option>
+                  </select>
+                </div>
               </div>
             </div>
 

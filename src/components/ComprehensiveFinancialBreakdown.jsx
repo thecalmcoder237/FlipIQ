@@ -71,13 +71,6 @@ const ComprehensiveFinancialBreakdown = ({ deal, metrics }) => {
 
   const toggle = (sec) => setOpenSections(prev => ({ ...prev, [sec]: !prev[sec] }));
 
-  // #region agent log
-  const _log = (message, data, hypothesisId) => {
-    fetch('http://127.0.0.1:7245/ingest/d3874b50-fda2-4990-b7a4-de8818f92f9c', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'ComprehensiveFinancialBreakdown.jsx', message, data: data ?? {}, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId }) }).catch(() => {});
-  };
-  _log('ComprehensiveFinancialBreakdown: render', { hasMetrics: !!metrics, metricsKeys: metrics ? Object.keys(metrics) : [], hasAcquisition: !!(metrics && metrics.acquisition) }, 'H4');
-  // #endregion
-
   if (!metrics) return <div className="p-4 text-center text-muted-foreground">Loading breakdown...</div>;
 
   const {

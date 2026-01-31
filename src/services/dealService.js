@@ -23,25 +23,24 @@ export const dealService = {
   async saveDeal(inputs, userId) {
     if (!userId) throw new Error("User ID is required to save a deal.");
 
-    try {
-      // inputsToDatabase ensures we don't try to save 'scenarios' array to the deals table
-      const payload = inputsToDatabase(inputs);
+    const doUpsert = (includeFundingContactStatus = true) => {
+      const payload = inputsToDatabase(inputs, { includeFundingContactStatus });
       payload.user_id = userId;
       payload.updated_at = new Date().toISOString();
-
-      // If it's a new deal (no ID), explicitly set created_at
       if (!inputs.id) {
         payload.created_at = new Date().toISOString();
       } else {
         payload.id = inputs.id;
       }
+      return supabase.from('deals').upsert(payload).select().single();
+    };
 
-      const { data, error } = await supabase
-        .from('deals')
-        .upsert(payload)
-        .select()
-        .single();
-
+    try {
+      let { data, error } = await doUpsert(true);
+      // If DB doesn't have funding/contact/status columns (migration not applied), retry without them
+      if (error?.code === 'PGRST204') {
+        ({ data, error } = await doUpsert(false));
+      }
       if (error) throw error;
       return databaseToInputs(data);
     } catch (error) {

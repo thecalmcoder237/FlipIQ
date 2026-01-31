@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, DollarSign, Hammer, RefreshCw, ChevronDown, ChevronRight, Calculator, MapPin, Loader2 } from 'lucide-react';
+import { Home, DollarSign, Hammer, RefreshCw, ChevronDown, ChevronRight, Calculator, MapPin, Loader2, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -73,7 +73,10 @@ const DealInputForm = () => {
     closingCostsBuying: '3000', inspectionCost: '500', appraisalCost: '500', titleInsurance: '1500', transferTaxRate: '0',
     buyerFinancingFallthrough: '0', marketAppreciationPercent: '0',
     permitFees: '0', permitDelayMonths: '0',
-    activeScenarioId: null
+    activeScenarioId: null,
+    amountApproved: '', ltvPercent: '', fundingRatePercent: '', fundingTermMonths: '', fundingSource: '',
+    dealAgentName: '', dealAgentPhone: '', dealAgentEmail: '', dealSourceType: '',
+    isClosed: false, isFunded: false, fundedTerms: ''
   });
 
   useEffect(() => {
@@ -319,6 +322,18 @@ const DealInputForm = () => {
             <div><label className="text-muted-foreground text-xs">Staging ($)</label><input name="stagingCost" type="number" value={formData.stagingCost} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
             <div><label className="text-muted-foreground text-xs">Marketing ($)</label><input name="marketingCost" type="number" value={formData.marketingCost} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
             <div><label className="text-muted-foreground text-xs">Market Appreciation (%)</label><input name="marketAppreciationPercent" type="number" value={formData.marketAppreciationPercent} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
+        </InputSection>
+
+        <InputSection title="G. Funding & Contact (optional)" icon={User}>
+            <div><label className="text-muted-foreground text-xs">Amount approved ($)</label><input name="amountApproved" type="number" value={formData.amountApproved} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" placeholder="e.g. 250000" /></div>
+            <div><label className="text-muted-foreground text-xs">LTV (%)</label><input name="ltvPercent" type="number" value={formData.ltvPercent} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" placeholder="e.g. 70" /></div>
+            <div><label className="text-muted-foreground text-xs">Funding rate (%)</label><input name="fundingRatePercent" type="number" value={formData.fundingRatePercent} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" placeholder="e.g. 10" /></div>
+            <div><label className="text-muted-foreground text-xs">Funding term (months)</label><input name="fundingTermMonths" type="number" value={formData.fundingTermMonths} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" placeholder="e.g. 12" /></div>
+            <div className="md:col-span-2"><label className="text-muted-foreground text-xs">Funding source (lender)</label><input name="fundingSource" type="text" value={formData.fundingSource} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" placeholder="e.g. ABC Lending" /></div>
+            <div><label className="text-muted-foreground text-xs">Agent / owner name</label><input name="dealAgentName" type="text" value={formData.dealAgentName} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" placeholder="Name" /></div>
+            <div><label className="text-muted-foreground text-xs">Phone</label><input name="dealAgentPhone" type="tel" value={formData.dealAgentPhone} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" placeholder="Phone" /></div>
+            <div><label className="text-muted-foreground text-xs">Email</label><input name="dealAgentEmail" type="email" value={formData.dealAgentEmail} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" placeholder="Email" /></div>
+            <div><label className="text-muted-foreground text-xs">Source type</label><select name="dealSourceType" value={formData.dealSourceType || ''} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground"><option value="">—</option><option value="Agent">Agent</option><option value="Wholesaler">Wholesaler</option><option value="Direct">Direct</option></select></div>
         </InputSection>
 
         <div className="flex justify-end gap-4 mt-8 pb-12">

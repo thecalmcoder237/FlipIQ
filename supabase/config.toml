@@ -21,3 +21,7 @@ enabled = false
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory. For example:
 # sql_paths = ['./seeds/*.sql', '../project-src/seeds/*-load-testing.sql']
+
+[functions]
+# Import map for shared modules
+import_map = "./functions/import_map.json"

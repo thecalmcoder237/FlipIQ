@@ -14,11 +14,7 @@ export function Toaster() {
 
 	return (
 		<ToastProvider>
-			{toasts.map(({ id, title, description, action, dismiss, duration, ...props }) => {
-				// #region agent log
-				fetch('http://127.0.0.1:7245/ingest/d3874b50-fda2-4990-b7a4-de8818f92f9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'toaster.jsx:Toaster',message:'toast render',data:{id,propsKeys:Object.keys(props),dismissDestructured:typeof dismiss},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-				// #endregion
-				return (
+			{toasts.map(({ id, title, description, action, dismiss, duration, ...props }) => (
 					<Toast key={id} {...props}>
 						<div className="grid gap-1">
 							{title && <ToastTitle>{title}</ToastTitle>}
@@ -29,8 +25,7 @@ export function Toaster() {
 						{action}
 						<ToastClose />
 					</Toast>
-				);
-			})}
+				))}
 			<ToastViewport />
 		</ToastProvider>
 	);

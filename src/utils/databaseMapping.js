@@ -3,10 +3,12 @@
  * Maps camelCase application inputs to snake_case database columns.
  * Handles type conversion and default values.
  * Ensures bidirectional consistency for robust data handling.
+ * @param {Object} inputs - Application inputs (camelCase).
+ * @param {{ includeFundingContactStatus?: boolean }} [opts] - If false, omits funding/contact/status columns (for DBs that haven't run the migration).
  */
-
-export const inputsToDatabase = (inputs) => {
+export const inputsToDatabase = (inputs, opts = {}) => {
   if (!inputs) return {};
+  const includeFundingContactStatus = opts.includeFundingContactStatus !== false;
 
   // Create the payload object explicitly to avoid including non-existent columns
   const payload = {
@@ -103,6 +105,21 @@ export const inputsToDatabase = (inputs) => {
     annualized_roi: parseFloat(inputs.annualizedRoi) || 0,
     profit_margin_percent: parseFloat(inputs.profitMargin) || 0,
   };
+
+  if (includeFundingContactStatus) {
+    payload.amount_approved = inputs.amountApproved != null && inputs.amountApproved !== '' ? parseFloat(inputs.amountApproved) : null;
+    payload.ltv_percent = inputs.ltvPercent != null && inputs.ltvPercent !== '' ? parseFloat(inputs.ltvPercent) : null;
+    payload.funding_rate_percent = inputs.fundingRatePercent != null && inputs.fundingRatePercent !== '' ? parseFloat(inputs.fundingRatePercent) : null;
+    payload.funding_term_months = inputs.fundingTermMonths != null && inputs.fundingTermMonths !== '' ? parseInt(inputs.fundingTermMonths, 10) : null;
+    payload.funding_source = inputs.fundingSource || null;
+    payload.deal_agent_name = inputs.dealAgentName || null;
+    payload.deal_agent_phone = inputs.dealAgentPhone || null;
+    payload.deal_agent_email = inputs.dealAgentEmail || null;
+    payload.deal_source_type = inputs.dealSourceType || null;
+    payload.is_closed = inputs.isClosed === true;
+    payload.is_funded = inputs.isFunded === true;
+    payload.funded_terms = inputs.fundedTerms || null;
+  }
 
   return payload;
 };
@@ -206,6 +223,24 @@ export const databaseToInputs = (dbRecord) => {
     netProfit: dbRecord.net_profit || 0,
     roi: dbRecord.roi_percent || 0,
     annualizedRoi: dbRecord.annualized_roi || 0,
-    profitMargin: dbRecord.profit_margin_percent || 0
+    profitMargin: dbRecord.profit_margin_percent || 0,
+
+    // Funding approved
+    amountApproved: dbRecord.amount_approved != null ? dbRecord.amount_approved : null,
+    ltvPercent: dbRecord.ltv_percent != null ? dbRecord.ltv_percent : null,
+    fundingRatePercent: dbRecord.funding_rate_percent != null ? dbRecord.funding_rate_percent : null,
+    fundingTermMonths: dbRecord.funding_term_months != null ? dbRecord.funding_term_months : null,
+    fundingSource: dbRecord.funding_source || null,
+
+    // Deal contact / source
+    dealAgentName: dbRecord.deal_agent_name || null,
+    dealAgentPhone: dbRecord.deal_agent_phone || null,
+    dealAgentEmail: dbRecord.deal_agent_email || null,
+    dealSourceType: dbRecord.deal_source_type || null,
+
+    // Status / closed / funded
+    isClosed: dbRecord.is_closed === true,
+    isFunded: dbRecord.is_funded === true,
+    fundedTerms: dbRecord.funded_terms || null,
   };
 };

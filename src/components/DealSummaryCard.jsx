@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, DollarSign, TrendingUp, Star, Edit2, User, Mail, Wallet, Building, ArrowRight, HelpCircle } from 'lucide-react';
+import { MapPin, DollarSign, TrendingUp, Star, Edit2, User, Mail, Wallet, Building, ArrowRight, HelpCircle, Phone, CheckCircle, Banknote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { dealService } from '@/services/dealService';
@@ -17,16 +17,7 @@ const DealSummaryCard = ({ deal, metrics, onEdit }) => {
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
-  // #region agent log
-  const _log = (message, data, hypothesisId) => {
-    fetch('http://127.0.0.1:7245/ingest/d3874b50-fda2-4990-b7a4-de8818f92f9c', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'DealSummaryCard.jsx', message, data: data ?? {}, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId }) }).catch(() => {});
-  };
-  if (!deal || !metrics) {
-    _log('DealSummaryCard: return null', { hasDeal: !!deal, hasMetrics: !!metrics }, 'H5');
-    return null;
-  }
-  _log('DealSummaryCard: rendering', { hasDeal: true, hasMetrics: true }, 'H5');
-  // #endregion
+  if (!deal || !metrics) return null;
 
   const handleToggleFavorite = async () => {
     try {
@@ -51,7 +42,7 @@ const DealSummaryCard = ({ deal, metrics, onEdit }) => {
         
         {/* Address & Status */}
         <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
             <MapPin className="text-primary-foreground" size={20} />
             <h1 className="text-2xl font-bold text-primary-foreground">{deal.address || "Untitled Deal"}</h1>
             {deal.status && (
@@ -61,7 +52,20 @@ const DealSummaryCard = ({ deal, metrics, onEdit }) => {
                 {deal.status}
               </span>
             )}
+            {(deal.isClosed || deal.status === 'Closed' || deal.status === 'Completed') && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium border bg-white/20 text-primary-foreground border-white/30 flex items-center gap-1">
+                <CheckCircle size={12} /> Closed
+              </span>
+            )}
+            {(deal.isFunded || deal.status === 'Funded') && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium border bg-white/20 text-primary-foreground border-white/30 flex items-center gap-1">
+                <Banknote size={12} /> Funded
+              </span>
+            )}
           </div>
+          {deal.fundedTerms && (
+            <p className="text-sm text-primary-foreground/90 mb-2">Funded terms: {deal.fundedTerms}</p>
+          )}
           <div className="flex items-center gap-4 text-primary-foreground text-base font-semibold">
              <span className="flex items-center gap-1.5"><DollarSign size={16}/> Purchase: <span className="font-bold text-white text-xl">${metrics.purchasePrice?.toLocaleString()}</span></span>
              <ArrowRight size={16} className="text-primary-foreground/80"/>
@@ -168,6 +172,35 @@ const DealSummaryCard = ({ deal, metrics, onEdit }) => {
           </div>
       </div>
       </TooltipProvider>
+
+      {/* Additional info: Funding & Contact (when present) */}
+      {(deal.amountApproved != null || deal.dealAgentName || deal.dealAgentPhone || deal.dealAgentEmail) && (
+        <div className="mt-6 pt-6 border-t border-primary/20 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {(deal.amountApproved != null || deal.ltvPercent != null || deal.fundingRatePercent != null || deal.fundingSource) && (
+            <div className="p-3 bg-white/10 rounded-lg border border-primary/20">
+              <p className="text-xs text-primary-foreground/80 uppercase font-bold mb-2 flex items-center gap-1"><Banknote size={12} /> Funding</p>
+              <div className="text-sm text-primary-foreground space-y-1">
+                {deal.amountApproved != null && deal.amountApproved !== '' && <p>Amount approved: ${Number(deal.amountApproved).toLocaleString()}</p>}
+                {deal.ltvPercent != null && deal.ltvPercent !== '' && <p>LTV: {deal.ltvPercent}%</p>}
+                {deal.fundingRatePercent != null && deal.fundingRatePercent !== '' && <p>Rate: {deal.fundingRatePercent}%</p>}
+                {deal.fundingTermMonths != null && deal.fundingTermMonths !== '' && <p>Term: {deal.fundingTermMonths} months</p>}
+                {deal.fundingSource && <p>Source: {deal.fundingSource}</p>}
+              </div>
+            </div>
+          )}
+          {(deal.dealAgentName || deal.dealAgentPhone || deal.dealAgentEmail) && (
+            <div className="p-3 bg-white/10 rounded-lg border border-primary/20">
+              <p className="text-xs text-primary-foreground/80 uppercase font-bold mb-2 flex items-center gap-1"><User size={12} /> Contact / source</p>
+              <div className="text-sm text-primary-foreground space-y-1">
+                {deal.dealAgentName && <p className="font-medium">{deal.dealAgentName}</p>}
+                {deal.dealSourceType && <p className="text-primary-foreground/80">{deal.dealSourceType}</p>}
+                {deal.dealAgentPhone && <p className="flex items-center gap-1"><Phone size={12} /> {deal.dealAgentPhone}</p>}
+                {deal.dealAgentEmail && <p className="flex items-center gap-1"><Mail size={12} /> {deal.dealAgentEmail}</p>}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 };
