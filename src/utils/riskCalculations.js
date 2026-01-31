@@ -98,31 +98,41 @@ export function identifyTopThreats(deal, metrics, scenarios, hiddenCosts, timeli
   // Rehab overrun threat
   if (deal.rehabOverrunPercent > 20) {
     const overrunCost = (metrics.rehab?.total || 0) * (deal.rehabOverrunPercent / 100);
+    const prob = Math.min(100, deal.rehabOverrunPercent * 2) / 100;
     threats.push({
       name: 'Rehab Overrun',
       probability: Math.min(100, deal.rehabOverrunPercent * 2),
       impact: `+$${Math.round(overrunCost).toLocaleString()} cost`,
+      profitImpact: -overrunCost * prob,
+      costImpact: overrunCost,
       severity: overrunCost > 10000 ? 'high' : 'medium'
     });
   }
   
   // Permit delay threat
   if (timelineRisks?.permitDelay) {
+    const r = timelineRisks.permitDelay;
+    const prob = (r.probability || 0) / 100;
     threats.push({
       name: 'Permit Delay',
-      probability: timelineRisks.permitDelay.probability,
-      impact: `+${timelineRisks.permitDelay.days} days, +$${Math.round(timelineRisks.permitDelay.cost).toLocaleString()}`,
-      severity: timelineRisks.permitDelay.days > 20 ? 'high' : 'medium'
+      probability: r.probability,
+      impact: `+${r.days} days, +$${Math.round(r.cost).toLocaleString()}`,
+      profitImpact: -(r.cost || 0) * prob,
+      costImpact: r.cost || 0,
+      severity: r.days > 20 ? 'high' : 'medium'
     });
   }
   
   // ARV drop threat
   if (deal.arvShift < -5) {
     const arvLoss = (metrics.arv || 0) * (Math.abs(deal.arvShift) / 100);
+    const prob = (Math.abs(deal.arvShift) * 5) / 100;
     threats.push({
       name: 'ARV Decline',
       probability: Math.abs(deal.arvShift) * 5,
       impact: `-$${Math.round(arvLoss).toLocaleString()} sale price`,
+      profitImpact: -arvLoss * Math.min(1, prob),
+      costImpact: 0,
       severity: arvLoss > 15000 ? 'high' : 'medium'
     });
   }
@@ -130,19 +140,22 @@ export function identifyTopThreats(deal, metrics, scenarios, hiddenCosts, timeli
   // Hidden cost threats
   hiddenCosts?.forEach(cost => {
     if (cost.probability > 15) {
+      const prob = (cost.probability || 0) / 100;
       threats.push({
         name: cost.name,
         probability: cost.probability,
         impact: `+$${Math.round(cost.impact).toLocaleString()}`,
+        profitImpact: -(cost.impact || 0) * prob,
+        costImpact: cost.impact || 0,
         severity: cost.impact > 10000 ? 'high' : 'medium'
       });
     }
   });
   
-  // Sort by probability * impact
+  // Sort by probability * impact magnitude
   threats.sort((a, b) => {
-    const aScore = a.probability * (parseFloat(a.impact.replace(/[^0-9]/g, '')) || 0);
-    const bScore = b.probability * (parseFloat(b.impact.replace(/[^0-9]/g, '')) || 0);
+    const aScore = (a.probability || 0) * (Math.abs(a.profitImpact) || parseFloat(String(a.impact).replace(/[^0-9]/g, '')) || 0);
+    const bScore = (b.probability || 0) * (Math.abs(b.profitImpact) || parseFloat(String(b.impact).replace(/[^0-9]/g, '')) || 0);
     return bScore - aScore;
   });
   

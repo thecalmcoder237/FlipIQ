@@ -61,7 +61,10 @@ const EditDealModal = ({ isOpen, onClose, deal, onSave }) => {
           className="bg-card border border-border rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
         >
           <div className="sticky top-0 bg-card border-b border-border p-4 flex justify-between items-center z-10">
-            <h2 className="text-xl font-bold text-foreground">Edit Deal Details</h2>
+            <div>
+              <h2 className="text-xl font-bold text-foreground">Edit Deal Details</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Vital inputs (~60% of full Deal Input form)</p>
+            </div>
             <Button variant="ghost" size="icon" onClick={onClose} className="text-muted-foreground hover:text-foreground">
               <X className="w-5 h-5" />
             </Button>
@@ -70,23 +73,46 @@ const EditDealModal = ({ isOpen, onClose, deal, onSave }) => {
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                 <label className="text-sm text-muted-foreground block mb-1">Status</label>
-                 <select
-                    name="status"
-                    value={formData.status || 'Analyzing'}
-                    onChange={handleChange}
-                    className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
-                 >
-                    <option value="Analyzing">Analyzing</option>
-                    <option value="Under Contract">Under Contract</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Abandoned">Abandoned</option>
-                 </select>
+                <label className="text-sm text-muted-foreground block mb-1">Address</label>
+                <input
+                  type="text"
+                  name="address"
+                  value={formData.address || ''}
+                  onChange={handleChange}
+                  placeholder="123 Main St, City, State ZIP"
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">Zip Code</label>
+                <input
+                  type="text"
+                  name="zipCode"
+                  value={formData.zipCode || ''}
+                  onChange={handleChange}
+                  placeholder="5-digit ZIP"
+                  maxLength={5}
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">Status</label>
+                <select
+                  name="status"
+                  value={formData.status || 'Analyzing'}
+                  onChange={handleChange}
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
+                >
+                  <option value="Analyzing">Analyzing</option>
+                  <option value="Under Contract">Under Contract</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Abandoned">Abandoned</option>
+                </select>
               </div>
 
               <div>
-                <label className="text-sm text-muted-foreground block mb-1">Purchase Price</label>
+                <label className="text-sm text-muted-foreground block mb-1">Purchase Price ($)</label>
                 <input
                   type="number"
                   name="purchasePrice"
@@ -95,9 +121,8 @@ const EditDealModal = ({ isOpen, onClose, deal, onSave }) => {
                   className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
                 />
               </div>
-              
               <div>
-                <label className="text-sm text-muted-foreground block mb-1">ARV</label>
+                <label className="text-sm text-muted-foreground block mb-1">ARV ($)</label>
                 <input
                   type="number"
                   name="arv"
@@ -107,8 +132,63 @@ const EditDealModal = ({ isOpen, onClose, deal, onSave }) => {
                 />
               </div>
 
-               <div>
-                <label className="text-sm text-muted-foreground block mb-1">Rehab Costs</label>
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">Down Payment (%)</label>
+                <input
+                  type="number"
+                  name="downPaymentPercent"
+                  value={formData.downPaymentPercent || ''}
+                  onChange={handleChange}
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">Closing Costs Buy ($)</label>
+                <input
+                  type="number"
+                  name="closingCostsBuying"
+                  value={formData.closingCostsBuying || ''}
+                  onChange={handleChange}
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">Hard Money Rate (%)</label>
+                <input
+                  type="number"
+                  name="hardMoneyRate"
+                  value={formData.hardMoneyRate || ''}
+                  onChange={handleChange}
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">Hard Money Points (%)</label>
+                <input
+                  type="number"
+                  name="hardMoneyPoints"
+                  value={formData.hardMoneyPoints || ''}
+                  onChange={handleChange}
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">Rehab Category</label>
+                <select
+                  name="rehabCategory"
+                  value={formData.rehabCategory || 'Cosmetic'}
+                  onChange={handleChange}
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
+                >
+                  <option value="Cosmetic">Cosmetic ($25/sf)</option>
+                  <option value="Moderate">Moderate ($50/sf)</option>
+                  <option value="Heavy">Heavy ($85/sf)</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">Rehab Costs ($)</label>
                 <input
                   type="number"
                   name="rehabCosts"
@@ -118,7 +198,17 @@ const EditDealModal = ({ isOpen, onClose, deal, onSave }) => {
                 />
               </div>
 
-               <div>
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">Contingency (%)</label>
+                <input
+                  type="number"
+                  name="contingencyPercent"
+                  value={formData.contingencyPercent || ''}
+                  onChange={handleChange}
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
+                />
+              </div>
+              <div>
                 <label className="text-sm text-muted-foreground block mb-1">Holding Months</label>
                 <input
                   type="number"
@@ -129,23 +219,52 @@ const EditDealModal = ({ isOpen, onClose, deal, onSave }) => {
                 />
               </div>
 
-               <div>
-                <label className="text-sm text-muted-foreground block mb-1">Down Payment %</label>
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">Realtor Commission (%)</label>
                 <input
                   type="number"
-                  name="downPaymentPercent"
-                  value={formData.downPaymentPercent || ''}
+                  name="realtorCommission"
+                  value={formData.realtorCommission || ''}
                   onChange={handleChange}
                   className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
                 />
               </div>
-
-               <div>
-                <label className="text-sm text-muted-foreground block mb-1">Hard Money Rate %</label>
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">Closing Costs Sell (%)</label>
                 <input
                   type="number"
-                  name="hardMoneyRate"
-                  value={formData.hardMoneyRate || ''}
+                  name="closingCostsSelling"
+                  value={formData.closingCostsSelling || ''}
+                  onChange={handleChange}
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">Staging Cost ($)</label>
+                <input
+                  type="number"
+                  name="stagingCost"
+                  value={formData.stagingCost || ''}
+                  onChange={handleChange}
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">Property Tax / mo ($)</label>
+                <input
+                  type="number"
+                  name="propertyTax"
+                  value={formData.propertyTax || ''}
+                  onChange={handleChange}
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">Insurance / mo ($)</label>
+                <input
+                  type="number"
+                  name="insurance"
+                  value={formData.insurance || ''}
                   onChange={handleChange}
                   className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
                 />

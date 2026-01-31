@@ -10,9 +10,11 @@ export const inputsToDatabase = (inputs) => {
 
   // Create the payload object explicitly to avoid including non-existent columns
   const payload = {
-    // Basic Info
+    // Basic Info (Realie: address = street line 1 or full; zipCode for state; optional city/county)
     address: inputs.address || '',
     zip_code: inputs.zipCode || '',
+    city: inputs.city || '',
+    county: inputs.county || '',
     property_type: inputs.propertyType || 'Single-Family',
     status: inputs.status || 'Analyzing',
     is_favorite: inputs.isFavorite || false,
@@ -120,6 +122,8 @@ export const databaseToInputs = (dbRecord) => {
     // Basic Info
     address: dbRecord.address || '',
     zipCode: dbRecord.zip_code || '',
+    city: dbRecord.city || '',
+    county: dbRecord.county || '',
     propertyType: dbRecord.property_type || 'Single-Family',
     status: dbRecord.status || 'Analyzing',
     isFavorite: dbRecord.is_favorite || false,

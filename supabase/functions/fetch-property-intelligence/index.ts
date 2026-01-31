@@ -168,7 +168,16 @@ function mapRealieToProperty(p: Record<string, unknown> | null): Record<string, 
   const str = (v: unknown) => (v != null && String(v).trim() ? String(v).trim() : undefined);
   const lat = num(p.latitude ?? p.lat);
   const lng = num(p.longitude ?? p.lng ?? p.lon);
+  const addressStr = str(p.address ?? p.streetAddress ?? p.street_address ?? p.line1);
+  const cityStr = str(p.city ?? p.City);
+  const stateStr = str(p.state ?? p.State);
+  const zipStr = str(p.zipCode ?? p.zip_code ?? p.zip ?? p.postalCode ?? p.postal_code);
   return {
+    address: addressStr ?? undefined,
+    streetAddress: addressStr ?? str(p.streetAddress ?? p.street_address) ?? undefined,
+    city: cityStr ?? undefined,
+    state: stateStr ?? undefined,
+    zipCode: zipStr ?? undefined,
     yearBuilt: num(p.yearBuilt ?? p.year_built ?? p.YearBuilt) ?? undefined,
     squareFootage: num(p.squareFootage ?? p.square_footage ?? p.sqft ?? p.SquareFootage) ?? undefined,
     bedrooms: p.bedrooms ?? p.beds ?? p.Bedrooms,
@@ -257,6 +266,14 @@ Deno.serve(async (req) => {
     if (!address) {
       return json({ error: "address is required" }, { status: 400 });
     }
+    // Realie Address Lookup requires state (derived from ZIP); enforce 5-digit zipCode
+    if (zipCode.length !== 5) {
+      return json({ error: "zipCode is required and must be a 5-digit US ZIP (used to derive state for Realie)" }, { status: 400 });
+    }
+    // Realie: county is required when city is provided
+    if (city && !county) {
+      return json({ error: "county is required when city is provided (Realie API)" }, { status: 400 });
+    }
 
     const ym = yearMonth();
     const supabase = createSupabaseAdminClient();
@@ -289,9 +306,13 @@ Deno.serve(async (req) => {
       errors.push(`Realie monthly limit (${REALIE_LIMIT}) reached.`);
     }
 
+    // Pull comps after property; use required data from property details when available
+    const compAddress = (String(property?.address ?? property?.streetAddress ?? "").trim() || address).trim();
+    const compZip = (String(property?.zipCode ?? property?.zip ?? "").trim().replace(/\D/g, "").slice(0, 5) || zipCode);
+
     if (getRentCastKey() && rentcastAllowed) {
       try {
-        recentComps = await fetchRentCastComps(address, zipCode, 10);
+        recentComps = await fetchRentCastComps(compAddress, compZip, 10);
         if (userId && recentComps.length >= 0) {
           await incrementUsage(supabase, userId, ym, "rentcast");
         }

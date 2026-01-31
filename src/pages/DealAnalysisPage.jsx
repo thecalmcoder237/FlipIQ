@@ -99,7 +99,12 @@ const DealAnalysisPage = () => {
       // #endregion
 
       if (!loadedInputs) {
-        throw new Error("Deal data could not be loaded");
+        setDeal(null);
+        setInputs(null);
+        setMetrics(null);
+        setLoading(false);
+        toast({ variant: "destructive", title: "Deal not found", description: "This deal may have been deleted or you may not have access. Try opening it from Deal History." });
+        return;
       }
 
       setInputs(loadedInputs);

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, DollarSign, Hammer, RefreshCw, ChevronDown, ChevronRight, Calculator, MapPin, CheckCircle2, Loader2 } from 'lucide-react';
+import { Home, DollarSign, Hammer, RefreshCw, ChevronDown, ChevronRight, Calculator, MapPin, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -17,8 +17,6 @@ import {
 } from '@/components/ui/dialog';
 import Breadcrumb from '@/components/Breadcrumb';
 import { dealService } from '@/services/dealService';
-import { addressValidationService, getPostalCodeFromComponents, getPostalCodeFromPlaceAddressComponents } from '@/services/addressValidationService';
-import { useGooglePlacesScript } from '@/hooks/useGooglePlacesScript';
 import { logDataFlow, validateInputs } from '@/utils/dataFlowDebug';
 
 const InputSection = ({ title, icon: Icon, children, total }) => {
@@ -59,18 +57,14 @@ const DealInputForm = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [addressValidating, setAddressValidating] = useState(false);
-  const [addressValidated, setAddressValidated] = useState(false);
   const [existingDealMatch, setExistingDealMatch] = useState(null);
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [pendingSubmitData, setPendingSubmitData] = useState(null);
   const editId = searchParams.get('id');
   const addressInputRef = useRef(null);
-  const addressAutocompleteContainerRef = useRef(null);
-  const placeAutocompleteAttachedRef = useRef(false);
-  const { isReady: placesReady, error: placesError } = useGooglePlacesScript();
 
   const [formData, setFormData] = useState({
-    address: '', status: 'Analyzing', zipCode: '', bedrooms: '', bathrooms: '', sqft: '', yearBuilt: '',
+    address: '', status: 'Analyzing', zipCode: '', city: '', county: '', bedrooms: '', bathrooms: '', sqft: '', yearBuilt: '',
     purchasePrice: '', arv: '', downPaymentPercent: '20',
     hardMoneyRate: '10', hardMoneyPoints: '2',
     rehabCosts: '', rehabCategory: 'Cosmetic', contingencyPercent: '10', rehabOverrunPercent: '0',
@@ -88,57 +82,6 @@ const DealInputForm = () => {
     }
   }, [editId, currentUser]);
 
-  // Mount PlaceAutocompleteElement (new API) when Places library is ready
-  useEffect(() => {
-    if (!placesReady || !addressAutocompleteContainerRef.current || placeAutocompleteAttachedRef.current) return;
-    const PlaceAutocompleteElement = window.google?.maps?.places?.PlaceAutocompleteElement;
-    if (typeof PlaceAutocompleteElement === 'undefined') return;
-    const container = addressAutocompleteContainerRef.current;
-    if (container.children.length > 0) return;
-    const placeAutocomplete = new PlaceAutocompleteElement({
-      includedRegionCodes: ['us']
-    });
-    placeAutocomplete.placeholder = 'Start typing for suggestions...';
-    const onSelect = async (e) => {
-      const placePrediction = e.placePrediction ?? e.detail?.placePrediction;
-      if (!placePrediction?.toPlace) return;
-      try {
-        const place = placePrediction.toPlace();
-        await place.fetchFields({ fields: ['formattedAddress', 'location', 'addressComponents'] });
-        const addr = place.formattedAddress;
-        const formattedAddress = typeof addr === 'string' ? addr : (addr?.text ?? '');
-        if (!formattedAddress) return;
-        const zip = getPostalCodeFromPlaceAddressComponents(place.addressComponents || []);
-        setFormData(prev => ({
-          ...prev,
-          address: formattedAddress,
-          zipCode: zip || prev.zipCode
-        }));
-        setAddressValidated(true);
-        setExistingDealMatch(null);
-        toast({ title: 'Address selected', description: 'Address and ZIP set for consistent storage.' });
-        if (currentUser?.id) {
-          const existing = await dealService.findDealByAddress(currentUser.id, formattedAddress, editId);
-          if (existing) {
-            setExistingDealMatch(existing);
-            setDuplicateDialogOpen(true);
-          }
-        }
-      } catch (err) {
-        console.error('Place fetch error:', err);
-        toast({ variant: 'destructive', title: 'Address error', description: err?.message || 'Could not get address details.' });
-      }
-    };
-    placeAutocomplete.addEventListener('gmp-select', onSelect);
-    container.appendChild(placeAutocomplete);
-    placeAutocompleteAttachedRef.current = true;
-    return () => {
-      placeAutocomplete.removeEventListener('gmp-select', onSelect);
-      placeAutocomplete.remove();
-      placeAutocompleteAttachedRef.current = false;
-    };
-  }, [placesReady, currentUser?.id, editId]);
-
   const loadDealData = async () => {
     try {
       logDataFlow('LOADING_DEAL_FOR_EDIT', { editId }, new Date());
@@ -154,43 +97,30 @@ const DealInputForm = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    if (name === 'address') setAddressValidated(false);
   };
 
-  const handleValidateAddress = async () => {
+  const handleCheckDuplicate = async () => {
     const raw = (formData.address || '').trim();
-    if (raw.length < 4) {
-      toast({ variant: 'destructive', title: 'Address too short', description: 'Enter at least a street number and name.' });
+    if (raw.length < 5) {
+      toast({ variant: 'destructive', title: 'Address too short', description: 'Enter at least a street number and name (5+ characters).' });
       return;
     }
     setAddressValidating(true);
     setExistingDealMatch(null);
     try {
-      const result = await addressValidationService.validateAndGeocode(raw);
-      if (!result.isValid) {
-        toast({ variant: 'destructive', title: 'Address not found', description: result.error || 'Could not validate address.' });
-        setAddressValidating(false);
-        return;
-      }
-      const formattedAddress = result.formattedAddress || raw;
-      const zipFromGeocode = getPostalCodeFromComponents(result.components);
-      setFormData(prev => ({
-        ...prev,
-        address: formattedAddress,
-        zipCode: zipFromGeocode || prev.zipCode,
-      }));
-      setAddressValidated(true);
-      toast({ title: 'Address validated', description: 'Address and ZIP updated for consistent storage.' });
-
-      if (!currentUser?.id) { setAddressValidating(false); return; }
-      const existing = await dealService.findDealByAddress(currentUser.id, formattedAddress, editId);
-      if (existing) {
-        setExistingDealMatch(existing);
-        setDuplicateDialogOpen(true);
+      if (currentUser?.id) {
+        const existing = await dealService.findDealByAddress(currentUser.id, raw, editId);
+        if (existing) {
+          setExistingDealMatch(existing);
+          setDuplicateDialogOpen(true);
+          toast({ title: 'Duplicate found', description: 'A deal with this address already exists.' });
+        } else {
+          toast({ title: 'No duplicate', description: 'No existing deal with this address.' });
+        }
       }
     } catch (err) {
-      console.error('Validate address error:', err);
-      toast({ variant: 'destructive', title: 'Validation failed', description: err.message || 'Could not validate address.' });
+      console.error('Check duplicate error:', err);
+      toast({ variant: 'destructive', title: 'Check failed', description: err?.message || 'Could not check for duplicate.' });
     } finally {
       setAddressValidating(false);
     }
@@ -274,23 +204,8 @@ const DealInputForm = () => {
       return;
     }
 
-    let addressToSave = formData.address;
-    let zipToSave = formData.zipCode;
-
-    try {
-      const raw = (formData.address || '').trim();
-      if (raw.length >= 4) {
-        const geocodeResult = await addressValidationService.validateAndGeocode(raw);
-        if (geocodeResult.isValid && geocodeResult.formattedAddress) {
-          addressToSave = geocodeResult.formattedAddress;
-          zipToSave = getPostalCodeFromComponents(geocodeResult.components) || formData.zipCode;
-          setFormData(prev => ({ ...prev, address: addressToSave, zipCode: zipToSave }));
-        }
-      }
-    } catch (err) {
-      console.warn('Geocode before save failed, using form values:', err);
-    }
-
+    const addressToSave = (formData.address || '').trim();
+    const zipToSave = (formData.zipCode || '').trim().replace(/\D/g, '').slice(0, 5);
     const dataToSave = { ...formData, address: addressToSave, zipCode: zipToSave };
     logDataFlow('FORM_INPUTS_BEFORE_SAVE', dataToSave, new Date());
 
@@ -327,43 +242,26 @@ const DealInputForm = () => {
             <div className="md:col-span-2">
                <label className="text-foreground text-xs">Address</label>
                <div className="flex gap-2 items-center">
-                 {placesReady ? (
-                   <div className="flex-1 min-w-0 flex flex-col">
-                     <div ref={addressAutocompleteContainerRef} className="[&_gmp-place-autocomplete]:w-full [&_gmp-place-autocomplete]:min-w-0" />
-                     <input type="hidden" name="address" value={formData.address} readOnly required aria-hidden />
-                   </div>
-                 ) : (
-                   <input
-                     ref={addressInputRef}
-                     name="address"
-                     value={formData.address}
-                     onChange={handleChange}
-                     className="flex-1 bg-background border border-input p-2 rounded text-foreground"
-                     placeholder="123 Main St, City, State ZIP"
-                     required
-                   />
-                 )}
-                 <Button type="button" variant="outline" size="sm" onClick={handleValidateAddress} disabled={addressValidating || (formData.address || '').trim().length < 4} className="shrink-0 border-border text-foreground hover:bg-accent" title="Validate typed address">
+                 <input
+                   ref={addressInputRef}
+                   name="address"
+                   value={formData.address}
+                   onChange={handleChange}
+                   className="flex-1 bg-background border border-input p-2 rounded text-foreground"
+                   placeholder="123 Main St, City, State ZIP"
+                   required
+                 />
+                 <Button type="button" variant="outline" size="sm" onClick={handleCheckDuplicate} disabled={addressValidating || (formData.address || '').trim().length < 5} className="shrink-0 border-border text-foreground hover:bg-accent" title="Check for existing deal with this address">
                    {addressValidating ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
-                   {addressValidating ? ' Validating...' : ' Validate'}
+                   {addressValidating ? ' Checking...' : ' Check duplicate'}
                  </Button>
                </div>
-               {placesReady && (
-                 <>
-                   <p className="text-xs text-muted-foreground mt-1">Select an address from the dropdown for consistent storage.</p>
-                   <p className="text-xs text-muted-foreground mt-0.5">If suggestions show &quot;blocked&quot; or 403, enable <strong>Places API (New)</strong> in Google Cloud Console → APIs &amp; Services → Enable APIs.</p>
-                 </>
-               )}
-               {placesError && (
-                 <p className="text-xs text-amber-600 mt-1" role="alert">{placesError}</p>
-               )}
-               {addressValidated && (
-                 <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                   <CheckCircle2 className="h-3.5 w-3.5" /> Address validated — stored consistently
-                 </p>
-               )}
+               <p className="text-xs text-muted-foreground mt-1">Realie: street line 1 (e.g. 123 Main St) or full address; 5-digit ZIP required for state.</p>
             </div>
-            <div><label className="text-muted-foreground text-xs">Zip Code</label><input name="zipCode" value={formData.zipCode} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" placeholder="From geocode or enter" /></div>
+            <div><label className="text-muted-foreground text-xs">Zip Code (required)</label><input name="zipCode" value={formData.zipCode} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" placeholder="5-digit ZIP" maxLength={5} required /></div>
+            <div><label className="text-muted-foreground text-xs">City (optional)</label><input name="city" value={formData.city} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" placeholder="City" /></div>
+            <div><label className="text-muted-foreground text-xs">County (optional)</label><input name="county" value={formData.county} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" placeholder="County" /></div>
+            <p className="text-xs text-muted-foreground md:col-span-2">Realie: if you enter City, also enter County (required for address lookup).</p>
             <div><label className="text-muted-foreground text-xs">Sqft</label><input name="sqft" type="number" value={formData.sqft} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
             <div><label className="text-muted-foreground text-xs">Beds</label><input name="bedrooms" type="number" value={formData.bedrooms} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>
             <div><label className="text-muted-foreground text-xs">Baths</label><input name="bathrooms" type="number" value={formData.bathrooms} onChange={handleChange} className="w-full bg-background border border-input p-2 rounded text-foreground" /></div>

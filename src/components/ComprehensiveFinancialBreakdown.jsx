@@ -86,16 +86,20 @@ const ComprehensiveFinancialBreakdown = ({ deal, metrics }) => {
     rehab,
     holding,
     selling,
-    totalProjectCost
+    totalProjectCost,
+    purchasePrice
   } = metrics;
 
   // We use totalProjectCost + selling.total as the denominator for percentages to show where every dollar goes
   const totalAllCosts = totalProjectCost + selling.total;
 
+  // Purchase & Acquisition section must sum to purchasePrice + feesOnly to align with totalProjectCost formula:
+  // totalProjectCost = purchasePrice + feesOnly + interest + rehab + holding
+  const purchaseAndAcquisitionTotal = (purchasePrice || 0) + (acquisition?.feesOnly || 0);
   const acquisitionItems = [
-    { label: "Down Payment", value: acquisition.downPayment },
+    { label: "Purchase Price", value: purchasePrice || 0 },
     { label: "Loan Points", value: acquisition.hardMoneyPoints },
-    { label: "Inspection & Appraisal", value: acquisition.inspection + acquisition.appraisal },
+    { label: "Inspection & Appraisal", value: (acquisition.inspection || 0) + (acquisition.appraisal || 0) },
     { label: "Title & Legal", value: acquisition.titleInsurance },
     { label: "Closing Costs (Buy)", value: acquisition.closingCostsBuying },
     { label: "Transfer Tax", value: acquisition.transferTax },
@@ -113,16 +117,17 @@ const ComprehensiveFinancialBreakdown = ({ deal, metrics }) => {
     { label: "Permits", value: rehab.permitFees },
   ];
 
+  const totalMonthlySoft = holding.totalMonthlySoft || 1;
   const holdingItems = [
-    { label: "Property Taxes", value: holding.totalSoft * (holding.monthlyTax / (holding.totalMonthlySoft || 1)) },
-    { label: "Insurance", value: holding.totalSoft * (holding.monthlyIns / (holding.totalMonthlySoft || 1)) },
-    { label: "Utilities & HOA", value: holding.totalSoft * ((holding.monthlyUtil + holding.monthlyHoa) / (holding.totalMonthlySoft || 1)) },
+    { label: "Property Taxes", value: totalMonthlySoft > 0 ? holding.totalSoft * ((holding.monthlyTax || 0) / totalMonthlySoft) : 0 },
+    { label: "Insurance", value: totalMonthlySoft > 0 ? holding.totalSoft * ((holding.monthlyIns || 0) / totalMonthlySoft) : 0 },
+    { label: "Utilities, HOA & Lawn", value: totalMonthlySoft > 0 ? holding.totalSoft * (((holding.monthlyUtil || 0) + (holding.monthlyHoa || 0) + (holding.monthlyLawn || 0)) / totalMonthlySoft) : 0 },
   ];
 
   const sellingItems = [
     { label: "Realtor Commission", value: selling.realtorCommission },
     { label: "Closing Costs (Sell)", value: selling.closingCostsSelling },
-    { label: "Staging & Marketing", value: selling.staging + selling.marketing },
+    { label: "Staging & Marketing", value: (selling.staging || 0) + (selling.marketing || 0) },
     { label: "Fallthrough Reserve", value: selling.fallthroughCost },
   ];
 
@@ -144,14 +149,14 @@ const ComprehensiveFinancialBreakdown = ({ deal, metrics }) => {
            </Tooltip>
 
          <BreakdownSection 
-           title="Acquisition Costs" 
+           title="Purchase & Acquisition" 
            items={acquisitionItems} 
-           total={acquisition.total} 
+           total={purchaseAndAcquisitionTotal} 
            color="border-primary" 
            isOpen={openSections.acquisition} 
            onToggle={() => toggle('acquisition')}
            totalAllCosts={totalAllCosts}
-           tooltip="Cash at closing: down payment + loan points + inspection + appraisal + title + closing (buy) + transfer tax. Same as Total Cash Needed."
+           tooltip="Purchase price + acquisition fees (points, inspection, appraisal, title, closing, transfer tax). Sum aligns with Total Project Cost formula."
          />
          <BreakdownSection 
            title="Hard Money Costs" 

@@ -1,4 +1,4 @@
-import { handleCors, json } from "../_shared/cors.ts";
+import { corsHeaders, handleCors, json } from "../_shared/cors.ts";
 import { createSupabaseAdminClient } from "../_shared/supabaseAdmin.ts";
 
 const REALIE_LIMIT = 25;
@@ -9,6 +9,10 @@ function yearMonth(): string {
 }
 
 Deno.serve(async (req) => {
+  // Handle CORS preflight first (required for browser calls from localhost/production).
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { status: 200, headers: corsHeaders });
+  }
   const cors = handleCors(req);
   if (cors) return cors;
 

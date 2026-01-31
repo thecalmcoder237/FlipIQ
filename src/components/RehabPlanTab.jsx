@@ -8,6 +8,7 @@ import RehabBudgetReport from '@/components/RehabBudgetReport';
 import RehabSOWSection from '@/components/RehabSOWSection';
 import SOWBudgetComparison from '@/components/SOWBudgetComparison';
 import AdvancedAnalysisModal from '@/components/AdvancedAnalysisModal';
+import CompsDisplay from '@/components/CompsDisplay';
 import { useToast } from '@/components/ui/use-toast';
 
 const RehabPlanTab = ({ deal, setDeal, isHighPotential, inputs, calculations, propertyData, onSowGenerated }) => {
@@ -60,6 +61,34 @@ const RehabPlanTab = ({ deal, setDeal, isHighPotential, inputs, calculations, pr
           </h2>
           <p className="text-muted-foreground text-sm">Manage renovations, analyze photos, and track budget.</p>
        </div>
+
+       {/* Property data from fetch (Realie) – shown when we have intelligence */}
+       {propertyData && (propertyData.yearBuilt != null || propertyData.squareFootage != null || propertyData.bedrooms != null || propertyData.county) && (
+          <div className="bg-card p-6 rounded-xl border border-border shadow-sm">
+            <h3 className="text-foreground font-bold mb-4">Property Data (from fetch)</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {propertyData.yearBuilt != null && <div className="bg-muted/50 p-3 rounded-lg border border-border"><p className="text-xs text-muted-foreground uppercase">Year Built</p><p className="text-foreground font-medium">{propertyData.yearBuilt}</p></div>}
+              {propertyData.squareFootage != null && <div className="bg-muted/50 p-3 rounded-lg border border-border"><p className="text-xs text-muted-foreground uppercase">Sq Ft</p><p className="text-foreground font-medium">{propertyData.squareFootage}</p></div>}
+              {propertyData.bedrooms != null && <div className="bg-muted/50 p-3 rounded-lg border border-border"><p className="text-xs text-muted-foreground uppercase">Beds</p><p className="text-foreground font-medium">{propertyData.bedrooms}</p></div>}
+              {propertyData.bathrooms != null && <div className="bg-muted/50 p-3 rounded-lg border border-border"><p className="text-xs text-muted-foreground uppercase">Baths</p><p className="text-foreground font-medium">{propertyData.bathrooms}</p></div>}
+              {propertyData.county && <div className="bg-muted/50 p-3 rounded-lg border border-border"><p className="text-xs text-muted-foreground uppercase">County</p><p className="text-foreground font-medium">{propertyData.county}</p></div>}
+              {propertyData.propertyType && <div className="bg-muted/50 p-3 rounded-lg border border-border"><p className="text-xs text-muted-foreground uppercase">Type</p><p className="text-foreground font-medium">{propertyData.propertyType}</p></div>}
+            </div>
+          </div>
+        )}
+
+       {/* Comps from property intelligence (pulled after property fetch) */}
+       {propertyData?.recentComps?.length > 0 && (
+          <div>
+            <h3 className="text-foreground font-bold mb-4">Comparable Sales (from property data)</h3>
+            <CompsDisplay
+              comps={propertyData.recentComps}
+              loading={false}
+              onRefresh={() => {}}
+              source="RentCast (from property fetch)"
+            />
+          </div>
+        )}
 
        {/* 2. Photo Upload first (vision-first flow) */}
        <PhotoUploadSection deal={deal} onPhotosUpdated={handlePhotosUpdated} />

@@ -11,7 +11,6 @@ import { LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveCont
 import { 
   calculateExpectedValue, 
   calculateLossProbability, 
-  calculateBreakEvenConfidence,
   generateProbabilityCurve,
   calculateRiskScore,
   identifyTopThreats,
@@ -156,7 +155,6 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
     return calculateExpectedValue(scenarios) || 0;
   }, [scenarios]);
   const lossProb = useMemo(() => calculateLossProbability(scenarios), [scenarios]);
-  const breakEvenConf = useMemo(() => calculateBreakEvenConfidence(scenarios), [scenarios]);
   const riskScore = useMemo(() => calculateRiskScore(deal, metrics, scenarios), [deal, metrics, scenarios]);
   const topThreats = useMemo(() => identifyTopThreats(deal, metrics, scenarios, hiddenCosts, timelineRisks), 
     [deal, metrics, scenarios, hiddenCosts, timelineRisks]);
@@ -164,49 +162,41 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
   const timelineCollision = useMemo(() => calculateTimelineCollision(timelineRisks), [timelineRisks]);
   const minARV = useMemo(() => calculateMinARV(deal, metrics, targetProfit), [deal, metrics, targetProfit]);
 
-  // Calculate adjusted profit with all risk factors (must be after expectedProfit is defined)
-  const calculateAdjustedProfit = useMemo(() => {
-    if (!deal || !metrics) return 0;
+  // Adjusted profit = Expected profit minus probability-weighted impact of ALL risks (not just toggles)
+  const adjustedProfit = useMemo(() => {
     const baseProfit = expectedProfit || 0;
-    
-    let adjustedProfit = baseProfit;
-    
-    // Apply market shocks if enabled
-    if (marketShocks && marketShockEnabled) {
-      Object.entries(marketShockEnabled).forEach(([key, enabled]) => {
-        if (enabled && marketShocks[key]) {
-          const shock = marketShocks[key];
-          if (shock.impactROI) {
-            adjustedProfit = adjustedProfit * (1 + shock.impactROI / 100);
-          }
-        }
-      });
-    }
-    
-    // Apply hidden costs if enabled
-    if (hiddenCosts && hiddenCostEnabled) {
-      Object.entries(hiddenCostEnabled).forEach(([key, enabled]) => {
-        if (enabled) {
-          const cost = hiddenCosts.find(c => c.name === key);
-          if (cost) {
-            adjustedProfit -= cost.impact * (cost.probability / 100);
-          }
-        }
-      });
-    }
-    
-    // Apply timeline risks if enabled
-    if (timelineCollision && timelineRiskEnabled) {
-      Object.entries(timelineRiskEnabled).forEach(([key, enabled]) => {
-        if (enabled && timelineRisks?.[key]) {
-          const risk = timelineRisks[key];
-          adjustedProfit -= risk.cost * (risk.probability / 100);
+    let drag = 0;
+
+    // Market shocks: always include all shocks (convert impactROI % to dollar drag)
+    if (marketShocks) {
+      Object.values(marketShocks).forEach((shock) => {
+        if (shock && typeof shock === 'object' && shock.probability != null && shock.impactROI != null) {
+          const probPct = (shock.probability || 0) / 100;
+          const roiImpactPct = (shock.impactROI || 0) / 100;
+          drag += baseProfit * (-roiImpactPct) * probPct;
         }
       });
     }
 
-    return adjustedProfit;
-  }, [deal, metrics, expectedProfit, marketShocks, marketShockEnabled, hiddenCosts, hiddenCostEnabled, timelineCollision, timelineRiskEnabled, timelineRisks]);
+    // Hidden costs: always include all (expected cost = impact * probability)
+    (hiddenCosts || []).forEach((cost) => {
+      drag += (cost.impact || 0) * ((cost.probability || 0) / 100);
+    });
+
+    // Timeline risks: always include all (expected cost)
+    if (timelineRisks) {
+      Object.values(timelineRisks).forEach((risk) => {
+        if (risk && risk.cost != null && risk.probability != null) {
+          drag += (risk.cost || 0) * ((risk.probability || 0) / 100);
+        }
+      });
+    }
+
+    return baseProfit - drag;
+  }, [expectedProfit, marketShocks, hiddenCosts, timelineRisks]);
+
+  // Display: break-even confidence = 100 - probability of loss (aligned)
+  const breakEvenDisplay = useMemo(() => Math.round((100 - lossProb) * 10) / 10, [lossProb]);
 
   const riskColor = riskScore < 30 ? 'text-green-400' : riskScore < 60 ? 'text-yellow-400' : 'text-red-400';
   const riskBgColor = riskScore < 30 ? 'bg-green-500/20' : riskScore < 60 ? 'bg-yellow-500/20' : 'bg-red-500/20';
@@ -357,15 +347,15 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-xs text-muted-foreground">Adjusted Profit (with risks)</span>
-                    <span className={`text-sm font-bold ${calculateAdjustedProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      ${Math.round(calculateAdjustedProfit).toLocaleString()}
+                    <span className={`text-sm font-bold ${adjustedProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      ${Math.round(adjustedProfit).toLocaleString()}
                     </span>
                   </div>
-                  {Math.abs(calculateAdjustedProfit - expectedProfit) > 100 && (
+                  {Math.abs(adjustedProfit - expectedProfit) > 100 && (
                     <div className="flex justify-between pt-1 border-t border-border">
                       <span className="text-xs text-muted-foreground">Risk Impact</span>
-                      <span className={`text-xs font-bold ${(calculateAdjustedProfit - expectedProfit) < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {calculateAdjustedProfit - expectedProfit >= 0 ? '+' : ''}${Math.round(calculateAdjustedProfit - expectedProfit).toLocaleString()}
+                      <span className={`text-xs font-bold ${(adjustedProfit - expectedProfit) < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {adjustedProfit - expectedProfit >= 0 ? '+' : ''}${Math.round(adjustedProfit - expectedProfit).toLocaleString()}
                       </span>
                     </div>
                   )}
@@ -375,7 +365,7 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-xs text-muted-foreground">Break-Even Confidence</span>
-                    <span className="text-sm font-bold text-green-600">{breakEvenConf.toFixed(1)}%</span>
+                    <span className="text-sm font-bold text-green-600">{breakEvenDisplay}%</span>
                   </div>
                 </div>
               </div>
@@ -463,6 +453,20 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                     <p className="text-xs text-foreground">
                       → {threat.impact}
                     </p>
+                    {(threat.profitImpact != null || threat.costImpact != null) && (
+                      <div className="mt-2 pt-2 border-t border-border/50 space-y-0.5">
+                        {threat.profitImpact != null && threat.profitImpact !== 0 && (
+                          <p className="text-xs text-red-600">
+                            Profit impact: {threat.profitImpact >= 0 ? '+' : ''}${Math.round(threat.profitImpact).toLocaleString()}
+                          </p>
+                        )}
+                        {threat.costImpact != null && threat.costImpact > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            Cost impact: +${Math.round(threat.costImpact).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
                 {topThreats.length === 0 && (
@@ -489,7 +493,15 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
             <p className="text-xs text-muted-foreground mt-1">Toggle to apply to profit calculation</p>
           </CardHeader>
           <CardContent className="space-y-3">
-            {marketShocks && Object.entries(marketShocks).filter(([key]) => key !== 'aiInsight').map(([key, shock]) => (
+            {marketShocks && Object.entries(marketShocks).filter(([key]) => key !== 'aiInsight').map(([key, shock]) => {
+              const prob = (shock.probability || 0) / 100;
+              const profitImpact = shock.impactROI != null ? expectedProfit * (-(shock.impactROI) / 100) * prob : 0;
+              const holdingCostImpact = (shock.impactHoldingCost != null && (metrics?.holding?.total || 0) > 0)
+                ? (metrics.holding.total || 0) * ((shock.impactHoldingCost || 0) / 100) * prob : 0;
+              const salePriceImpact = (shock.impactSalePrice != null && (metrics?.arv ?? 0) > 0)
+                ? (metrics.arv || 0) * (Math.min(0, shock.impactSalePrice) / 100) * prob : 0;
+              const costImpact = holdingCostImpact + (shock.impactCost != null ? (shock.impactCost || 0) * prob : 0) + (salePriceImpact < 0 ? -salePriceImpact : 0);
+              return (
               <div key={key} className="bg-muted p-3 rounded-lg border border-border">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex items-center gap-2">
@@ -519,12 +531,26 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                 {shock.impactSalePrice && (
                   <p className="text-xs text-muted-foreground">Sale price: {shock.impactSalePrice}%</p>
                 )}
+                {(profitImpact !== 0 || costImpact > 0) && (
+                  <div className="mt-2 pt-2 border-t border-border/50 space-y-0.5">
+                    {profitImpact !== 0 && (
+                      <p className="text-xs text-red-600">
+                        Profit impact: {profitImpact >= 0 ? '+' : ''}${Math.round(profitImpact).toLocaleString()}
+                      </p>
+                    )}
+                    {costImpact > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Cost impact: +${Math.round(costImpact).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                )}
                 {marketShockEnabled[key] && (
                   <p className="text-xs text-red-600 mt-1">⚠️ Applied to profit calculation</p>
                 )}
                 <p className="text-xs text-muted-foreground mt-1">Source: {shock.dataSource}</p>
               </div>
-            ))}
+            ); })}
           </CardContent>
         </Card>
 
@@ -538,7 +564,9 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
             <p className="text-xs text-muted-foreground mt-1">Toggle to apply to profit calculation</p>
           </CardHeader>
           <CardContent className="space-y-3">
-            {hiddenCosts.map((cost, idx) => (
+            {hiddenCosts.map((cost, idx) => {
+              const expectedProfitImpact = (cost.impact || 0) * ((cost.probability || 0) / 100);
+              return (
               <div key={idx} className="bg-muted p-3 rounded-lg border border-border">
                 <div className="flex justify-between items-start mb-1">
                   <div className="flex items-center gap-2">
@@ -557,6 +585,14 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                 <p className="text-xs text-muted-foreground">
                   Impact: +${cost.impact.toLocaleString()}
                 </p>
+                <div className="mt-1.5 pt-1.5 border-t border-border/50 space-y-0.5">
+                  <p className="text-xs text-red-600">
+                    Profit impact: -${Math.round(expectedProfitImpact).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Cost impact: +${cost.impact.toLocaleString()}
+                  </p>
+                </div>
                 {cost.probability > cost.baseProb && (
                   <p className="text-xs text-yellow-600 mt-1">
                     ↑ Elevated risk (base: {cost.baseProb}%)
@@ -566,7 +602,7 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                   <p className="text-xs text-red-600 mt-1">⚠️ Applied to profit calculation</p>
                 )}
               </div>
-            ))}
+            ); })}
           </CardContent>
         </Card>
 
@@ -588,7 +624,10 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                     {timelineCollision.probability30Plus.toFixed(1)}%
                   </p>
                 </div>
-                {timelineRisks && Object.entries(timelineRisks).map(([key, risk]) => (
+                {timelineRisks && Object.entries(timelineRisks).map(([key, risk]) => {
+                  const prob = (risk.probability || 0) / 100;
+                  const profitImpact = -(risk.cost || 0) * prob;
+                  return (
                   <div key={key} className="bg-muted p-3 rounded-lg border border-border">
                     <div className="flex items-center gap-2 mb-2">
                       <input
@@ -607,11 +646,19 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                     <p className="text-xs text-muted-foreground">
                       +{risk.days} days, +${Math.round(risk.cost).toLocaleString()}
                     </p>
+                    <div className="mt-1.5 pt-1.5 border-t border-border/50 space-y-0.5">
+                      <p className="text-xs text-red-600">
+                        Profit impact: {profitImpact >= 0 ? '+' : ''}${Math.round(profitImpact).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Cost impact: +${Math.round(risk.cost || 0).toLocaleString()}
+                      </p>
+                    </div>
                     {timelineRiskEnabled[key] && (
                       <p className="text-xs text-red-600 mt-1">⚠️ Applied to profit calculation</p>
                     )}
                   </div>
-                ))}
+                ); })}
                 <div className="bg-red-500/10 border border-red-500/30 p-3 rounded-lg">
                   <p className="text-xs text-muted-foreground mb-1">Total ROI Impact</p>
                   <p className="text-sm font-bold text-red-400">

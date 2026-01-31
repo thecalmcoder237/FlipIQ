@@ -63,9 +63,9 @@ const DealSummaryCard = ({ deal, metrics, onEdit }) => {
             )}
           </div>
           <div className="flex items-center gap-4 text-primary-foreground text-base font-semibold">
-             <span className="flex items-center gap-1.5"><DollarSign size={16}/> Purchase: <span className="font-bold text-orange-400">${metrics.purchasePrice?.toLocaleString()}</span></span>
+             <span className="flex items-center gap-1.5"><DollarSign size={16}/> Purchase: <span className="font-bold text-white text-xl">${metrics.purchasePrice?.toLocaleString()}</span></span>
              <ArrowRight size={16} className="text-primary-foreground/80"/>
-             <span className="flex items-center gap-1.5"><Building size={16}/> ARV: <span className="font-bold text-orange-400">${metrics.arv?.toLocaleString()}</span></span>
+             <span className="flex items-center gap-1.5"><Building size={16}/> ARV: <span className="font-bold text-white text-xl">${metrics.arv?.toLocaleString()}</span></span>
           </div>
         </div>
 

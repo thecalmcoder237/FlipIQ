@@ -11,7 +11,6 @@ import { useToast } from "@/components/ui/use-toast";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { logDataFlow } from "@/utils/dataFlowDebug";
 import { useAuth } from '@/contexts/AuthContext';
-import { addressValidationService, getPostalCodeFromComponents, getCityAndCountyFromComponents } from '@/services/addressValidationService';
 import { fetchPropertyIntelligence, getPropertyApiUsage } from '@/services/edgeFunctionService';
 
 const SpecItem = ({ icon: Icon, label, value }) => (
@@ -53,7 +52,10 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
     setFetchError(null);
     logDataFlow('FETCH_PROPERTY_CLICK', { inputs }, new Date());
 
-    const validation = validatePropertyInput(inputs?.address, inputs?.zipCode);
+    const validation = validatePropertyInput(inputs?.address, inputs?.zipCode, {
+      city: inputs?.city,
+      county: inputs?.county,
+    });
     if (!validation.valid) {
       setFetchError(validation.error);
       toast({
@@ -67,44 +69,18 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
     setLoading(true);
 
     try {
-      // Geocode first so backend gets a normalized address (and optional lat/lng)
-      const geocodeResult = await addressValidationService.validateAndGeocode(inputs.address);
-      if (!geocodeResult.isValid) {
-        setFetchError(geocodeResult.error || "Address not found.");
-        toast({
-          variant: "destructive",
-          title: "Address Not Found",
-          description: geocodeResult.error || "Could not validate address. Check spelling and try again."
-        });
-        setLoading(false);
-        return;
-      }
-
-      const formattedAddress = geocodeResult.formattedAddress || inputs.address;
-      const zipFromGeocode = getPostalCodeFromComponents(geocodeResult.components);
-      const userZip5 = (inputs.zipCode || '').trim().replace(/\D/g, '').slice(0, 5);
-      const zipToSend = zipFromGeocode || userZip5 || inputs.zipCode?.trim() || '';
-      const { city: geocodeCity, county: geocodeCounty } = getCityAndCountyFromComponents(geocodeResult.components || []);
-
-      if (zipFromGeocode && userZip5 && zipFromGeocode !== userZip5) {
-        toast({
-          title: "ZIP mismatch",
-          description: `Geocoded ZIP (${zipFromGeocode}) differs from entered (${userZip5}). Using geocoded address for accuracy.`,
-          variant: "default"
-        });
-      }
+      const address = (inputs.address || "").trim();
+      const zipToSend = (inputs.zipCode || "").trim().replace(/\D/g, "").slice(0, 5);
 
       const data = await fetchPropertyIntelligence(
-        formattedAddress,
+        address,
         zipToSend,
         inputs.propertyType || "Single-Family",
         Number(inputs.arv) || 0,
         {
-          formattedAddress,
-          lat: geocodeResult.location?.lat,
-          lng: geocodeResult.location?.lng,
-          city: geocodeCity || inputs.propertyIntelligence?.city,
-          county: geocodeCounty || inputs.propertyIntelligence?.county,
+          formattedAddress: address,
+          city: inputs.city || inputs.propertyIntelligence?.city,
+          county: inputs.county || inputs.propertyIntelligence?.county,
           propertyId: inputs.propertyIntelligence?.propertyId,
           userId: currentUser?.id,
         }

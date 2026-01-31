@@ -61,18 +61,17 @@ export const dealService = {
     if (!dealId) throw new Error("Deal ID is required.");
     
     try {
-      // We join scenarios table to get the list of scenarios for this deal
-      // Note: 'scenarios' is not a column in 'deals', it's a related table.
-      // We use the explicit foreign key column 'deal_id' to disambiguate the relationship
-      // because there are two FKs between deals and scenarios.
+      // We join scenarios table to get the list of scenarios for this deal.
+      // Use maybeSingle() so missing deal returns null instead of PGRST116/406.
       const { data, error } = await supabase
         .from('deals')
         .select('*, scenarios:scenarios!deal_id(*)')
         .eq('id', dealId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
-      
+      if (!data) return null;
+
       // Security: Enforce ownership check
       if (userId && data.user_id !== userId) {
           throw new Error("Access denied: You do not have permission to access this deal.");

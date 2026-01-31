@@ -18,12 +18,13 @@ import { useToast } from '@/components/ui/use-toast';
 import { dealService } from '@/services/dealService';
 import { calculateDealMetrics } from '@/utils/dealCalculations';
 import { generateFullAnalysisReportPDF } from '@/utils/fullAnalysisReportPdf';
-import { generateLoanProposalPDF } from '@/utils/proposalTemplate';
+import { generateLoanProposalHtml } from '@/utils/loanProposalHtmlTemplate';
 import {
   arrayBufferToBase64,
   buildDealReportPath,
   uploadReportAndCreateSignedUrl,
 } from '@/services/reportStorageService';
+import html2pdf from 'html2pdf.js';
 import Breadcrumb from '@/components/Breadcrumb';
 
 const DEFAULT_TEAM_EMAILS = [
@@ -240,10 +241,8 @@ const DealActionHub = () => {
     try {
       const { supabase } = await import('@/lib/customSupabaseClient');
 
-      // Generate Loan Proposal PDF (80% ARV ask) + upload for link + attachment
       const borrowerName = (currentUser?.email || '').split('@')[0] || '';
       const defaultLoanTerms = {
-        // For display only; the PDF explicitly requests 80% ARV LTV
         loanAmount: Math.round((deal.purchasePrice || deal.purchase_price || 0) + (deal.rehab_costs || deal.rehabCosts || 0)),
         interestRate: 10,
         termMonths: 12,
@@ -256,8 +255,53 @@ const DealActionHub = () => {
         liquidity: 50000,
         trackRecord: 'Track record available upon request.',
       };
-      const proposalDoc = generateLoanProposalPDF(deal, metrics, defaultLoanTerms, defaultBorrower);
-      const proposalArrayBuffer = proposalDoc.output('arraybuffer');
+
+      // Generate Waterford-style HTML, render in hidden iframe, html2pdf → arrayBuffer
+      const proposalHtml = generateLoanProposalHtml({ deal, metrics, loanTerms: defaultLoanTerms, borrowerInfo: defaultBorrower });
+      const proposalArrayBuffer = await new Promise((resolve, reject) => {
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:absolute;width:1px;height:1px;left:-9999px;visibility:hidden;';
+        iframe.srcdoc = proposalHtml;
+        document.body.appendChild(iframe);
+        const onLoad = () => {
+          try {
+            const body = iframe.contentDocument?.body;
+            if (!body) {
+              document.body.removeChild(iframe);
+              reject(new Error('Iframe body not available'));
+              return;
+            }
+            const opt = {
+              margin: 10,
+              filename: `Loan_Proposal_${(deal.address || 'Deal').toString().replace(/\s+/g, '_')}.pdf`,
+              html2canvas: { scale: 2, useCORS: true },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+              pagebreak: { mode: ['avoid-all', 'css', 'legacy'], before: '.slide', after: '.slide' },
+            };
+            html2pdf()
+              .set(opt)
+              .from(body)
+              .outputPdf('arraybuffer')
+              .then((ab) => {
+                document.body.removeChild(iframe);
+                resolve(ab);
+              })
+              .catch((err) => {
+                document.body.removeChild(iframe);
+                reject(err);
+              });
+          } catch (e) {
+            document.body.removeChild(iframe);
+            reject(e);
+          }
+        };
+        iframe.onload = onLoad;
+        iframe.onerror = () => {
+          document.body.removeChild(iframe);
+          reject(new Error('Iframe failed to load'));
+        };
+      });
+
       const proposalBase64 = arrayBufferToBase64(proposalArrayBuffer);
       const proposalPath = buildDealReportPath({ dealId, type: 'loan-proposal', ext: 'pdf' });
       let downloadUrl;
@@ -307,11 +351,11 @@ const DealActionHub = () => {
 
       setActionStates(prev => ({
         ...prev,
-        loanProposal: { 
-          loading: false, 
-          success: true, 
-          error: null, 
-          downloadUrl: downloadUrl ?? data?.downloadUrl 
+        loanProposal: {
+          loading: false,
+          success: true,
+          error: null,
+          downloadUrl: downloadUrl ?? data?.downloadUrl
         }
       }));
 
@@ -322,7 +366,6 @@ const DealActionHub = () => {
           : "Loan proposal generated successfully"
       });
 
-      // Prefer our signed URL (works even if edge function doesn't return one yet)
       if (downloadUrl) window.open(downloadUrl, '_blank');
       else if (data?.downloadUrl) window.open(data.downloadUrl, '_blank');
     } catch (error) {
