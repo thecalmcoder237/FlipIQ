@@ -25,9 +25,12 @@ def readFileAsBase64(file_path):
         with open(file_path, "rb") as image_file:
             input_image = base64.b64encode(image_file.read()).decode("utf8")
         return input_image
-    except:
-        print("bad file name")
-        sys.exit(0)
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+        sys.exit(1)
+    except OSError as e:
+        print(f"Error reading file {file_path}: {e}")
+        sys.exit(1)
 
 
 def construct_bedrock_image_body(base64_string):
@@ -109,6 +112,9 @@ def seed():
 
 def search(query_term: Optional[str] = None):
     if query_term is None:
+        if len(sys.argv) < 2:
+            print("Usage: search <query_term>")
+            sys.exit(1)
         query_term = sys.argv[1]
     
     # create vector store client
@@ -129,6 +135,9 @@ def search(query_term: Optional[str] = None):
         limit=1,                            # number of records to return
         filters={"type": {"$eq": "jpg"}},   # metadata filters
     )
+    if not results:
+        print("No matches found")
+        sys.exit(1)
     result = results[0]
     print(result)
     plt.title(result)

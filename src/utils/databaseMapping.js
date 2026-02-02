@@ -3,12 +3,10 @@
  * Maps camelCase application inputs to snake_case database columns.
  * Handles type conversion and default values.
  * Ensures bidirectional consistency for robust data handling.
- * @param {Object} inputs - Application inputs (camelCase).
- * @param {{ includeFundingContactStatus?: boolean }} [opts] - If false, omits funding/contact/status columns (for DBs that haven't run the migration).
  */
-export const inputsToDatabase = (inputs, opts = {}) => {
+
+export const inputsToDatabase = (inputs) => {
   if (!inputs) return {};
-  const includeFundingContactStatus = opts.includeFundingContactStatus !== false;
 
   // Create the payload object explicitly to avoid including non-existent columns
   const payload = {
@@ -104,22 +102,25 @@ export const inputsToDatabase = (inputs, opts = {}) => {
     roi_percent: parseFloat(inputs.roi) || 0,
     annualized_roi: parseFloat(inputs.annualizedRoi) || 0,
     profit_margin_percent: parseFloat(inputs.profitMargin) || 0,
-  };
 
-  if (includeFundingContactStatus) {
-    payload.amount_approved = inputs.amountApproved != null && inputs.amountApproved !== '' ? parseFloat(inputs.amountApproved) : null;
-    payload.ltv_percent = inputs.ltvPercent != null && inputs.ltvPercent !== '' ? parseFloat(inputs.ltvPercent) : null;
-    payload.funding_rate_percent = inputs.fundingRatePercent != null && inputs.fundingRatePercent !== '' ? parseFloat(inputs.fundingRatePercent) : null;
-    payload.funding_term_months = inputs.fundingTermMonths != null && inputs.fundingTermMonths !== '' ? parseInt(inputs.fundingTermMonths, 10) : null;
-    payload.funding_source = inputs.fundingSource || null;
-    payload.deal_agent_name = inputs.dealAgentName || null;
-    payload.deal_agent_phone = inputs.dealAgentPhone || null;
-    payload.deal_agent_email = inputs.dealAgentEmail || null;
-    payload.deal_source_type = inputs.dealSourceType || null;
-    payload.is_closed = inputs.isClosed === true;
-    payload.is_funded = inputs.isFunded === true;
-    payload.funded_terms = inputs.fundedTerms || null;
-  }
+    // Funding approved
+    amount_approved: inputs.amountApproved != null && inputs.amountApproved !== '' ? parseFloat(inputs.amountApproved) : null,
+    ltv_percent: inputs.ltvPercent != null && inputs.ltvPercent !== '' ? parseFloat(inputs.ltvPercent) : null,
+    funding_rate_percent: inputs.fundingRatePercent != null && inputs.fundingRatePercent !== '' ? parseFloat(inputs.fundingRatePercent) : null,
+    funding_term_months: inputs.fundingTermMonths != null && inputs.fundingTermMonths !== '' ? parseInt(inputs.fundingTermMonths, 10) : null,
+    funding_source: inputs.fundingSource || null,
+
+    // Deal contact / source
+    deal_agent_name: inputs.dealAgentName || null,
+    deal_agent_phone: inputs.dealAgentPhone || null,
+    deal_agent_email: inputs.dealAgentEmail || null,
+    deal_source_type: inputs.dealSourceType || null,
+
+    // Status / closed / funded
+    is_closed: inputs.isClosed === true,
+    is_funded: inputs.isFunded === true,
+    funded_terms: inputs.fundedTerms || null,
+  };
 
   return payload;
 };

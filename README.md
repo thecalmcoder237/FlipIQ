@@ -1,41 +1,52 @@
-# Image Search with Amazon Bedrock and Supabase Vector
+# FlipIQ
 
-In this example we're implementing image search using the [Amazon Titan Multimodal Embeddings G1](https://aws.amazon.com/bedrock/titan), a set of pre-trained high-performing image, multimodal, and text model, accessible via a fully managed API.
+Real estate deal analysis platform for flippers and investors. Analyze deals, model scenarios, track portfolio performance, and generate loan proposals.
 
-We're implementing two methods in the [`/image_search/main.py` file](/image_search/main.py):
+## Tech stack
 
-1. The `seed` method generates embeddings for the images in the `images` folder and upserts them into a collection in Supabase Vector.
-2. The `search` method generates an embedding from the search query and performs a vector similarity search query.
+- **Frontend:** React 18, Vite 7, Tailwind CSS, Radix UI, Framer Motion, Recharts
+- **Backend / data:** Supabase (auth, Postgres, storage)
+- **Deal math:** Custom calculators for acquisition, rehab, holding, selling costs, ROI, and deal score
+
+## Features
+
+- **Deal input & analysis:** Enter property and financial inputs; get total project cost, net profit, ROI, annualized ROI, and deal score
+- **Scenario modeling:** Base / Best / Worst case with rehab overrun, hold time, and ARV shift; impact on cost, profit, ROI, and risk
+- **Scenario risk tab:** Minimum ARV calculator, adjustable assumptions (rehab overrun %, hold time, ARV shift %), probability-weighted outcomes, market shock and hidden-cost toggles
+- **Portfolio dashboard:** Snapshot (total deals, active, closed profitable/unprofitable, pending, avg score, portfolio ROI, cash deployed), filterable/sortable deal grid, deal comparison (2–3 deals side-by-side)
+- **Deal funding & contact:** Per-deal funding (amount approved, LTV %, rate, term, source), agent/owner contact (name, phone, email, source type), status (closed/funded and funded terms)
+- **Property intelligence:** Optional property details and comps
+- **Rehab SOW & budget:** Scope of work and budget tools
+- **Loan proposal generator:** Generate loan proposal documents
+- **PDF export:** Export analysis and rehab insights to PDF
 
 ## Setup
 
-- Install poetry: `pip install poetry`
-- Activate the virtual environment: `poetry shell`
-  - (to leave the venv just run `exit`)
-- Install app dependencies: `poetry install`
+1. Clone the repo.
+2. Install dependencies: `npm install`
+3. Copy `.env.example` to `.env.local` and fill in your Supabase URL and anon key (and any other keys you use). **Do not commit `.env` or `.env.local`**; they are listed in `.gitignore`.
+4. Run Supabase migrations (see Supabase docs or `supabase/` folder).
+5. Start dev server: `npm run dev`
 
-## Run locally
+## Scripts
 
-### Generate the embeddings and seed the collection
+- `npm run dev` — Start Vite dev server (port 3000)
+- `npm run build` — Production build
+- `npm run preview` — Preview production build
+- `npm run lint` — Run ESLint
 
-- `supabase start`
-- `poetry run seed`
-- Check the embeddings stored in the local Supabase Dashboard: http://localhost:54323/project/default/editor > schema: vecs
+## Security
 
-### Perform a search
+- **Secrets:** Never commit `.env`, `.env.local`, or any file containing API keys, database URLs, or passwords. The `.gitignore` is configured to exclude these. If credentials were ever committed, rotate them immediately in the Supabase dashboard and any other services.
 
-- `poetry run search "bike in front of red brick wall"`
+## Project structure
 
-## Run on hosted Supabase project
+- `src/pages/` — Route pages (DealAnalysisPage, PortfolioDashboard, DealInputForm, etc.)
+- `src/components/` — Reusable UI and feature components
+- `src/utils/` — Deal calculations, database mapping, risk calculations
+- `src/services/` — API and Supabase services
+- `supabase/` — Migrations and edge functions
 
-- Set `DB_CONNECTION` with the connection string from your hosted Supabase Dashboard: https://supabase.com/dashboard/project/_/database/settings > Connection string > URI
+## License
 
-## Attributions
-
-### Models
-
-[Amazon Titan Multimodal Embeddings G1](https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-titan-embed-mm.html)
-
-### Images
-
-Images from https://unsplash.com/license via https://picsum.photos/
+Proprietary. All rights reserved.
