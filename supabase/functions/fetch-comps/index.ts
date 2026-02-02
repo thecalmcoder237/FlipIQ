@@ -182,6 +182,10 @@ function mapPropertyRecordToComp(p: Record<string, unknown> | null): Record<stri
   );
   const saleDate =
     p.lastSaleDate ?? p.last_sale_date ?? lastSale?.saleDate ?? lastSale?.closeDate ?? lastSale?.date ?? "";
+  const yearBuilt = p.yearBuilt ?? p.year_built;
+  const lat = p.latitude ?? p.lat;
+  const lng = p.longitude ?? p.lng ?? p.lon;
+  const dist = p.distance;
   return {
     address: a,
     salePrice: Number.isFinite(salePrice) ? salePrice : undefined,
@@ -197,6 +201,10 @@ function mapPropertyRecordToComp(p: Record<string, unknown> | null): Record<stri
     parkingType: (p.garageType ?? p.parkingType) != null ? String(p.garageType ?? p.parkingType) : undefined,
     parkingSpaces: p.parkingSpaces ?? p.garageSpaces,
     levels: p.levels ?? p.stories,
+    yearBuilt: yearBuilt != null ? Number(yearBuilt) : undefined,
+    latitude: lat != null && Number.isFinite(Number(lat)) ? Number(lat) : undefined,
+    longitude: lng != null && Number.isFinite(Number(lng)) ? Number(lng) : undefined,
+    distance: dist != null && Number.isFinite(Number(dist)) ? Number(dist) : undefined,
   };
 }
 
@@ -234,6 +242,10 @@ function mapRentCastToComp(item: Record<string, unknown>): Record<string, unknow
   const parkingType = item.garageType ?? item.garage_type ?? item.parkingType ?? item.parking_type ?? item.carport ?? item.streetParking;
   const parkingSpaces = item.parkingSpaces ?? item.parking_spaces ?? item.garageSpaces ?? item.numberOfParking ?? item.garage_spaces;
   const levels = item.levels ?? item.stories ?? item.numberOfStories ?? item.stories_count;
+  const yearBuilt = item.yearBuilt ?? item.year_built;
+  const lat = item.latitude ?? item.lat;
+  const lng = item.longitude ?? item.lng ?? item.lon;
+  const dist = item.distance;
   return {
     address: a,
     salePrice: Number.isFinite(salePrice) ? salePrice : undefined,
@@ -249,6 +261,10 @@ function mapRentCastToComp(item: Record<string, unknown>): Record<string, unknow
     parkingType: parkingType != null ? String(parkingType) : undefined,
     parkingSpaces: parkingSpaces != null ? (Number(parkingSpaces) || String(parkingSpaces)) : undefined,
     levels: levels != null ? (Number(levels) || String(levels)) : undefined,
+    yearBuilt: yearBuilt != null ? Number(yearBuilt) : undefined,
+    latitude: lat != null && Number.isFinite(Number(lat)) ? Number(lat) : undefined,
+    longitude: lng != null && Number.isFinite(Number(lng)) ? Number(lng) : undefined,
+    distance: dist != null && Number.isFinite(Number(dist)) ? Number(dist) : undefined,
   };
 }
 
@@ -312,36 +328,84 @@ function buildFullAddress(opts: { address: string; zipCode: string; city?: strin
   return parts.join(", ");
 }
 
+/** Normalize AVM subject/property object to a minimal shape for comparison (address, squareFootage, bedrooms, bathrooms, yearBuilt). */
+function mapAvmSubject(p: Record<string, unknown> | null): Record<string, unknown> | undefined {
+  if (!p || typeof p !== "object") return undefined;
+  const num = (v: unknown) => (v != null && v !== "" ? Number(v) : undefined);
+  const str = (v: unknown) => (v != null && String(v).trim() ? String(v).trim() : undefined);
+  const addressStr = str(p.formattedAddress ?? p.address ?? p.streetAddress ?? p.street_address ?? p.line1);
+  const sqft = num(p.squareFootage ?? p.square_footage ?? p.sqft);
+  const beds = p.bedrooms ?? p.beds;
+  const baths = p.bathrooms ?? p.baths;
+  const yearBuilt = num(p.yearBuilt ?? p.year_built ?? p.YearBuilt);
+  if (!addressStr && sqft == null && beds == null && baths == null && yearBuilt == null) return undefined;
+  const out: Record<string, unknown> = {};
+  if (addressStr) out.address = addressStr;
+  if (sqft != null && Number.isFinite(sqft)) out.squareFootage = sqft;
+  if (beds != null) out.bedrooms = beds;
+  if (baths != null) out.bathrooms = baths;
+  if (yearBuilt != null && Number.isFinite(yearBuilt)) out.yearBuilt = yearBuilt;
+  return Object.keys(out).length ? out : undefined;
+}
+
+type AvmCompsResult = {
+  comparables: Array<Record<string, unknown>>;
+  avmValue?: number;
+  avmSubject?: Record<string, unknown>;
+};
+
 /** GET /v1/avm/value - returns value estimate and comparables array; primary source for comps. */
-async function fetchRentCastCompsFromAvmValue(address: string, zipCode: string): Promise<Array<Record<string, unknown>>> {
+async function fetchRentCastCompsFromAvmValue(address: string, zipCode: string): Promise<AvmCompsResult> {
   const apiKey = getRentCastKey();
-  if (!apiKey) return [];
+  if (!apiKey) return { comparables: [] };
   const params = new URLSearchParams();
   if (address) params.set("address", address);
   if (zipCode) params.set("zipCode", zipCode);
   const url = `${RENTCAST_BASE}/avm/value?${params.toString()}`;
   const res = await fetch(url, { headers: { "X-Api-Key": apiKey, Accept: "application/json" } });
-  if (!res.ok) return [];
+  if (!res.ok) return { comparables: [] };
   const data = await res.json();
-  if (!data || typeof data !== "object") return [];
+  if (!data || typeof data !== "object") return { comparables: [] };
   const d = data as Record<string, unknown>;
   const comparables = Array.isArray(d.comparables) ? d.comparables : [];
   const mapped = comparables
     .map((item: unknown) => mapRentCastToComp(item as Record<string, unknown>))
     .filter(Boolean) as Array<Record<string, unknown>>;
-  return mapped;
+
+  const rawValue = d.value ?? d.price ?? d.avmValue ?? d.estimatedValue;
+  const avmValue = rawValue != null && rawValue !== "" ? Number(rawValue) : undefined;
+  const numAvm = typeof avmValue === "number" && Number.isFinite(avmValue) ? avmValue : undefined;
+
+  const rawSubject = d.property ?? d.subject ?? d.subjectProperty;
+  const subjectObj = rawSubject && typeof rawSubject === "object" && !Array.isArray(rawSubject) ? (rawSubject as Record<string, unknown>) : null;
+  const avmSubject = subjectObj ? mapAvmSubject(subjectObj) : undefined;
+
+  return { comparables: mapped, avmValue: numAvm, avmSubject };
 }
+
+type CompsFetchResult =
+  | { comps: Array<Record<string, unknown>>; source: "avm"; avmValue?: number; avmSubject?: Record<string, unknown> }
+  | { comps: Array<Record<string, unknown>>; source: "listings" | "properties" };
 
 async function fetchRentCastComps(
   address: string,
   zipCode: string,
   limit: number,
   opts?: { fullAddress?: string; city?: string; state?: string }
-): Promise<Array<Record<string, unknown>>> {
-  let comps = await fetchRentCastCompsFromAvmValue(address, zipCode);
-  if (comps.length === 0) comps = await fetchRentCastCompsFromListings(address, zipCode, limit);
-  if (comps.length === 0) comps = await fetchRentCastCompsFromProperties(zipCode, limit, opts);
-  return comps.slice(0, limit);
+): Promise<CompsFetchResult> {
+  const avm = await fetchRentCastCompsFromAvmValue(address, zipCode);
+  if (avm.comparables.length > 0) {
+    return {
+      comps: avm.comparables.slice(0, limit),
+      source: "avm",
+      avmValue: avm.avmValue,
+      avmSubject: avm.avmSubject,
+    };
+  }
+  const listings = await fetchRentCastCompsFromListings(address, zipCode, limit);
+  if (listings.length > 0) return { comps: listings, source: "listings" };
+  const props = await fetchRentCastCompsFromProperties(zipCode, limit, opts);
+  return { comps: props, source: "properties" };
 }
 
 /** GET /v1/listings/sale/{id} - returns single sale listing for that property ID. */
@@ -401,6 +465,8 @@ Deno.serve(async (req) => {
 
     let recentComps: Array<Record<string, unknown>> = [];
     let subjectSaleListing: Record<string, unknown> | null = null;
+    let avmValue: number | undefined;
+    let avmSubject: Record<string, unknown> | undefined;
     const errors: string[] = [];
     let debugComps: { compsRawCount: number; notSubjectCount: number; recentCompsCount: number } | null = null;
 
@@ -409,7 +475,12 @@ Deno.serve(async (req) => {
     if (getRentCastKey() && rentcastAllowed) {
       try {
         // AVM first (returns comparables for this address), then listings/properties fallback
-        let compsRaw = await fetchRentCastComps(address, zipCode, 15, { fullAddress, city, state });
+        const fetchResult = await fetchRentCastComps(address, zipCode, 15, { fullAddress, city, state });
+        const compsRaw = fetchResult.comps;
+        if (fetchResult.source === "avm") {
+          avmValue = fetchResult.avmValue;
+          avmSubject = fetchResult.avmSubject;
+        }
 
         // Filter out the subject property by ID and normalized address (isSubjectComp)
         const notSubject = compsRaw.filter((c) => !isSubjectComp(c, subjectAddress, propertyId));
@@ -452,6 +523,8 @@ Deno.serve(async (req) => {
       source: "RentCast",
     };
     if (subjectSaleListing != null) result.subjectSaleListing = subjectSaleListing;
+    if (avmValue != null) result.avmValue = avmValue;
+    if (avmSubject != null) result.avmSubject = avmSubject;
     if (debugRequested) {
       result._debug = { address, zipCode, city: city ?? null, state: state ?? null, propertyId: propertyId ?? null, subjectAddress: subjectAddress ?? null, fullAddress };
       if (debugComps) result._debugComps = debugComps;

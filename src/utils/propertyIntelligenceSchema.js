@@ -81,6 +81,10 @@ function normalizeComp(raw) {
   const parkingType = safeStr(raw.parkingType ?? raw.parking_type ?? raw.garageType ?? raw.garage_type);
   const parkingSpaces = raw.parkingSpaces != null ? (Number(raw.parkingSpaces) || raw.parkingSpaces) : (raw.parking_spaces ?? raw.garageSpaces ?? raw.numberOfParking);
   const levels = raw.levels != null ? (Number(raw.levels) || raw.levels) : (raw.stories ?? raw.numberOfStories ?? raw.stories_count);
+  const yearBuilt = raw.yearBuilt != null ? safeNum(raw.yearBuilt, MIN_YEAR, MAX_YEAR) : (raw.year_built != null ? safeNum(raw.year_built, MIN_YEAR, MAX_YEAR) : undefined);
+  const latitude = raw.latitude != null ? safeNum(raw.latitude, -90, 90) : (raw.lat != null ? safeNum(raw.lat, -90, 90) : undefined);
+  const longitude = raw.longitude != null ? safeNum(raw.longitude, -180, 180) : (raw.lng != null ? safeNum(raw.lng, -180, 180) : (raw.lon != null ? safeNum(raw.lon, -180, 180) : undefined));
+  const distance = raw.distance != null ? safeNum(raw.distance, 0, 1e6) : undefined;
 
   return {
     address,
@@ -96,6 +100,10 @@ function normalizeComp(raw) {
     parkingType: parkingType || undefined,
     parkingSpaces: parkingSpaces !== undefined && parkingSpaces !== null ? (Number(parkingSpaces) || String(parkingSpaces)) : undefined,
     levels: levels !== undefined && levels !== null ? (Number(levels) || String(levels)) : undefined,
+    yearBuilt: yearBuilt ?? undefined,
+    latitude: latitude ?? undefined,
+    longitude: longitude ?? undefined,
+    distance: distance ?? undefined,
   };
 }
 
@@ -130,6 +138,19 @@ export function normalizePropertyIntelligenceResponse(raw) {
   const longitude = merged.longitude != null ? safeNum(merged.longitude, -180, 180) : undefined;
   const propertyId = safeStr(merged.propertyId ?? merged.property_id ?? merged.parcelId ?? merged.parcel_id ?? merged.ParcelNumber);
 
+  const avmValue = merged.avmValue != null ? safeNum(merged.avmValue, 0, 1e12) : undefined;
+  const avmSubjectRaw = merged.avmSubject ?? merged.avm_subject;
+  const avmSubject =
+    avmSubjectRaw && typeof avmSubjectRaw === 'object' && !Array.isArray(avmSubjectRaw)
+      ? {
+          address: safeStr(avmSubjectRaw.address ?? avmSubjectRaw.formattedAddress ?? avmSubjectRaw.streetAddress),
+          squareFootage: avmSubjectRaw.squareFootage != null ? safeNum(avmSubjectRaw.squareFootage, 0, 1e7) : (avmSubjectRaw.square_footage != null ? safeNum(avmSubjectRaw.square_footage, 0, 1e7) : undefined),
+          bedrooms: avmSubjectRaw.bedrooms ?? avmSubjectRaw.beds,
+          bathrooms: avmSubjectRaw.bathrooms ?? avmSubjectRaw.baths,
+          yearBuilt: avmSubjectRaw.yearBuilt != null ? safeNum(avmSubjectRaw.yearBuilt, MIN_YEAR, MAX_YEAR) : (avmSubjectRaw.year_built != null ? safeNum(avmSubjectRaw.year_built, MIN_YEAR, MAX_YEAR) : undefined),
+        }
+      : undefined;
+
   const out = {
     propertyType: safeStr(merged.propertyType ?? merged.property_type ?? merged.UseCode),
     yearBuilt: yearBuilt ?? undefined,
@@ -156,6 +177,8 @@ export function normalizePropertyIntelligenceResponse(raw) {
   if (subjectSaleListing != null && subjectSaleListing.address && !recentComps.some((c) => c.address === subjectSaleListing.address)) {
     out.subjectSaleListing = subjectSaleListing;
   }
+  if (avmValue != null) out.avmValue = avmValue;
+  if (avmSubject != null) out.avmSubject = avmSubject;
 
   // Preserve usage/source/warnings and any other keys from merged
   const knownKeys = new Set([
@@ -164,6 +187,7 @@ export function normalizePropertyIntelligenceResponse(raw) {
     'schoolDistrict', 'zoning', 'county', 'annualPropertyTaxes', 'assessedValue', 'recentComps', 'subjectSaleListing',
     'property_type', 'year_built', 'square_footage', 'recent_comps', 'propertySpecs', 'subject_sale_listing',
     'latitude', 'longitude', 'propertyId', 'property_id', 'parcelId', 'parcel_id', 'usage', 'source', 'warnings',
+    'avmValue', 'avmSubject', 'avm_value', 'avm_subject',
   ]);
   Object.keys(merged).forEach((key) => {
     if (knownKeys.has(key)) return;

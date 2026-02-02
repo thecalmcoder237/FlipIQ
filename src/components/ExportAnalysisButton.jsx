@@ -4,18 +4,36 @@ import { Button } from '@/components/ui/button';
 import { Download, Mail } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import html2pdf from 'html2pdf.js';
 import { useToast } from '@/components/ui/use-toast';
 
-const ExportAnalysisButton = ({ deal, metrics, propertyIntelligence, sowData, scenarios }) => {
+const ExportAnalysisButton = ({ deal, metrics, propertyIntelligence, sowData, scenarios, pageRef }) => {
   const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setIsExporting(true);
     try {
+      const filename = `Analysis-${(deal?.address || 'deal').replace(/\s+/g, '-')}.pdf`;
+
+      if (pageRef?.current) {
+        await html2pdf()
+          .set({
+            margin: 10,
+            filename,
+            image: { type: 'jpeg', quality: 0.95 },
+            html2canvas: { scale: 2, useCORS: true, scrollY: 0, scrollX: 0 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['css', 'legacy'], before: '.page-break-before', after: '.page-break-after', avoid: 'tr' },
+          })
+          .from(pageRef.current)
+          .save();
+        toast({ title: "Report Downloaded", description: "Full page PDF is ready." });
+        return;
+      }
+
       const doc = new jsPDF();
       
-      // 1. Header
       doc.setFontSize(22);
       doc.setTextColor(40, 40, 40);
       doc.text("Investment Analysis Report", 14, 20);
@@ -24,7 +42,6 @@ const ExportAnalysisButton = ({ deal, metrics, propertyIntelligence, sowData, sc
       doc.setTextColor(100, 100, 100);
       doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, 28);
 
-      // 2. Deal Summary
       doc.setFontSize(14);
       doc.setTextColor(0, 0, 0);
       doc.text("Deal Executive Summary", 14, 40);
@@ -34,9 +51,9 @@ const ExportAnalysisButton = ({ deal, metrics, propertyIntelligence, sowData, sc
         ['Purchase Price', `$${deal.purchase_price?.toLocaleString()}`],
         ['ARV', `$${deal.arv?.toLocaleString()}`],
         ['Rehab Budget', `$${deal.rehab_costs?.toLocaleString()}`],
-        ['Deal Score', `${metrics.score}/100`],
-        ['Est. Net Profit', `$${metrics.netProfit?.toLocaleString()}`],
-        ['Est. ROI', `${metrics.roi?.toFixed(1)}%`]
+        ['Deal Score', `${metrics?.score ?? 0}/100`],
+        ['Est. Net Profit', `$${metrics?.netProfit?.toLocaleString() ?? 0}`],
+        ['Est. ROI', `${metrics?.roi?.toFixed(1) ?? 0}%`]
       ];
       
       autoTable(doc, {
@@ -47,8 +64,8 @@ const ExportAnalysisButton = ({ deal, metrics, propertyIntelligence, sowData, sc
         headStyles: { fillColor: [63, 180, 224] }
       });
 
-      // 3. Property Intelligence
-      let finalY = doc.lastAutoTable.finalY + 15;
+      let finalY = doc.lastAutoTable?.finalY ?? 60;
+      finalY += 15;
       
       if (propertyIntelligence?.propertySpecs) {
          doc.text("Property Specifications", 14, finalY);
@@ -66,18 +83,17 @@ const ExportAnalysisButton = ({ deal, metrics, propertyIntelligence, sowData, sc
             body: specRows,
             theme: 'grid'
          });
-         finalY = doc.lastAutoTable.finalY + 15;
+         finalY = doc.lastAutoTable?.finalY + 15;
       }
 
-      // 4. Financial Breakdown
       doc.text("Financial Breakdown", 14, finalY);
       const finData = [
-        ['Acquisition Costs', `$${metrics.acquisition.total?.toLocaleString()}`],
-        ['Hard Money Costs', `$${metrics.hardMoney.total?.toLocaleString()}`],
-        ['Rehab Costs', `$${metrics.rehab.total?.toLocaleString()}`],
-        ['Holding Costs', `$${metrics.holding.total?.toLocaleString()}`],
-        ['Selling Costs', `$${metrics.selling.total?.toLocaleString()}`],
-        ['TOTAL PROJECT COST', `$${metrics.totalProjectCost?.toLocaleString()}`]
+        ['Acquisition Costs', `$${metrics?.acquisition?.total?.toLocaleString() ?? 0}`],
+        ['Hard Money Costs', `$${metrics?.hardMoney?.total?.toLocaleString() ?? 0}`],
+        ['Rehab Costs', `$${metrics?.rehab?.total?.toLocaleString() ?? 0}`],
+        ['Holding Costs', `$${metrics?.holding?.total?.toLocaleString() ?? 0}`],
+        ['Selling Costs', `$${metrics?.selling?.total?.toLocaleString() ?? 0}`],
+        ['TOTAL PROJECT COST', `$${metrics?.totalProjectCost?.toLocaleString() ?? 0}`]
       ];
       autoTable(doc, {
          startY: finalY + 5,
@@ -86,13 +102,12 @@ const ExportAnalysisButton = ({ deal, metrics, propertyIntelligence, sowData, sc
          columnStyles: { 1: { fontStyle: 'bold', halign: 'right' } }
       });
 
-      // Save
-      doc.save(`Analysis-${deal.address.replace(/\s+/g, '-')}.pdf`);
+      doc.save(filename);
       toast({ title: "Report Downloaded", description: "Your PDF analysis is ready." });
       
     } catch (error) {
       console.error(error);
-      toast({ variant: "destructive", title: "Export Failed", description: "Could not generate PDF." });
+      toast({ variant: "destructive", title: "Export Failed", description: error?.message ?? "Could not generate PDF." });
     } finally {
       setIsExporting(false);
     }

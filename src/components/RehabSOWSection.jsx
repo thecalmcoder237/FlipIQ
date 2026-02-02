@@ -9,7 +9,14 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { logDataFlow } from "@/utils/dataFlowDebug";
 import { generateRehabSOW } from '@/services/edgeFunctionService';
 
-const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, onSowGenerated }) => {
+/** Strip ## Pro Flipper Recommendations section from SOW so it only appears in the dedicated card. */
+function stripProFlipperSection(text) {
+  if (!text || typeof text !== 'string') return text;
+  const re = /##\s+Pro Flipper Recommendations[\s\S]*?(?=\n##\s|$)/i;
+  return text.replace(re, '').trim();
+}
+
+const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, onSowGenerated, recentComps }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const { toast } = useToast();
@@ -63,20 +70,35 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
     
     const requestPayload = {
         userAddress: userAddress,
-        rehabBudget: Number(inputs?.rehabCosts) || 0, // Optional reference only, not a constraint
+        rehabBudget: Number(inputs?.rehabCosts) || 0,
         propertyDescription: typeof propertyData === 'string' ? propertyData : JSON.stringify(propertyData || {}),
-        images: imageUrls // Include images for Claude Vision analysis
+        images: imageUrls,
+        options: {
+          deal: {
+            address: deal?.address ?? userAddress,
+            arv: deal?.arv ?? inputs?.arv ?? 0,
+            purchase_price: deal?.purchase_price ?? deal?.purchasePrice ?? inputs?.purchase_price ?? 0,
+            rehab_costs: Number(inputs?.rehabCosts) || 0,
+            squareFootage: propertyData?.squareFootage ?? propertyData?.square_footage ?? deal?.sqft,
+            bedrooms: propertyData?.bedrooms ?? deal?.bedrooms,
+            bathrooms: propertyData?.bathrooms ?? deal?.bathrooms,
+            yearBuilt: propertyData?.yearBuilt ?? propertyData?.year_built ?? deal?.yearBuilt,
+            county: propertyData?.county ?? deal?.county,
+            zipCode: deal?.zipCode ?? deal?.zip_code ?? inputs?.zipCode,
+          },
+          recentComps: Array.isArray(recentComps) ? recentComps : [],
+        },
     };
 
-    console.log('Rehab SOW Request with images:', { ...requestPayload, imagesCount: imageUrls.length });
+    console.log('Rehab SOW Request with images and context:', { ...requestPayload, imagesCount: imageUrls.length });
 
     try {
-      // Use edge function service - now includes images
       const data = await generateRehabSOW(
-        requestPayload.userAddress, 
-        requestPayload.rehabBudget, 
+        requestPayload.userAddress,
+        requestPayload.rehabBudget,
         requestPayload.propertyDescription,
-        requestPayload.images
+        requestPayload.images,
+        requestPayload.options
       );
 
       console.log('Rehab SOW Response:', data);
@@ -117,9 +139,11 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
       if (line.trim().startsWith('|')) {
         const cols = line.split('|').filter(c => c.trim() !== '');
         if (line.includes('---')) return null;
+        const colCount = Math.max(2, Math.min(cols.length, 4));
+        const lastIdx = cols.length - 1;
         return (
-           <div key={i} className="grid grid-cols-3 gap-2 py-2 border-b border-border text-sm hover:bg-accent px-2">
-              {cols.map((c, idx) => <span key={idx} className={idx === 2 ? "text-right font-mono text-green-600 font-medium" : "text-foreground"}>{c.trim()}</span>)}
+           <div key={i} className={`grid gap-2 py-2 border-b border-border text-sm hover:bg-accent px-2 ${colCount === 2 ? 'grid-cols-2' : colCount === 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>
+              {cols.map((c, idx) => <span key={idx} className={idx === lastIdx ? "text-right font-mono text-green-600 font-medium" : "text-foreground"}>{c.trim()}</span>)}
            </div>
         );
       }
@@ -127,6 +151,16 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
          return <li key={i} className="ml-4 text-foreground mb-1 list-disc pl-2">{line.replace('- ', '')}</li>
       }
       if (line.trim() === '') return <br key={i}/>;
+      const trimmed = line.trim();
+      const isTimeline = /estimated\s*(?:timeline|duration|time)\s*:\s*\d+/i.test(trimmed) || /^\d+\s*(?:weeks?|months?)\s*(?:estimated|timeline)?/i.test(trimmed);
+      const isTotalCost = /total\s*estimated\s*cost\s*:\s*\$?[\d,]+/i.test(trimmed) || /^total\s*:\s*\$?[\d,]+/i.test(trimmed);
+      if (isTimeline || isTotalCost) {
+        return (
+          <p key={i} className="mb-2 py-2 px-3 rounded-md bg-primary/15 border-l-4 border-primary font-semibold text-primary">
+            {trimmed}
+          </p>
+        );
+      }
       return <p key={i} className="text-foreground mb-1 leading-relaxed">{line}</p>;
     });
   };
@@ -250,9 +284,8 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
               </CardHeader>
               <CardContent className="p-6 bg-background">
                 <div className="prose max-w-none">
-                   {renderContent(savedSow)}
+                   {renderContent(stripProFlipperSection(savedSow))}
                 </div>
-                
                 <div className="mt-8 bg-primary/20 border border-primary/30 p-4 rounded-lg flex items-start gap-3">
                    <CheckCircle2 className="text-primary shrink-0 mt-1" />
                    <div>

@@ -106,22 +106,57 @@ export const getPropertyApiUsage = async (userId) => {
     }
 };
 
-export const generateRehabSOW = async (address, budget, propertyDetails, images = []) => {
-    return invokeEdgeFunction('generate-rehab-sow', {
+/**
+ * Reset RentCast API usage count for the current month (e.g. when a new plan period starts).
+ * @param {string} userId - Authenticated user id
+ * @returns {{ realie_count: number, rentcast_count: number, realie_limit: number, rentcast_limit: number, year_month: string }} Updated usage
+ */
+export const resetPropertyApiUsage = async (userId) => {
+    if (!userId) return null;
+    try {
+      return await invokeEdgeFunction('get-property-api-usage', { userId, action: 'reset' });
+    } catch (err) {
+      return null;
+    }
+};
+
+/**
+ * Generate rehab SOW. Pass full property data, deal summary, and comps so Claude can use them.
+ * @param {string} address
+ * @param {number} budget
+ * @param {string|object} propertyDetails - Property intelligence / description
+ * @param {string[]} images - Photo URLs
+ * @param {{ deal?: object, recentComps?: array, compsSummary?: string }} [options] - Deal summary and comps for accuracy and recommendations
+ */
+export const generateRehabSOW = async (address, budget, propertyDetails, images = [], options = {}) => {
+    const payload = {
         userAddress: address,
-        rehabBudget: budget || 0, // Optional reference, not a constraint
-        propertyDescription: typeof propertyDetails === 'string' ? propertyDetails : JSON.stringify(propertyDetails),
+        rehabBudget: budget || 0,
+        propertyDescription: typeof propertyDetails === 'string' ? propertyDetails : JSON.stringify(propertyDetails || {}),
         images: Array.isArray(images) ? images : []
-    });
+    };
+    if (options.deal && typeof options.deal === 'object') {
+        payload.deal = options.deal;
+    }
+    if (Array.isArray(options.recentComps) && options.recentComps.length > 0) {
+        payload.recentComps = options.recentComps;
+    }
+    if (typeof options.compsSummary === 'string' && options.compsSummary.trim()) {
+        payload.compsSummary = options.compsSummary.trim();
+    }
+    return invokeEdgeFunction('generate-rehab-sow', payload);
 };
 
 /**
  * Vision-first Advanced Rehab Analysis: sends photos + per-photo analysis + deal context.
  * Returns structured property_details for deal.property_details.
+ * Includes userAddress and rehabBudget so server validation (if any) passes; analyze path ignores them.
  */
 export const runAdvancedRehabAnalysis = async (deal, photoUrls = [], perPhotoAnalysis = []) => {
-    return invokeEdgeFunction('generate-rehab-sow', {
+    const payload = {
         action: 'analyze',
+        userAddress: deal?.address ?? deal?.formattedAddress ?? '',
+        rehabBudget: Number(deal?.rehabCosts ?? deal?.rehab_costs ?? 0) || 0,
         deal: {
             address: deal?.address,
             zipCode: deal?.zipCode ?? deal?.zip_code,
@@ -132,7 +167,8 @@ export const runAdvancedRehabAnalysis = async (deal, photoUrls = [], perPhotoAna
         },
         images: Array.isArray(photoUrls) ? photoUrls : [],
         perPhotoAnalysis: Array.isArray(perPhotoAnalysis) ? perPhotoAnalysis : []
-    });
+    };
+    return invokeEdgeFunction('generate-rehab-sow', payload);
 };
 
 export const calculateCostBreakdown = async (dealData) => {

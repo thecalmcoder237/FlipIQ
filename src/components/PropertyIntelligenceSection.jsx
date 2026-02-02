@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, DollarSign, ChevronDown, ChevronUp, RefreshCw, Sparkles, AlertTriangle, History } from 'lucide-react';
+import { Building2, DollarSign, ChevronDown, ChevronUp, RefreshCw, Sparkles, AlertTriangle, History, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/use-toast";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { logDataFlow } from "@/utils/dataFlowDebug";
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchPropertyIntelligence, fetchComps, getPropertyApiUsage } from '@/services/edgeFunctionService';
+import { fetchPropertyIntelligence, fetchComps, getPropertyApiUsage, resetPropertyApiUsage } from '@/services/edgeFunctionService';
 
 /** Renders property detail values: primitives as text, arrays as tags/list, objects as styled key-value blocks. */
 function DetailValueCell({ value }) {
@@ -67,7 +67,7 @@ function DetailValueCell({ value }) {
 
 const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch, propertyData }) => {
   const { currentUser } = useAuth();
-  const [isSpecsOpen, setIsSpecsOpen] = useState(true);
+  const [isSpecsOpen, setIsSpecsOpen] = useState(false);
   const [isCompsOpen, setIsCompsOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const [compsRefreshing, setCompsRefreshing] = useState(false);
@@ -85,6 +85,17 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
       .then((data) => data && setApiUsage(data))
       .catch(() => {});
   }, [currentUser?.id]);
+
+  const handleResetUsage = async () => {
+    if (!currentUser?.id) return;
+    const data = await resetPropertyApiUsage(currentUser.id);
+    if (data) {
+      setApiUsage(data);
+      toast({ title: "Count reset", description: "RentCast API usage count has been reset to 0." });
+    } else {
+      toast({ variant: "destructive", title: "Reset failed", description: "Could not reset usage count." });
+    }
+  };
 
   const handleFetchIntelligence = async () => {
     setFetchError(null);
@@ -155,6 +166,8 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
         ...(propertyResponse || {}),
         recentComps: Array.isArray(compsResponse?.recentComps) ? compsResponse.recentComps : [],
         ...(compsResponse?.subjectSaleListing != null ? { subjectSaleListing: compsResponse.subjectSaleListing } : {}),
+        ...(compsResponse?.avmValue != null ? { avmValue: compsResponse.avmValue } : {}),
+        ...(compsResponse?.avmSubject != null ? { avmSubject: compsResponse.avmSubject } : {}),
         usage: compsResponse?.usage ?? propertyResponse?.usage,
         warnings: [].concat(
           Array.isArray(propertyResponse?.warnings) ? propertyResponse.warnings : [],
@@ -247,6 +260,8 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
         ...(inputs.propertyIntelligence || {}),
         recentComps: Array.isArray(compsResponse?.recentComps) ? compsResponse.recentComps : [],
         ...(compsResponse?.subjectSaleListing != null ? { subjectSaleListing: compsResponse.subjectSaleListing } : {}),
+        ...(compsResponse?.avmValue != null ? { avmValue: compsResponse.avmValue } : {}),
+        ...(compsResponse?.avmSubject != null ? { avmSubject: compsResponse.avmSubject } : {}),
         usage: compsResponse?.usage ?? inputs.propertyIntelligence?.usage,
         warnings: [].concat(
           Array.isArray(inputs.propertyIntelligence?.warnings) ? inputs.propertyIntelligence.warnings : [],
@@ -311,9 +326,20 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
                 Property data and comps from RentCast.
               </p>
               {apiUsage && (
-                <p className="text-xs text-muted-foreground mb-2">
-                  RentCast {apiUsage.rentcast_count}/{apiUsage.rentcast_limit ?? 50}
-                </p>
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-xs text-muted-foreground">
+                    RentCast {apiUsage.rentcast_count}/{apiUsage.rentcast_limit ?? 50}
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={handleResetUsage}
+                    title="Reset count (e.g. when a new plan period starts)"
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" /> Reset
+                  </Button>
+                </div>
               )}
               <Button 
                 onClick={handleFetchIntelligence} 
@@ -363,9 +389,20 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
                 <p className="text-xs text-muted-foreground absolute right-4 top-14">Property data and comps from RentCast.</p>
                 <div className="flex items-center gap-2">
                    {apiUsage && (
-                     <span className="text-xs text-muted-foreground mr-2">
-                       RentCast {apiUsage.rentcast_count}/{apiUsage.rentcast_limit ?? 50}
-                     </span>
+                     <>
+                       <span className="text-xs text-muted-foreground mr-1">
+                         RentCast {apiUsage.rentcast_count}/{apiUsage.rentcast_limit ?? 50}
+                       </span>
+                       <Button
+                         variant="ghost"
+                         size="sm"
+                         className="h-7 px-1.5 text-xs text-muted-foreground hover:text-foreground"
+                         onClick={(e) => { e.stopPropagation(); handleResetUsage(); }}
+                         title="Reset count (e.g. when a new plan period starts)"
+                       >
+                         <RotateCcw className="h-3.5 w-3" />
+                       </Button>
+                     </>
                    )}
                    <Button 
                      variant="ghost" 

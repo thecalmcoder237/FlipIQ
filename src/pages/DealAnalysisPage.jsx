@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { BarChart3, Hammer, Home, FileText, Share2, Sparkles, Building2, Table as TableIcon, Settings2, Shield } from 'lucide-react';
@@ -60,6 +60,7 @@ const DealAnalysisPage = () => {
   // Loading States
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const pageContainerRef = useRef(null);
 
   useEffect(() => {
     if (!dealId) {
@@ -189,7 +190,7 @@ const DealAnalysisPage = () => {
   const displayMetrics = metrics || {};
 
   return (
-    <div className="min-h-screen bg-muted px-4 py-8 max-w-7xl mx-auto mb-20">
+    <div ref={pageContainerRef} className="min-h-screen bg-muted px-4 py-8 max-w-7xl mx-auto mb-20">
       <Helmet><title>Deal Analysis - {deal.address} | FlipIQ</title></Helmet>
       <Breadcrumb />
       <ProgressIndicator />
@@ -211,6 +212,7 @@ const DealAnalysisPage = () => {
                metrics={displayMetrics} 
                propertyIntelligence={inputs.propertyIntelligence}
                sowData={inputs.rehabSow}
+               pageRef={pageContainerRef}
             />
         </div>
       </div>
@@ -335,6 +337,19 @@ const DealAnalysisPage = () => {
                loading={false}
                onRefresh={() => { /* Trigger refresh in child */ }}
                source={inputs.propertyIntelligence?.recentComps?.length ? "RentCast" : "Manual/Legacy"}
+               subjectAddress={deal?.address ?? inputs?.address ?? ''}
+               subjectSpecs={(() => {
+                 const pi = inputs?.propertyIntelligence;
+                 const avm = pi?.avmSubject;
+                 return avm && typeof avm === 'object'
+                   ? { squareFootage: avm.squareFootage, bedrooms: avm.bedrooms, bathrooms: avm.bathrooms, yearBuilt: avm.yearBuilt, address: avm.address }
+                   : pi
+                     ? { squareFootage: pi.squareFootage, bedrooms: pi.bedrooms, bathrooms: pi.bathrooms, yearBuilt: pi.yearBuilt, address: pi.address }
+                     : deal
+                       ? { squareFootage: deal.sqft, bedrooms: deal.bedrooms, bathrooms: deal.bathrooms, yearBuilt: deal.yearBuilt, address: deal.address }
+                       : undefined;
+               })()}
+               avmValue={inputs?.propertyIntelligence?.avmValue}
             />
          </TabsContent>
 

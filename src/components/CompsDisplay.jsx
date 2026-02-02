@@ -1,10 +1,12 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Home, Bed, Bath, Maximize, Calendar, RefreshCw, AlertCircle, Car, Layers, Warehouse } from 'lucide-react';
+import { Home, Bed, Bath, Maximize, Calendar, RefreshCw, AlertCircle, Car, Layers, Warehouse, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-const CompsDisplay = ({ comps, loading, onRefresh, source = "AI" }) => {
+const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress, subjectSpecs, avmValue }) => {
   if (loading && !comps) {
     return (
       <div className="bg-card backdrop-blur-xl rounded-xl shadow-sm p-12 border border-border text-center">
@@ -118,6 +120,113 @@ const CompsDisplay = ({ comps, loading, onRefresh, source = "AI" }) => {
           </motion.div>
         ))}
       </div>
+
+      {comps.length > 0 && (subjectAddress || subjectSpecs || avmValue != null) && (
+        <Card className="bg-card border-border shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" /> Subject vs comparables
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Subject: {subjectAddress || subjectSpecs?.address || '—'}
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="text-muted-foreground font-medium w-[120px]">Attribute</TableHead>
+                    <TableHead className="text-muted-foreground font-medium">Subject</TableHead>
+                    {comps.map((_, i) => (
+                      <TableHead key={i} className="text-muted-foreground font-medium">Comp {i + 1}</TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow className="border-border hover:bg-accent/50">
+                    <TableCell className="font-medium text-muted-foreground">Address</TableCell>
+                    <TableCell className="text-foreground">{subjectAddress || subjectSpecs?.address || '—'}</TableCell>
+                    {comps.map((comp, i) => (
+                      <TableCell key={i} className="text-foreground">{comp.address || '—'}</TableCell>
+                    ))}
+                  </TableRow>
+                  <TableRow className="border-border hover:bg-accent/50">
+                    <TableCell className="font-medium text-muted-foreground">Sqft</TableCell>
+                    <TableCell className="text-foreground">{subjectSpecs?.squareFootage ?? subjectSpecs?.sqft ?? '—'}</TableCell>
+                    {comps.map((comp, i) => (
+                      <TableCell key={i} className="text-foreground">{comp.sqft ?? '—'}</TableCell>
+                    ))}
+                  </TableRow>
+                  <TableRow className="border-border hover:bg-accent/50">
+                    <TableCell className="font-medium text-muted-foreground">Year built</TableCell>
+                    <TableCell className="text-foreground">{subjectSpecs?.yearBuilt ?? '—'}</TableCell>
+                    {comps.map((comp, i) => (
+                      <TableCell key={i} className="text-foreground">{comp.yearBuilt ?? '—'}</TableCell>
+                    ))}
+                  </TableRow>
+                  <TableRow className="border-border hover:bg-accent/50">
+                    <TableCell className="font-medium text-muted-foreground">Distance</TableCell>
+                    <TableCell className="text-foreground">—</TableCell>
+                    {comps.map((comp, i) => (
+                      <TableCell key={i} className="text-foreground">
+                        {comp.distance != null ? `${Number(comp.distance).toFixed(2)} mi` : '—'}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                  <TableRow className="border-border hover:bg-accent/50">
+                    <TableCell className="font-medium text-muted-foreground">Beds</TableCell>
+                    <TableCell className="text-foreground">{subjectSpecs?.bedrooms ?? '—'}</TableCell>
+                    {comps.map((comp, i) => (
+                      <TableCell key={i} className="text-foreground">{comp.beds ?? comp.bedrooms ?? '—'}</TableCell>
+                    ))}
+                  </TableRow>
+                  <TableRow className="border-border hover:bg-accent/50">
+                    <TableCell className="font-medium text-muted-foreground">Baths</TableCell>
+                    <TableCell className="text-foreground">{subjectSpecs?.bathrooms ?? '—'}</TableCell>
+                    {comps.map((comp, i) => (
+                      <TableCell key={i} className="text-foreground">{comp.baths ?? comp.bathrooms ?? '—'}</TableCell>
+                    ))}
+                  </TableRow>
+                  <TableRow className="border-border hover:bg-accent/50">
+                    <TableCell className="font-medium text-muted-foreground">Price</TableCell>
+                    <TableCell className="text-foreground">
+                      {avmValue != null ? `$${Number(avmValue).toLocaleString()}` : '—'}
+                    </TableCell>
+                    {comps.map((comp, i) => (
+                      <TableCell key={i} className="text-foreground">
+                        {comp.salePrice != null ? `$${Number(comp.salePrice).toLocaleString()}` : comp.price != null ? `$${Number(comp.price).toLocaleString()}` : '—'}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                  <TableRow className="border-border hover:bg-accent/50">
+                    <TableCell className="font-medium text-muted-foreground">$/sqft</TableCell>
+                    <TableCell className="text-foreground">
+                      {avmValue != null && (subjectSpecs?.squareFootage ?? subjectSpecs?.sqft) != null
+                        ? `$${Math.round(avmValue / (Number(subjectSpecs?.squareFootage ?? subjectSpecs?.sqft) || 1))}`
+                        : '—'}
+                    </TableCell>
+                    {comps.map((comp, i) => (
+                      <TableCell key={i} className="text-foreground">
+                        {(comp.salePrice ?? comp.price) != null && comp.sqft != null
+                          ? `$${Math.round((Number(comp.salePrice ?? comp.price) || 0) / (Number(comp.sqft) || 1))}`
+                          : '—'}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                  <TableRow className="border-border hover:bg-accent/50">
+                    <TableCell className="font-medium text-muted-foreground">Sale date</TableCell>
+                    <TableCell className="text-foreground">—</TableCell>
+                    {comps.map((comp, i) => (
+                      <TableCell key={i} className="text-foreground">{comp.saleDate ?? '—'}</TableCell>
+                    ))}
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

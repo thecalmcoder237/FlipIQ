@@ -26,6 +26,19 @@ Deno.serve(async (req) => {
 
     const ym = yearMonth();
     const supabase = createSupabaseAdminClient();
+
+    if (body?.action === "reset") {
+      const { error } = await supabase
+        .from("api_usage")
+        .upsert(
+          { user_id: userId, year_month: ym, realie_count: 0, rentcast_count: 0, updated_at: new Date().toISOString() },
+          { onConflict: "user_id,year_month" }
+        );
+      if (error) {
+        return json({ error: error.message }, { status: 500 });
+      }
+    }
+
     const { data } = await supabase
       .from("api_usage")
       .select("realie_count, rentcast_count")
