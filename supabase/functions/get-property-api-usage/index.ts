@@ -1,8 +1,9 @@
 import { corsHeaders, handleCors, json } from "../_shared/cors.ts";
 import { createSupabaseAdminClient } from "../_shared/supabaseAdmin.ts";
 
-const REALIE_LIMIT = 25;
-const RENTCAST_LIMIT = 45;
+/** Realie no longer used; kept for response shape compatibility. */
+const REALIE_LIMIT = 0;
+const RENTCAST_LIMIT = 50;
 
 function yearMonth(): string {
   return new Date().toISOString().slice(0, 7);

@@ -36,11 +36,8 @@ export const dealService = {
     };
 
     try {
-      let { data, error } = await doUpsert(true);
-      // If DB doesn't have funding/contact/status columns (migration not applied), retry without them
-      if (error?.code === 'PGRST204') {
-        ({ data, error } = await doUpsert(false));
-      }
+      // Omit funding/contact/status columns until migration 20260131120000_deals_funding_contact_status.sql is applied
+      const { data, error } = await doUpsert(false);
       if (error) throw error;
       return databaseToInputs(data);
     } catch (error) {

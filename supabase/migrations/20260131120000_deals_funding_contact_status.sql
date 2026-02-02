@@ -1,4 +1,4 @@
-c-- Deal funding, contact/source, and status/closed/funded fields.
+-- Deal funding, contact/source, and status/closed/funded fields.
 -- Funding approved
 ALTER TABLE deals ADD COLUMN IF NOT EXISTS amount_approved numeric;
 ALTER TABLE deals ADD COLUMN IF NOT EXISTS ltv_percent numeric;

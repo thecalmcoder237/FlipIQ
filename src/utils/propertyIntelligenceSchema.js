@@ -65,7 +65,8 @@ function safeStr(value) {
  */
 function normalizeComp(raw) {
   if (!raw || typeof raw !== 'object') return null;
-  const address = safeStr(raw.address ?? raw.formattedAddress ?? raw.streetAddress);
+  const address = safeStr(raw.address ?? raw.formattedAddress ?? raw.streetAddress)
+    || [raw.city, raw.state, raw.zipCode ?? raw.zip_code ?? raw.zip].filter(Boolean).join(', ').trim() || null;
   if (!address) return null;
 
   const salePrice = safeNum(raw.salePrice ?? raw.sale_price ?? raw.price ?? raw.last_sale_price ?? raw.lastSalePrice);
@@ -108,54 +109,68 @@ export function normalizePropertyIntelligenceResponse(raw) {
   if (!raw || typeof raw !== 'object') {
     return { recentComps: [] };
   }
+  // Flatten: edge may return { ...property, recentComps, rawRentCastRecord } or { property: {...}, recentComps }; merge so fields are at top level
+  const merged = raw.property && typeof raw.property === 'object'
+    ? { ...raw.property, recentComps: raw.recentComps ?? raw.recent_comps, usage: raw.usage, source: raw.source, warnings: raw.warnings, rawRentCastRecord: raw.rawRentCastRecord }
+    : { ...raw };
 
-  const yearBuilt = safeNum(raw.yearBuilt ?? raw.year_built ?? raw.YearBuilt, MIN_YEAR, MAX_YEAR);
-  const squareFootage = safeNum(raw.squareFootage ?? raw.square_footage ?? raw.sqft ?? raw.SquareFootage, 0, 1e7);
-  const annualPropertyTaxes = safeNum(raw.annualPropertyTaxes ?? raw.annual_property_taxes ?? raw.propertyTaxes ?? raw.TaxAmount ?? raw.taxAmount, 0, 1e10);
+  const yearBuilt = safeNum(merged.yearBuilt ?? merged.year_built ?? merged.YearBuilt, MIN_YEAR, MAX_YEAR);
+  const squareFootage = safeNum(merged.squareFootage ?? merged.square_footage ?? merged.sqft ?? merged.SquareFootage, 0, 1e7);
+  const annualPropertyTaxes = safeNum(merged.annualPropertyTaxes ?? merged.annual_property_taxes ?? merged.propertyTaxes ?? merged.TaxAmount ?? merged.taxAmount ?? merged.tax ?? merged.propertyTax ?? merged.annualTax ?? merged.totalTax, 0, 1e10);
+  const assessedValue = safeNum(merged.assessedValue ?? merged.assessed_value ?? merged.taxAssessedValue ?? merged.tax_assessed_value ?? merged.assessmentValue ?? merged.taxAssessment, 0, 1e12);
 
-  const compsRaw = Array.isArray(raw.recentComps) ? raw.recentComps : Array.isArray(raw.recent_comps) ? raw.recent_comps : [];
-  const recentComps = compsRaw
+  const compsRaw = Array.isArray(merged.recentComps) ? merged.recentComps : Array.isArray(merged.recent_comps) ? merged.recent_comps : [];
+  let recentComps = compsRaw
     .map((c) => normalizeComp(c))
     .filter((c) => c !== null && c.address);
+  const subjectSaleListingRaw = merged.subjectSaleListing ?? merged.subject_sale_listing;
+  const subjectSaleListing = subjectSaleListingRaw && typeof subjectSaleListingRaw === 'object' ? normalizeComp(subjectSaleListingRaw) : null;
 
-  const latitude = raw.latitude != null ? safeNum(raw.latitude, -90, 90) : undefined;
-  const longitude = raw.longitude != null ? safeNum(raw.longitude, -180, 180) : undefined;
-  const propertyId = safeStr(raw.propertyId ?? raw.property_id ?? raw.parcelId ?? raw.parcel_id ?? raw.ParcelNumber);
+  const latitude = merged.latitude != null ? safeNum(merged.latitude, -90, 90) : undefined;
+  const longitude = merged.longitude != null ? safeNum(merged.longitude, -180, 180) : undefined;
+  const propertyId = safeStr(merged.propertyId ?? merged.property_id ?? merged.parcelId ?? merged.parcel_id ?? merged.ParcelNumber);
 
   const out = {
-    propertyType: safeStr(raw.propertyType ?? raw.property_type ?? raw.UseCode),
+    propertyType: safeStr(merged.propertyType ?? merged.property_type ?? merged.UseCode),
     yearBuilt: yearBuilt ?? undefined,
     squareFootage: squareFootage && squareFootage > 0 ? squareFootage : undefined,
-    bedrooms: raw.bedrooms != null ? (Number(raw.bedrooms) || raw.bedrooms) : undefined,
-    bathrooms: raw.bathrooms != null ? (Number(raw.bathrooms) || raw.bathrooms) : undefined,
-    hasGarage: Boolean(raw.hasGarage ?? raw.has_garage),
-    garageSize: safeStr(raw.garageSize ?? raw.garage_size),
-    hvacType: safeStr(raw.hvacType ?? raw.hvac_type),
-    hvacAge: safeStr(raw.hvacAge ?? raw.hvac_age),
-    roofType: safeStr(raw.roofType ?? raw.roof_type),
-    roofAge: safeStr(raw.roofAge ?? raw.roof_age),
-    schoolDistrict: safeStr(raw.schoolDistrict ?? raw.school_district),
-    zoning: safeStr(raw.zoning),
-    county: safeStr(raw.county ?? raw.County),
+    bedrooms: merged.bedrooms != null ? (Number(merged.bedrooms) || merged.bedrooms) : undefined,
+    bathrooms: merged.bathrooms != null ? (Number(merged.bathrooms) || merged.bathrooms) : undefined,
+    hasGarage: Boolean(merged.hasGarage ?? merged.has_garage),
+    garageSize: safeStr(merged.garageSize ?? merged.garage_size),
+    hvacType: safeStr(merged.hvacType ?? merged.hvac_type),
+    hvacAge: safeStr(merged.hvacAge ?? merged.hvac_age),
+    roofType: safeStr(merged.roofType ?? merged.roof_type),
+    roofAge: safeStr(merged.roofAge ?? merged.roof_age),
+    schoolDistrict: safeStr(merged.schoolDistrict ?? merged.school_district),
+    zoning: safeStr(merged.zoning),
+    county: safeStr(merged.county ?? merged.County),
     annualPropertyTaxes: annualPropertyTaxes != null && annualPropertyTaxes >= 0 ? annualPropertyTaxes : undefined,
+    assessedValue: assessedValue != null && assessedValue >= 0 ? assessedValue : undefined,
     latitude: latitude ?? undefined,
     longitude: longitude ?? undefined,
     propertyId: propertyId || undefined,
     recentComps,
   };
 
-  // Preserve any other top-level keys the edge function returns (e.g. propertySpecs) without mutating
+  if (subjectSaleListing != null && subjectSaleListing.address && !recentComps.some((c) => c.address === subjectSaleListing.address)) {
+    out.subjectSaleListing = subjectSaleListing;
+  }
+
+  // Preserve usage/source/warnings and any other keys from merged
   const knownKeys = new Set([
     'propertyType', 'yearBuilt', 'squareFootage', 'bedrooms', 'bathrooms',
     'hasGarage', 'garageSize', 'hvacType', 'hvacAge', 'roofType', 'roofAge',
-    'schoolDistrict', 'zoning', 'county', 'annualPropertyTaxes', 'recentComps',
-    'property_type', 'year_built', 'square_footage', 'recent_comps', 'propertySpecs',
-    'latitude', 'longitude', 'propertyId', 'property_id', 'parcelId', 'parcel_id', 'usage',
+    'schoolDistrict', 'zoning', 'county', 'annualPropertyTaxes', 'assessedValue', 'recentComps', 'subjectSaleListing',
+    'property_type', 'year_built', 'square_footage', 'recent_comps', 'propertySpecs', 'subject_sale_listing',
+    'latitude', 'longitude', 'propertyId', 'property_id', 'parcelId', 'parcel_id', 'usage', 'source', 'warnings',
   ]);
-  Object.keys(raw).forEach((key) => {
+  Object.keys(merged).forEach((key) => {
     if (knownKeys.has(key)) return;
-    if (out[key] === undefined) out[key] = raw[key];
+    if (out[key] === undefined) out[key] = merged[key];
   });
+
+  if (Array.isArray(merged.warnings)) out.warnings = merged.warnings;
 
   return out;
 }

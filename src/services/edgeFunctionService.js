@@ -45,7 +45,7 @@ export const invokeEdgeFunction = async (functionName, payload) => {
  * @param {string} zipCode - 5-digit ZIP (use geocode postal when available for consistency)
  * @param {string} [propertyType] - e.g. "Single-Family"
  * @param {number} [arv] - After repair value
- * @param {{ formattedAddress?: string, lat?: number, lng?: number, city?: string, county?: string, propertyId?: string, userId?: string }} [options] - Optional: normalized address, coordinates, city/county, propertyId, and userId for rate limits
+ * @param {{ formattedAddress?: string, lat?: number, lng?: number, city?: string, county?: string, state?: string, propertyId?: string, userId?: string }} [options] - Optional: normalized address, coordinates, city/county/state, propertyId, userId
  */
 export const fetchPropertyIntelligence = async (address, zipCode, propertyType, arv, options = {}) => {
     const body = {
@@ -60,9 +60,31 @@ export const fetchPropertyIntelligence = async (address, zipCode, propertyType, 
     }
     if (options.city) body.city = options.city;
     if (options.county) body.county = options.county;
+    if (options.state && options.state.trim().length >= 2) body.state = options.state.trim().slice(0, 2).toUpperCase();
     if (options.propertyId) body.propertyId = options.propertyId;
     if (options.userId) body.userId = options.userId;
+    if (options.debug === true || (typeof localStorage !== 'undefined' && localStorage.getItem('propertyIntelDebug') === '1')) body.debug = true;
     return invokeEdgeFunction('fetch-property-intelligence', body);
+};
+
+/**
+ * Fetch comps only (RentCast listings/sale + fallbacks). Use with fetch-property-intelligence; UI merges property + comps.
+ * @param {string} address - Property address
+ * @param {string} zipCode - 5-digit ZIP
+ * @param {{ city?: string, state?: string, propertyId?: string, subjectAddress?: string, userId?: string, debug?: boolean }} [options] - Optional: city, state, propertyId, subjectAddress (for excluding subject from comps), userId, debug
+ */
+export const fetchComps = async (address, zipCode, options = {}) => {
+    const body = {
+        address: options.formattedAddress ?? address,
+        zipCode: String(zipCode ?? '').trim().replace(/\D/g, '').slice(0, 5) || '',
+    };
+    if (options.city) body.city = options.city;
+    if (options.state && String(options.state).trim().length >= 2) body.state = String(options.state).trim().slice(0, 2).toUpperCase();
+    if (options.propertyId) body.propertyId = options.propertyId;
+    if (options.subjectAddress) body.subjectAddress = options.subjectAddress;
+    if (options.userId) body.userId = options.userId;
+    if (options.debug === true || (typeof localStorage !== 'undefined' && localStorage.getItem('propertyIntelDebug') === '1')) body.debug = true;
+    return invokeEdgeFunction('fetch-comps', body);
 };
 
 /**

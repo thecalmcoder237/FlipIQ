@@ -11,7 +11,7 @@ const DebugDashboard = ({
   convertedInputs, 
   calculations, 
   propertyData, 
-  rehabSOW 
+  rehabSOW
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('summary');
@@ -21,13 +21,16 @@ const DebugDashboard = ({
 
   const StatusIcon = ({ valid }) => valid ? <CheckCircle className="w-4 h-4 text-green-500" /> : <XCircle className="w-4 h-4 text-red-500" />;
 
-  // Validation Checks
+  // Validation Checks: non-empty response object counts as fetched; hint when no address
+  const propertyIntelFetched = !!propertyData && typeof propertyData === 'object' && Object.keys(propertyData).length > 0;
+  const propertyIntelHasData = !!propertyData?.address;
   const checks = {
     formInputs: !!formInputs && Object.keys(formInputs).length > 0,
     loadedData: !!loadedData && !!loadedData.id,
     convertedInputs: !!convertedInputs && !!convertedInputs.address,
     calculations: !!calculations && typeof calculations.score === 'number',
-    propertyData: !!propertyData && !!propertyData.address,
+    propertyData: propertyIntelFetched,
+    propertyDataHasAddress: propertyIntelHasData,
     rehabSOW: !!rehabSOW && rehabSOW.length > 0
   };
 
@@ -76,6 +79,9 @@ const DebugDashboard = ({
                      <div className="flex justify-between items-center text-sm"><span>Converted to CamelCase</span> <StatusIcon valid={checks.convertedInputs} /></div>
                      <div className="flex justify-between items-center text-sm"><span>Calculations Run</span> <StatusIcon valid={checks.calculations} /></div>
                      <div className="flex justify-between items-center text-sm"><span>Property Intel Fetched</span> <StatusIcon valid={checks.propertyData} /></div>
+                     {checks.propertyData && !checks.propertyDataHasAddress && (
+                       <div className="text-xs text-amber-400 pl-2">Fetched but no match (no address)</div>
+                     )}
                      <div className="flex justify-between items-center text-sm"><span>SOW Generated</span> <StatusIcon valid={checks.rehabSOW} /></div>
                   </CardContent>
                 </Card>

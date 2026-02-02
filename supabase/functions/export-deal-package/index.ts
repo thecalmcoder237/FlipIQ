@@ -1,3 +1,7 @@
+/** Deno global provided by Supabase Edge Runtime */
+declare const Deno: { serve(handler: (req: Request) => Promise<Response> | Response): void };
+
+// @ts-expect-error - Deno resolves npm:jszip at runtime
 import JSZip from "npm:jszip@3.10.1";
 import { handleCors, json } from "../_shared/cors.ts";
 import { createSupabaseAdminClient } from "../_shared/supabaseAdmin.ts";

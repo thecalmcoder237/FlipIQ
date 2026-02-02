@@ -141,7 +141,13 @@ const DealAnalysisPage = () => {
   }, [deal, metrics, scenarioMode]);
 
   const handlePropertyDataFetch = async (data) => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/c06921ed-47f4-4a39-a851-8dc1a5aa6177',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DealAnalysisPage.jsx:handlePropertyDataFetch',message:'received from section',data:{dataKeys:data?Object.keys(data):[],recentCompsLen:data?.recentComps?.length??0,propertyType:data?.propertyType,yearBuilt:data?.yearBuilt,piKeys:data?.propertyIntelligence?Object.keys(data.propertyIntelligence):[]},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4,H5'})}).catch(()=>{});
+      // #endregion
       const updatedInputs = { ...inputs, propertyIntelligence: data };
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/c06921ed-47f4-4a39-a851-8dc1a5aa6177',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'DealAnalysisPage.jsx:updatedInputs',message:'state update',data:{updatedPiKeys:updatedInputs.propertyIntelligence?Object.keys(updatedInputs.propertyIntelligence):[],updatedRecentCompsLen:updatedInputs.propertyIntelligence?.recentComps?.length??0},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
       setInputs(updatedInputs);
       setDeal(updatedInputs);
       
