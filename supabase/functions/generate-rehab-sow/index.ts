@@ -61,6 +61,8 @@ async function runVisionAnalyze(body: {
   const yearBuilt = deal.yearBuilt ?? deal.year_built ?? "";
   const county = deal.county ?? "";
   const city = deal.city ?? "";
+  const rehabCategory = deal.rehabCategory ?? deal.rehab_category ?? "";
+  const rehabTypeLabel = ["Cosmetic", "Moderate", "Heavy"].includes(String(rehabCategory).trim()) ? String(rehabCategory).trim() : "";
 
   const perPhotoSummary = perPhotoAnalysis
     .map((p, i) => {
@@ -89,6 +91,7 @@ async function runVisionAnalyze(body: {
     arv ? `ARV: $${arv}` : "",
     purchasePrice ? `Purchase Price: $${purchasePrice}` : "",
     rehabBudget ? `Rehab Budget (reference): $${rehabBudget}` : "",
+    rehabTypeLabel ? `Rehab type: ${rehabTypeLabel}` : "",
   ]
     .filter(Boolean)
     .join(". ");
@@ -188,11 +191,14 @@ async function runSOWGeneration(body: {
   const baths = deal.bathrooms ?? deal.baths ?? "";
   const yearBuilt = deal.yearBuilt ?? deal.year_built ?? "";
   const county = deal.county ?? "";
+  const rehabCategory = (deal.rehabCategory ?? deal.rehab_category ?? (body as { rehabCategory?: string }).rehabCategory) as string | undefined;
+  const rehabType = ["Cosmetic", "Moderate", "Heavy"].includes(String(rehabCategory || "").trim()) ? String(rehabCategory).trim() : "Cosmetic";
   const dealContext = [
     address,
     arv ? `ARV: $${arv}` : "",
     purchasePrice ? `Purchase: $${purchasePrice}` : "",
     budget ? `Rehab budget ref: $${budget}` : "",
+    `Rehab type (user): ${rehabType}`,
     sqft ? `Sq Ft: ${sqft}` : "",
     beds ? `Beds: ${beds}` : "",
     baths ? `Baths: ${baths}` : "",
@@ -209,6 +215,8 @@ async function runSOWGeneration(body: {
   }
 
   const systemPrompt = `You are a rehab scope-of-work writer. Use ALL property data, deal context, comps (if provided), AND the uploaded photos to produce an accurate Scope of Work.
+
+Respect the deal's Rehab type (user): Cosmetic, Moderate, or Heavy. Use it when scoping: Cosmetic = paint, flooring, minor fixtures, no structural or major systems work; Moderate = kitchen/bath updates, some systems, no major structural; Heavy = structural work, full systems, major rehabs. Align line items, tier totals (Budget / Mid-Grade / High-End), and estimated timeline with this level (e.g. Cosmetic shorter and lower cost, Heavy longer and higher).
 
 Structure your response with these sections IN ORDER:
 

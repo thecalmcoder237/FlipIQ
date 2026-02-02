@@ -79,6 +79,7 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
             arv: deal?.arv ?? inputs?.arv ?? 0,
             purchase_price: deal?.purchase_price ?? deal?.purchasePrice ?? inputs?.purchase_price ?? 0,
             rehab_costs: Number(inputs?.rehabCosts) || 0,
+            rehabCategory: inputs?.rehabCategory ?? deal?.rehabCategory ?? 'Cosmetic',
             squareFootage: propertyData?.squareFootage ?? propertyData?.square_footage ?? deal?.sqft,
             bedrooms: propertyData?.bedrooms ?? deal?.bedrooms,
             bathrooms: propertyData?.bathrooms ?? deal?.bathrooms,
