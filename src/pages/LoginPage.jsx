@@ -56,7 +56,20 @@ const LoginPage = () => {
         <meta name="description" content="Sign in to FlipIQ - Real Estate Deal Analysis Platform powered by PAVEL REI" />
       </Helmet>
       
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-muted via-background to-muted px-4 py-16">
+      <div className="min-h-screen flex flex-col bg-gradient-to-br from-muted via-background to-muted">
+        {/* Header with logo */}
+        <header className="w-full border-b border-border bg-card/80 backdrop-blur-sm px-4 py-4 flex items-center justify-center shrink-0">
+          <img
+            src="/assets/flipiq-logo.png"
+            alt="FlipIQ Logo"
+            className="h-24 w-auto"
+            onError={(e) => {
+              e.target.style.display = 'none';
+            }}
+          />
+        </header>
+
+        <div className="flex-1 flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-6xl grid md:grid-cols-2 gap-8 items-center">
           {/* Left Side - Value Propositions */}
           <motion.div
@@ -68,7 +81,7 @@ const LoginPage = () => {
               <img 
                 src="/assets/flipiq-logo.png" 
                 alt="FlipIQ Logo" 
-                className="h-16 w-auto mb-4"
+                className="h-48 w-auto mb-4"
                 onError={(e) => {
                   e.target.style.display = 'none';
                 }}
@@ -127,7 +140,7 @@ const LoginPage = () => {
                 <img 
                   src="/assets/flipiq-logo.png" 
                   alt="FlipIQ Logo" 
-                  className="h-12 w-auto mx-auto mb-4"
+                  className="h-36 w-auto mx-auto mb-4"
                   onError={(e) => {
                     e.target.style.display = 'none';
                   }}
@@ -206,6 +219,7 @@ const LoginPage = () => {
               </div>
             </div>
           </motion.div>
+        </div>
         </div>
       </div>
     </>
