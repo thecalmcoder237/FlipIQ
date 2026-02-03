@@ -28,6 +28,8 @@ import PropertyIntelligenceSection from '@/components/PropertyIntelligenceSectio
 import RehabSOWSection from '@/components/RehabSOWSection';
 import ExportAnalysisButton from '@/components/ExportAnalysisButton';
 import RehabInsightsExportButton from '@/components/RehabInsightsExportButton';
+import PrintTabButton from '@/components/PrintTabButton';
+import { printIntelligenceReport, printRehabInsightsReport, printCompsReport } from '@/utils/printReportUtils';
 import SOWBudgetComparison from '@/components/SOWBudgetComparison';
 import PhotoUploadSection from '@/components/PhotoUploadSection';
 import ScenarioRiskModel from '@/components/ScenarioRiskModel';
@@ -229,6 +231,18 @@ const DealAnalysisPage = () => {
          </TabsList>
 
          <TabsContent value="intelligence" className="space-y-8 animate-in fade-in">
+             <div className="flex justify-end">
+               <PrintTabButton
+                 label="Print Intelligence"
+                 onPrint={() => printIntelligenceReport({
+                   deal,
+                   metrics: displayMetrics,
+                   propertyIntelligence: inputs.propertyIntelligence,
+                   scenarioMode,
+                   activeScenarioMetrics,
+                 })}
+               />
+             </div>
              {/* 1. Detailed Cost Break (left) - Deal Quality Score (right) */}
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                  <div className="lg:col-span-2">
@@ -312,13 +326,25 @@ const DealAnalysisPage = () => {
          <TabsContent value="rehab-insights" className="space-y-8">
              <div className="flex justify-between items-center">
                <h2 className="text-2xl font-bold text-foreground">Rehab & Property Insights</h2>
-               <RehabInsightsExportButton 
-                  deal={deal} 
-                  metrics={displayMetrics} 
-                  propertyIntelligence={inputs.propertyIntelligence}
-                  sowData={inputs.rehabSow}
-                  photos={deal.photos}
-               />
+               <div className="flex gap-2">
+                 <PrintTabButton
+                   label="Print"
+                   onPrint={() => printRehabInsightsReport({
+                     deal,
+                     metrics: displayMetrics,
+                     propertyIntelligence: inputs.propertyIntelligence,
+                     sowData: inputs.rehabSow,
+                     photos: deal.photos,
+                   })}
+                 />
+                 <RehabInsightsExportButton 
+                    deal={deal} 
+                    metrics={displayMetrics} 
+                    propertyIntelligence={inputs.propertyIntelligence}
+                    sowData={inputs.rehabSow}
+                    photos={deal.photos}
+                 />
+               </div>
              </div>
              <RehabPlanTab 
                 deal={deal} 
@@ -332,6 +358,27 @@ const DealAnalysisPage = () => {
          </TabsContent>
 
          <TabsContent value="comps">
+            <div className="flex justify-end mb-4">
+              <PrintTabButton
+                label="Print Comps"
+                onPrint={() => printCompsReport({
+                  comps: inputs.propertyIntelligence?.recentComps || deal.comps,
+                  subjectAddress: deal?.address ?? inputs?.address ?? '',
+                  subjectSpecs: (() => {
+                    const pi = inputs?.propertyIntelligence;
+                    const avm = pi?.avmSubject;
+                    return avm && typeof avm === 'object'
+                      ? { squareFootage: avm.squareFootage, bedrooms: avm.bedrooms, bathrooms: avm.bathrooms, yearBuilt: avm.yearBuilt, address: avm.address }
+                      : pi
+                        ? { squareFootage: pi.squareFootage, bedrooms: pi.bedrooms, bathrooms: pi.bathrooms, yearBuilt: pi.yearBuilt, address: pi.address }
+                        : deal
+                          ? { squareFootage: deal.sqft, bedrooms: deal.bedrooms, bathrooms: deal.bathrooms, yearBuilt: deal.yearBuilt, address: deal.address }
+                          : undefined;
+                  })(),
+                  avmValue: inputs?.propertyIntelligence?.avmValue,
+                })}
+              />
+            </div>
             <CompsDisplay 
                comps={inputs.propertyIntelligence?.recentComps || deal.comps} 
                loading={false}

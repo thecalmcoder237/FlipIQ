@@ -1,8 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { Camera, Upload, X, Loader2, RefreshCw } from 'lucide-react';
+import { Camera, Upload, X, Loader2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/customSupabaseClient';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { analyzePropertyPhoto } from '@/services/claudeVisionService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -10,6 +16,7 @@ import { useToast } from '@/components/ui/use-toast';
 const PhotoUploadSection = ({ deal, onPhotosUpdated }) => {
   const [uploading, setUploading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const [photos, setPhotos] = useState(deal.photos || []);
@@ -187,30 +194,86 @@ const PhotoUploadSection = ({ deal, onPhotosUpdated }) => {
            <p className="text-muted-foreground">Upload photos to detect damages and estimate repair needs automatically.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-           {photos.map((photo, idx) => (
-             <div key={idx} className="bg-muted/50 rounded-lg overflow-hidden border border-border group relative">
-                <img src={photo.url} alt="Property" className="w-full h-40 object-cover" />
-                <button 
-                  onClick={() => handleDelete(photo.path)}
-                  className="absolute top-2 right-2 bg-background/80 p-1 rounded-full text-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-destructive-foreground"
-                >
-                  <X size={14} />
-                </button>
-                <div className="p-3">
-                   <div className="flex justify-between items-start mb-1">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                         photo.analysis?.condition === 'Needs Repair' ? 'bg-destructive/20 text-destructive' : 'bg-green-500/20 text-green-600'
-                      }`}>
-                         {photo.analysis?.condition || 'Analyzed'}
-                      </span>
-                   </div>
-                   <p className="text-xs text-muted-foreground line-clamp-2">{photo.analysis?.observations}</p>
-                </div>
-             </div>
-           ))}
+        <div className="max-h-[420px] overflow-y-auto overflow-x-hidden pr-2 -mr-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+             {photos.map((photo, idx) => (
+               <div key={idx} className="bg-muted/50 rounded-lg overflow-hidden border border-border group relative">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPhoto(idx)}
+                    className="block w-full text-left cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-t-lg overflow-hidden"
+                  >
+                    <img src={photo.url} alt="Property" className="w-full h-40 object-cover" />
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleDelete(photo.path); }}
+                    className="absolute top-2 right-2 bg-background/80 p-1 rounded-full text-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-destructive-foreground"
+                  >
+                    <X size={14} />
+                  </button>
+                  <div className="p-3">
+                     <div className="flex justify-between items-start mb-1">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                           photo.analysis?.condition === 'Needs Repair' ? 'bg-destructive/20 text-destructive' : 'bg-green-500/20 text-green-600'
+                        }`}>
+                           {photo.analysis?.condition || 'Analyzed'}
+                        </span>
+                     </div>
+                     <p className="text-xs text-muted-foreground line-clamp-2">{photo.analysis?.observations}</p>
+                  </div>
+               </div>
+             ))}
+          </div>
         </div>
       )}
+
+      <Dialog open={selectedPhoto !== null} onOpenChange={(open) => !open && setSelectedPhoto(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-2 flex flex-col">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Enlarged Photo</DialogTitle>
+          </DialogHeader>
+          {selectedPhoto !== null && photos[selectedPhoto] && (
+            <>
+              <div className="flex-1 overflow-auto flex items-center justify-center bg-muted/30 rounded-lg min-h-[50vh]">
+                <img
+                  src={photos[selectedPhoto].url}
+                  alt="Property"
+                  className="max-w-full max-h-[80vh] object-contain"
+                />
+              </div>
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={selectedPhoto <= 0}
+                  onClick={() => setSelectedPhoto((p) => Math.max(0, p - 1))}
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1" /> Previous
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  {selectedPhoto + 1} / {photos.length}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={selectedPhoto >= photos.length - 1}
+                  onClick={() => setSelectedPhoto((p) => Math.min(photos.length - 1, p + 1))}
+                >
+                  Next <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
+              {photos[selectedPhoto]?.analysis?.observations && (
+                <p className="text-xs text-muted-foreground pt-2 border-t border-border">
+                  {photos[selectedPhoto].analysis.observations}
+                </p>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -29,16 +29,15 @@ function kpiGrid(kpis: Kpi[]): string {
   const items = kpis
     .map(
       (k) => `
-      <td style="padding:10px 10px 0 0; vertical-align:top;">
-        <div style="border:1px solid #E5E7EB; border-radius:12px; padding:12px 14px; background:#FFFFFF;">
-          <div style="font-size:12px; color:#6B7280; margin-bottom:6px;">${esc(k.label)}</div>
-          <div style="font-size:16px; font-weight:700; color:#111827;">${esc(k.value)}</div>
+      <td style="padding:8px 8px 0 0; vertical-align:top;">
+        <div style="border:1px solid #E5E7EB; border-radius:12px; padding:14px 16px; background:linear-gradient(135deg, #FFFFFF 0%, #F9FAFB 100%); box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+          <div style="font-size:11px; color:#6B7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">${esc(k.label)}</div>
+          <div style="font-size:18px; font-weight:700; color:#0F172A;">${esc(k.value)}</div>
         </div>
       </td>`
     )
     .join("");
 
-  // 2-column grid
   const rows: string[] = [];
   for (let i = 0; i < items.length; i += 2) {
     rows.push(`<tr>${items[i] ?? ""}${items[i + 1] ?? ""}</tr>`);
@@ -50,9 +49,9 @@ function bulletList(items: string[]): string {
   const li = items
     .filter(Boolean)
     .slice(0, 8)
-    .map((t) => `<li style="margin:0 0 8px 0; color:#111827;">${esc(t)}</li>`)
+    .map((t) => `<li style="margin:0 0 10px 0; color:#374151; line-height:1.5;">${esc(t)}</li>`)
     .join("");
-  return `<ul style="margin:0; padding:0 0 0 18px;">${li}</ul>`;
+  return `<ul style="margin:0; padding:0 0 0 22px;">${li}</ul>`;
 }
 
 function layout({
@@ -73,27 +72,27 @@ function layout({
   const cta =
     ctaUrl && ctaLabel
       ? `
-      <div style="margin-top:18px;">
-        <a href="${esc(ctaUrl)}" style="display:inline-block; background:#1D4ED8; color:#FFFFFF; text-decoration:none; padding:12px 16px; border-radius:10px; font-weight:700;">
+      <div style="margin-top:24px;">
+        <a href="${esc(ctaUrl)}" style="display:inline-block; background:linear-gradient(135deg, #EA580C 0%, #C2410C 100%); color:#FFFFFF; text-decoration:none; padding:14px 24px; border-radius:10px; font-weight:700; font-size:15px; box-shadow:0 4px 14px rgba(234,88,12,0.35);">
           ${esc(ctaLabel)}
         </a>
       </div>`
       : "";
 
   return `
-  <div style="background:#F3F4F6; padding:24px 12px; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;">
+  <div style="background:linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 100%); padding:28px 16px; font-family:ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse; max-width:680px; margin:0 auto;">
       <tr>
-        <td style="padding:0 0 12px 0;">
-          <div style="background:#0F172A; border-radius:16px; padding:18px 18px;">
+        <td style="padding:0 0 16px 0;">
+          <div style="background:linear-gradient(135deg, #0F172A 0%, #1E293B 100%); border-radius:16px; padding:22px 24px; box-shadow:0 4px 20px rgba(15,23,42,0.25);">
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
               <tr>
                 <td style="vertical-align:top;">
-                  <div style="color:#FBBF24; font-weight:800; letter-spacing:0.5px; font-size:12px;">FLIPIQ</div>
-                  <div style="color:#FFFFFF; font-size:20px; font-weight:800; margin-top:6px;">${esc(title)}</div>
-                  <div style="color:#CBD5E1; font-size:13px; margin-top:6px;">${esc(subtitle)}</div>
+                  <div style="color:#FBBF24; font-weight:800; letter-spacing:1px; font-size:12px;">FLIPIQ</div>
+                  <div style="color:#FFFFFF; font-size:22px; font-weight:800; margin-top:8px; letter-spacing:-0.5px;">${esc(title)}</div>
+                  <div style="color:#94A3B8; font-size:14px; margin-top:8px;">${esc(subtitle)}</div>
                 </td>
-                <td style="text-align:right; vertical-align:top; color:#CBD5E1; font-size:12px;">
+                <td style="text-align:right; vertical-align:top; color:#94A3B8; font-size:12px;">
                   ${headerRight ? esc(headerRight) : esc(new Date().toLocaleDateString())}
                 </td>
               </tr>
@@ -103,14 +102,14 @@ function layout({
       </tr>
       <tr>
         <td>
-          <div style="background:#FFFFFF; border-radius:16px; padding:18px; border:1px solid #E5E7EB;">
+          <div style="background:#FFFFFF; border-radius:16px; padding:24px; border:1px solid #E2E8F0; box-shadow:0 1px 3px rgba(0,0,0,0.06);">
             ${bodyHtml}
             ${cta}
           </div>
         </td>
       </tr>
       <tr>
-        <td style="padding:14px 6px 0 6px; color:#6B7280; font-size:12px; text-align:center;">
+        <td style="padding:18px 8px 0 8px; color:#64748B; font-size:12px; text-align:center;">
           FlipIQ • Real Estate Deal Analysis
         </td>
       </tr>
@@ -151,10 +150,10 @@ export function dealSummaryEmailHtml(params: {
   ];
 
   const body = `
-    <div style="font-size:14px; color:#111827; font-weight:700; margin-bottom:10px;">Deal Snapshot</div>
+    <div style="font-size:13px; color:#64748B; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px;">Deal Snapshot</div>
     ${kpiGrid(kpis)}
-    <div style="margin-top:16px; font-size:14px; color:#111827; font-weight:700;">Summary</div>
-    <div style="margin-top:8px; font-size:13px; color:#374151; line-height:1.5;">
+    <div style="margin-top:24px; font-size:15px; color:#0F172A; font-weight:700; border-bottom:2px solid #EA580C; padding-bottom:8px; margin-bottom:12px;">Summary</div>
+    <div style="font-size:14px; color:#475569; line-height:1.6;">
       Full Analysis PDF is ready for review. Use the button below to download the report or view it in your browser.
     </div>
   `;
@@ -190,10 +189,10 @@ export function loanProposalEmailHtml(params: {
   ];
 
   const body = `
-    <div style="font-size:14px; color:#111827; font-weight:700; margin-bottom:10px;">Loan Proposal Snapshot</div>
+    <div style="font-size:13px; color:#64748B; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px;">Loan Proposal Snapshot</div>
     ${kpiGrid(kpis)}
-    <div style="margin-top:16px; font-size:14px; color:#111827; font-weight:700;">Lender Request</div>
-    <div style="margin-top:8px; font-size:13px; color:#374151; line-height:1.5;">
+    <div style="margin-top:24px; font-size:15px; color:#0F172A; font-weight:700; border-bottom:2px solid #EA580C; padding-bottom:8px; margin-bottom:12px;">Lender Request</div>
+    <div style="font-size:14px; color:#475569; line-height:1.6;">
       Attached is a lender-ready loan proposal PDF. The request targets <b>80% ARV LTV</b> and includes a full presentation of the deal, supporting comps/market context (when available), and rehab summary.
     </div>
   `;
@@ -226,10 +225,10 @@ export function dealPackageEmailHtml(params: {
   ];
 
   const body = `
-    <div style="font-size:14px; color:#111827; font-weight:700; margin-bottom:10px;">Full Deal Package Ready</div>
+    <div style="font-size:13px; color:#64748B; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px;">Full Deal Package Ready</div>
     ${kpiGrid(kpis)}
-    <div style="margin-top:16px; font-size:14px; color:#111827; font-weight:700;">What’s inside</div>
-    <div style="margin-top:8px; font-size:13px; color:#374151; line-height:1.5;">
+    <div style="margin-top:24px; font-size:15px; color:#0F172A; font-weight:700; border-bottom:2px solid #EA580C; padding-bottom:8px; margin-bottom:12px;">What's inside</div>
+    <div style="font-size:14px; color:#475569; line-height:1.6;">
       ${bulletList(
         packageContents?.length
           ? packageContents
