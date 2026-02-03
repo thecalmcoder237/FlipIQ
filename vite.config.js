@@ -235,6 +235,7 @@ logger.error = (msg, options) => {
 
 export default defineConfig({
 	customLogger: logger,
+	base: './',
 	plugins: [
 		...(isDev ? [inlineEditPlugin(), editModeDevPlugin(), iframeRouteRestorationPlugin(), selectionModePlugin()] : []),
 		react(),
@@ -254,13 +255,18 @@ export default defineConfig({
 		},
 	},
 	build: {
+		outDir: 'dist',
+		assetsDir: 'assets',
 		rollupOptions: {
 			external: [
 				'@babel/parser',
 				'@babel/traverse',
 				'@babel/generator',
 				'@babel/types'
-			]
-		}
-	}
+			],
+			output: {
+				manualChunks: undefined,
+			},
+		},
+	},
 });
