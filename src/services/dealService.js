@@ -68,11 +68,7 @@ export const dealService = {
       if (error) throw error;
       if (!data) return null;
 
-      // Security: Enforce ownership check
-      if (userId && data.user_id !== userId) {
-          throw new Error("Access denied: You do not have permission to access this deal.");
-      }
-
+      // RLS controls visibility. For "All deals" view, users may view (read-only) other users' deals.
       return databaseToInputs(data);
     } catch (error) {
       console.error("dealService.loadDeal Error:", error);
@@ -91,8 +87,8 @@ export const dealService = {
      try {
         const { data, error } = await supabase
            .from('deals')
-           .select('*') // Usually don't need full scenario history for list view
-           .eq('user_id', userId) // Security: Filter by user_id to prevent data leakage
+           .select('*')
+           .eq('user_id', userId)
            .order('updated_at', { ascending: false });
         
         if (error) throw error;
@@ -101,6 +97,25 @@ export const dealService = {
         console.error("dealService.loadUserDeals Error:", error);
         throw error;
      }
+  },
+
+  /**
+   * Loads all deals (all users). Used for Deal History "All deals" view.
+   * Requires RLS policy allowing authenticated users to SELECT all deals.
+   * @returns {Promise<Array>} Array of deals in camelCase format.
+   */
+  async loadAllDeals() {
+    try {
+      const { data, error } = await supabase
+        .from('deals')
+        .select('*')
+        .order('updated_at', { ascending: false });
+      if (error) throw error;
+      return (data || []).map(databaseToInputs);
+    } catch (error) {
+      console.error("dealService.loadAllDeals Error:", error);
+      throw error;
+    }
   },
 
   /**

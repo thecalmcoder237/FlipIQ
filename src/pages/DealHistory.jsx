@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
@@ -10,37 +9,62 @@ import { useToast } from '@/components/ui/use-toast';
 import { calculateDealMetrics } from '@/utils/dealCalculations';
 import Breadcrumb from '@/components/Breadcrumb';
 import { dealService } from '@/services/dealService';
+import { getProfiles } from '@/services/profileService';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const DealHistory = () => {
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
-  const [viewFilter, setViewFilter] = useState('All');
+  const [viewFilter, setViewFilter] = useState('Mine');
+  const [selectedUserFilter, setSelectedUserFilter] = useState('all');
+  const [profiles, setProfiles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (currentUser) {
-      fetchDeals();
-    }
-  }, [currentUser]);
+  const profileByUserId = useMemo(() => {
+    const map = {};
+    profiles.forEach((p) => { map[p.id] = p; });
+    return map;
+  }, [profiles]);
 
-  const fetchDeals = async () => {
-    try {
-      const data = await dealService.loadUserDeals(currentUser.id);
-      setDeals(data || []);
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error fetching deals",
-        description: error.message,
-      });
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (viewFilter === 'All') {
+      getProfiles().then(setProfiles).catch(() => setProfiles([]));
     }
-  };
+  }, [viewFilter]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    setLoading(true);
+    const load = () => {
+      if (viewFilter === 'Mine') {
+        return dealService.loadUserDeals(currentUser.id);
+      }
+      if (selectedUserFilter === 'all') {
+        return dealService.loadAllDeals();
+      }
+      return dealService.loadUserDeals(selectedUserFilter);
+    };
+    load()
+      .then((data) => setDeals(data || []))
+      .catch((err) => {
+        toast({
+          variant: 'destructive',
+          title: 'Error fetching deals',
+          description: err.message,
+        });
+      })
+      .finally(() => setLoading(false));
+  }, [currentUser, viewFilter, selectedUserFilter, toast]);
 
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this deal?")) return;
@@ -65,18 +89,11 @@ const DealHistory = () => {
     }
   };
 
-  const filteredDeals = deals.filter(deal => {
-    const matchesSearch = deal.address.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filter === 'All' 
-      ? true 
-      : filter === 'Favorites' 
-        ? deal.isFavorite 
-        : deal.status === filter;
-    
-    // Client-side view filter (though service fetches based on permission usually)
-    const matchesView = viewFilter === 'All' ? true : deal.userId === currentUser?.id;
-
-    return matchesSearch && matchesStatus && matchesView;
+  const filteredDeals = deals.filter((deal) => {
+    const matchesSearch = (deal.address || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      filter === 'All' ? true : filter === 'Favorites' ? deal.isFavorite : deal.status === filter;
+    return matchesSearch && matchesStatus;
   });
 
   return (
@@ -96,19 +113,36 @@ const DealHistory = () => {
         </div>
 
         <div className="flex flex-col gap-4 mb-6">
-            <div className="flex bg-card p-1 rounded-lg w-fit border border-border shadow-sm">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex bg-card p-1 rounded-lg w-fit border border-border shadow-sm">
                 <button
-                    onClick={() => setViewFilter('All')}
-                    className={`px-4 py-2 rounded-md text-sm transition-all ${viewFilter === 'All' ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => setViewFilter('Mine')}
+                  className={`px-4 py-2 rounded-md text-sm transition-all ${viewFilter === 'Mine' ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:text-foreground'}`}
                 >
-                    All Deals
+                  My Deals
                 </button>
-                 <button
-                    onClick={() => setViewFilter('Mine')}
-                    className={`px-4 py-2 rounded-md text-sm transition-all ${viewFilter === 'Mine' ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+                <button
+                  onClick={() => setViewFilter('All')}
+                  className={`px-4 py-2 rounded-md text-sm transition-all ${viewFilter === 'All' ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:text-foreground'}`}
                 >
-                    My Deals Only
+                  All Deals
                 </button>
+              </div>
+              {viewFilter === 'All' && (
+                <Select value={selectedUserFilter} onValueChange={setSelectedUserFilter}>
+                  <SelectTrigger className="w-[220px] bg-card border-border">
+                    <SelectValue placeholder="Select user" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All users</SelectItem>
+                    {profiles.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.displayName || p.email || p.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="bg-card p-4 rounded-xl border border-border shadow-sm flex flex-col md:flex-row gap-4">
@@ -179,43 +213,54 @@ const DealHistory = () => {
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground items-center">
-                         <span>Created: {new Date(deal.createdAt).toLocaleDateString()}</span>
-                         <span>Profit: <span className={metrics.netProfit >= 0 ? "text-green-400" : "text-red-400"}>${Math.round(metrics.netProfit).toLocaleString()}</span></span>
-                         <span className="hidden sm:inline">ROI: {metrics.roi.toFixed(1)}%</span>
+                        <span>Created: {new Date(deal.createdAt).toLocaleDateString()}</span>
+                        <span>Profit: <span className={metrics.netProfit >= 0 ? 'text-green-400' : 'text-red-400'}>${Math.round(metrics.netProfit).toLocaleString()}</span></span>
+                        <span className="hidden sm:inline">ROI: {metrics.roi.toFixed(1)}%</span>
+                        {viewFilter === 'All' && deal.userId && (
+                          <span className="text-muted-foreground/80">
+                            Owner: {profileByUserId[deal.userId]?.email || profileByUserId[deal.userId]?.displayName || '—'}
+                          </span>
+                        )}
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => toggleFavorite(deal)}
-                        className="text-muted-foreground hover:text-primary"
-                      >
-                         <Star className={`w-5 h-5 ${deal.isFavorite ? 'fill-primary text-primary' : ''}`} />
-                      </Button>
+                      {deal.userId === currentUser?.id && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => toggleFavorite(deal)}
+                          className="text-muted-foreground hover:text-primary"
+                        >
+                          <Star className={`w-5 h-5 ${deal.isFavorite ? 'fill-primary text-primary' : ''}`} />
+                        </Button>
+                      )}
                       <Button
                         onClick={() => navigate(`/deal-analysis?id=${deal.id}`)}
                         className="bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30"
                       >
                         <Eye className="w-4 h-4 mr-2" /> View
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => navigate(`/deal-input?id=${deal.id}&edit=true`)}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                         <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(deal.id)}
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                         <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {deal.userId === currentUser?.id && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => navigate(`/deal-input?id=${deal.id}&edit=true`)}
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(deal.id)}
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </motion.div>
