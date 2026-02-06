@@ -1,30 +1,34 @@
 -- RLS on deals: allow authenticated users to read all deals (for "All deals" / user selector in Deal History).
 -- Users can only INSERT/UPDATE/DELETE their own deals.
--- Drop first so migration is idempotent (safe to re-run).
-ALTER TABLE deals ENABLE ROW LEVEL SECURITY;
+-- Use DO block to drop then create so migration is idempotent (safe to re-run).
+ALTER TABLE public.deals ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Authenticated can read all deals" ON deals;
+DO $$
+BEGIN
+  DROP POLICY IF EXISTS "Authenticated can read all deals" ON public.deals;
+  DROP POLICY IF EXISTS "Users can insert own deals" ON public.deals;
+  DROP POLICY IF EXISTS "Users can update own deals" ON public.deals;
+  DROP POLICY IF EXISTS "Users can delete own deals" ON public.deals;
+END $$;
+
 CREATE POLICY "Authenticated can read all deals"
-  ON deals FOR SELECT
+  ON public.deals FOR SELECT
   TO authenticated
   USING (true);
 
-DROP POLICY IF EXISTS "Users can insert own deals" ON deals;
 CREATE POLICY "Users can insert own deals"
-  ON deals FOR INSERT
+  ON public.deals FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Users can update own deals" ON deals;
 CREATE POLICY "Users can update own deals"
-  ON deals FOR UPDATE
+  ON public.deals FOR UPDATE
   TO authenticated
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Users can delete own deals" ON deals;
 CREATE POLICY "Users can delete own deals"
-  ON deals FOR DELETE
+  ON public.deals FOR DELETE
   TO authenticated
   USING (auth.uid() = user_id);
 
@@ -42,19 +46,23 @@ COMMENT ON TABLE public.profiles IS 'User profiles for display in Deal History a
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Authenticated can read profiles" ON public.profiles;
+DO $$
+BEGIN
+  DROP POLICY IF EXISTS "Authenticated can read profiles" ON public.profiles;
+  DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+  DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+END $$;
+
 CREATE POLICY "Authenticated can read profiles"
   ON public.profiles FOR SELECT
   TO authenticated
   USING (true);
 
-DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 CREATE POLICY "Users can insert own profile"
   ON public.profiles FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = id);
 
-DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile"
   ON public.profiles FOR UPDATE
   TO authenticated
