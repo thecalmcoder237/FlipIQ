@@ -18,25 +18,25 @@ const BreakdownSection = ({ title, items, total, color, isOpen, onToggle, totalA
     <div className="border border-border rounded-lg overflow-hidden mb-2 bg-muted/50">
       <div 
         onClick={onToggle}
-        className={`flex items-center justify-between p-3 cursor-pointer hover:bg-accent transition-colors border-l-4 ${color}`}
+        className={`flex items-center justify-between p-2 md:p-3 cursor-pointer hover:bg-accent transition-colors border-l-4 ${color}`}
       >
-        <div className="flex items-center gap-3">
-          {isOpen ? <ChevronDown size={16} className="text-muted-foreground" /> : <ChevronRight size={16} className="text-muted-foreground" />}
+        <div className="flex items-center gap-1 md:gap-3 min-w-0 flex-1">
+          {isOpen ? <ChevronDown size={14} className="text-muted-foreground shrink-0" /> : <ChevronRight size={14} className="text-muted-foreground shrink-0" />}
           {tooltip ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="cursor-help inline-flex items-center gap-1.5">
-                  {titleEl}
-                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-hidden />
+                <span className="cursor-help inline-flex items-center gap-1 md:gap-1.5 min-w-0 text-xs md:text-sm">
+                  <span className="truncate">{title}</span>
+                  <HelpCircle className="w-3 h-3 md:w-3.5 md:h-3.5 text-muted-foreground shrink-0" aria-hidden />
                 </span>
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-xs"><p className="text-xs">{tooltip}</p></TooltipContent>
             </Tooltip>
-          ) : titleEl}
+          ) : <span className="truncate text-xs md:text-sm font-semibold text-foreground">{title}</span>}
         </div>
-        <div className="flex items-center gap-4">
-           <span className="text-xs text-muted-foreground">{percentage}%</span>
-           <span className="font-bold text-foreground min-w-[80px] text-right">${safeTotal.toLocaleString()}</span>
+        <div className="flex items-center gap-1 md:gap-4 shrink-0">
+           <span className="text-[10px] md:text-xs text-muted-foreground hidden sm:inline">{percentage}%</span>
+           <span className="font-bold text-foreground text-xs md:text-base min-w-[60px] md:min-w-[80px] text-right">${safeTotal.toLocaleString()}</span>
         </div>
       </div>
       <AnimatePresence>
@@ -48,9 +48,9 @@ const BreakdownSection = ({ title, items, total, color, isOpen, onToggle, totalA
             className="bg-background/50 overflow-hidden"
           >
             {items.map((item, idx) => (
-              <div key={idx} className="flex justify-between items-center px-4 py-2 text-sm border-t border-border pl-10 hover:bg-accent/50">
-                <span className="text-foreground">{item.label}</span>
-                <span className="font-mono text-muted-foreground">${(item.value || 0).toLocaleString()}</span>
+              <div key={idx} className="flex justify-between items-center px-2 md:px-4 py-2 text-xs md:text-sm border-t border-border pl-6 md:pl-10 hover:bg-accent/50 gap-2">
+                <span className="text-foreground break-words flex-1">{item.label}</span>
+                <span className="font-mono text-muted-foreground text-xs md:text-sm shrink-0">${(item.value || 0).toLocaleString()}</span>
               </div>
             ))}
           </motion.div>

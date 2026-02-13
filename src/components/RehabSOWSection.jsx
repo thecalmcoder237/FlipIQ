@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Hammer, CheckCircle2, Loader2, RefreshCw, AlertTriangle, Lock, Sparkles, Camera, Building2, MessageSquarePlus, Send } from 'lucide-react';
+import { Hammer, CheckCircle2, Loader2, RefreshCw, AlertTriangle, Lock, Sparkles, Camera, Building2, MessageSquarePlus, Send, Pencil } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { logDataFlow } from "@/utils/dataFlowDebug";
 import { generateRehabSOW } from '@/services/edgeFunctionService';
+import EditableSOWTable from '@/components/EditableSOWTable';
 
 /** Strip ## Pro Flipper Recommendations section from SOW so it only appears in the dedicated card. */
 function stripProFlipperSection(text) {
@@ -21,6 +22,7 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [contextInput, setContextInput] = useState('');
+  const [isEditEstimatesMode, setIsEditEstimatesMode] = useState(false);
   const { toast } = useToast();
   const messages = Array.isArray(sowContextMessages) ? sowContextMessages : [];
 
@@ -137,6 +139,7 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
       if (onSowGenerated) {
         onSowGenerated(data.data);
       }
+      setIsEditEstimatesMode(false);
 
     } catch (err) {
       console.error('Rehab SOW Error:', err);
@@ -351,20 +354,43 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
                   AI-Generated Scope of Work
                 </CardTitle>
                 {!readOnly && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={handleGenerateSOW}
-                  className="border-border hover:bg-accent text-foreground"
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" /> Regenerate
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setIsEditEstimatesMode(true)}
+                    className="border-border hover:bg-accent text-foreground"
+                  >
+                    <Pencil className="w-4 h-4 mr-2" /> Edit Estimates
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleGenerateSOW}
+                    className="border-border hover:bg-accent text-foreground"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" /> Regenerate
+                  </Button>
+                </div>
                 )}
               </CardHeader>
               <CardContent className="p-6 bg-background">
+                {isEditEstimatesMode ? (
+                  <EditableSOWTable
+                    sowText={savedSow}
+                    readOnly={false}
+                    onSave={(updatedSow) => {
+                      onSowGenerated?.(updatedSow);
+                      setIsEditEstimatesMode(false);
+                      toast({ title: "Estimates updated", description: "SOW totals have been recalculated." });
+                    }}
+                    onCancel={() => setIsEditEstimatesMode(false)}
+                  />
+                ) : (
                 <div className="prose max-w-none">
                    {renderContent(stripProFlipperSection(savedSow))}
                 </div>
+                )}
                 <div className="mt-8 bg-primary/20 border border-primary/30 p-4 rounded-lg flex items-start gap-3">
                    <CheckCircle2 className="text-primary shrink-0 mt-1" />
                    <div>

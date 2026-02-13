@@ -66,10 +66,10 @@ const DealSummaryCard = ({ deal, metrics, onEdit, readOnly }) => {
           {deal.fundedTerms && (
             <p className="text-sm text-primary-foreground/90 mb-2">Funded terms: {deal.fundedTerms}</p>
           )}
-          <div className="flex items-center gap-4 text-primary-foreground text-base font-semibold">
-             <span className="flex items-center gap-1.5"><DollarSign size={16}/> Purchase: <span className="font-bold text-white text-xl">${metrics.purchasePrice?.toLocaleString()}</span></span>
-             <ArrowRight size={16} className="text-primary-foreground/80"/>
-             <span className="flex items-center gap-1.5"><Building size={16}/> ARV: <span className="font-bold text-white text-xl">${metrics.arv?.toLocaleString()}</span></span>
+          <div className="flex flex-wrap items-center gap-2 md:gap-4 text-primary-foreground text-sm md:text-base font-semibold">
+             <span className="flex items-center gap-1.5 text-xs md:text-base"><DollarSign size={16}/> Purchase: <span className="font-bold text-white text-base md:text-xl break-all">${metrics.purchasePrice?.toLocaleString()}</span></span>
+             <ArrowRight size={16} className="text-primary-foreground/80 hidden sm:block"/>
+             <span className="flex items-center gap-1.5 text-xs md:text-base"><Building size={16}/> ARV: <span className="font-bold text-white text-base md:text-xl break-all">${metrics.arv?.toLocaleString()}</span></span>
           </div>
         </div>
 
@@ -98,12 +98,12 @@ const DealSummaryCard = ({ deal, metrics, onEdit, readOnly }) => {
       </div>
 
       <TooltipProvider delayDuration={300}>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-primary/20">
-          <div className="p-3 bg-muted rounded-lg border border-border">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mt-6 pt-6 border-t border-primary/20">
+          <div className="p-2 md:p-3 bg-muted rounded-lg border border-border min-w-0">
              <Tooltip>
                <TooltipTrigger asChild>
-                 <p className="text-xs text-muted-foreground uppercase font-bold mb-1 cursor-help inline-flex items-center gap-1.5">
-                   Total Cash Needed <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-hidden />
+                 <p className="text-[10px] md:text-xs text-muted-foreground uppercase font-bold mb-1 cursor-help inline-flex items-center gap-1 flex-wrap">
+                   <span className="whitespace-nowrap">Total Cash Needed</span> <HelpCircle className="w-3 h-3 md:w-3.5 md:h-3.5 text-muted-foreground shrink-0" aria-hidden />
                  </p>
                </TooltipTrigger>
                <TooltipContent side="top" className="max-w-xs">
@@ -111,17 +111,17 @@ const DealSummaryCard = ({ deal, metrics, onEdit, readOnly }) => {
                  <p className="text-xs mt-1">Down payment + loan points + inspection + appraisal + title + closing costs (buy) + transfer tax. Cash required at closing.</p>
                </TooltipContent>
              </Tooltip>
-             <div className="text-xl font-bold text-foreground flex items-center gap-1">
-                <Wallet size={16} className="text-primary"/> ${(metrics.totalCashNeeded ?? metrics.acquisition?.total)?.toLocaleString()}
+             <div className="text-sm md:text-xl font-bold text-foreground flex items-center gap-1 break-all">
+                <Wallet size={14} className="text-primary shrink-0"/> <span className="break-all">${(metrics.totalCashNeeded ?? metrics.acquisition?.total)?.toLocaleString()}</span>
              </div>
-             <p className="text-[10px] text-muted-foreground mt-1">Acquisition only (at closing)</p>
+             <p className="text-[9px] md:text-[10px] text-muted-foreground mt-1">Acquisition only (at closing)</p>
           </div>
 
-          <div className="p-3 bg-muted rounded-lg border border-border">
+          <div className="p-2 md:p-3 bg-muted rounded-lg border border-border min-w-0">
              <Tooltip>
                <TooltipTrigger asChild>
-                 <p className="text-xs text-muted-foreground uppercase font-bold mb-1 cursor-help inline-flex items-center gap-1.5">
-                   Total Project Cost <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-hidden />
+                 <p className="text-[10px] md:text-xs text-muted-foreground uppercase font-bold mb-1 cursor-help inline-flex items-center gap-1 flex-wrap">
+                   <span className="whitespace-nowrap">Total Project Cost</span> <HelpCircle className="w-3 h-3 md:w-3.5 md:h-3.5 text-muted-foreground shrink-0" aria-hidden />
                  </p>
                </TooltipTrigger>
                <TooltipContent side="top" className="max-w-xs">
@@ -129,17 +129,17 @@ const DealSummaryCard = ({ deal, metrics, onEdit, readOnly }) => {
                  <p className="text-xs mt-1">Purchase price + acquisition fees + interest + rehab + holding (tax, insurance, utilities). Does not include selling costs.</p>
                </TooltipContent>
              </Tooltip>
-             <div className="text-xl font-bold text-foreground">
+             <div className="text-sm md:text-xl font-bold text-foreground break-all">
                 ${metrics.totalProjectCost?.toLocaleString()}
              </div>
-             <p className="text-[10px] text-muted-foreground mt-1">All Costs (Pre-Sale)</p>
+             <p className="text-[9px] md:text-[10px] text-muted-foreground mt-1">All Costs (Pre-Sale)</p>
           </div>
 
-          <div className="p-3 bg-muted rounded-lg border border-border">
+          <div className="p-2 md:p-3 bg-muted rounded-lg border border-border min-w-0">
              <Tooltip>
                <TooltipTrigger asChild>
-                 <p className="text-xs text-muted-foreground uppercase font-bold mb-1 cursor-help inline-flex items-center gap-1.5">
-                   Gross Profit <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-hidden />
+                 <p className="text-[10px] md:text-xs text-muted-foreground uppercase font-bold mb-1 cursor-help inline-flex items-center gap-1 flex-wrap">
+                   <span className="whitespace-nowrap">Gross Profit</span> <HelpCircle className="w-3 h-3 md:w-3.5 md:h-3.5 text-muted-foreground shrink-0" aria-hidden />
                  </p>
                </TooltipTrigger>
                <TooltipContent side="top" className="max-w-xs">
@@ -147,17 +147,17 @@ const DealSummaryCard = ({ deal, metrics, onEdit, readOnly }) => {
                  <p className="text-xs mt-1">Formula: ARV − Total Project Cost</p>
                </TooltipContent>
              </Tooltip>
-             <div className="text-xl font-bold text-foreground">
+             <div className="text-sm md:text-xl font-bold text-foreground break-all">
                 ${metrics.grossProfit?.toLocaleString()}
              </div>
-             <p className="text-[10px] text-muted-foreground mt-1">ARV − Project Cost</p>
+             <p className="text-[9px] md:text-[10px] text-muted-foreground mt-1">ARV − Project Cost</p>
           </div>
 
-          <div className="p-3 bg-muted rounded-lg border border-border">
+          <div className="p-2 md:p-3 bg-muted rounded-lg border border-border min-w-0">
              <Tooltip>
                <TooltipTrigger asChild>
-                 <p className="text-xs text-muted-foreground uppercase font-bold mb-1 cursor-help inline-flex items-center gap-1.5">
-                   Net Profit <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-hidden />
+                 <p className="text-[10px] md:text-xs text-muted-foreground uppercase font-bold mb-1 cursor-help inline-flex items-center gap-1 flex-wrap">
+                   <span className="whitespace-nowrap">Net Profit</span> <HelpCircle className="w-3 h-3 md:w-3.5 md:h-3.5 text-muted-foreground shrink-0" aria-hidden />
                  </p>
                </TooltipTrigger>
                <TooltipContent side="top" className="max-w-xs">
@@ -165,10 +165,10 @@ const DealSummaryCard = ({ deal, metrics, onEdit, readOnly }) => {
                  <p className="text-xs mt-1">Formula: Gross Profit − Selling Costs (realtor commission, closing, staging, marketing).</p>
                </TooltipContent>
              </Tooltip>
-             <div className={`text-xl font-bold ${isProfitable ? 'text-green-600' : 'text-destructive'}`}>
+             <div className={`text-sm md:text-xl font-bold break-all ${isProfitable ? 'text-green-600' : 'text-destructive'}`}>
                 ${metrics.netProfit?.toLocaleString()}
              </div>
-             <p className="text-[10px] text-muted-foreground mt-1">
+             <p className="text-[9px] md:text-[10px] text-muted-foreground mt-1">
                 After Selling Costs
              </p>
           </div>

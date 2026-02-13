@@ -50,22 +50,22 @@ const FinancialBreakdownCard = ({ deal, metrics, qualityScore }) => {
       animate={{ opacity: 1, y: 0 }}
       className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-2xl mb-8"
     >
-      <div className="p-6 border-b border-white/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-800/50">
+      <div className="p-4 md:p-6 border-b border-white/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-800/50">
         <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+          <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
             <Activity className="text-gold-400" /> Financial Dashboard
           </h2>
-          <p className="text-gray-400 text-sm">Comprehensive breakdown of project economics</p>
+          <p className="text-gray-400 text-xs md:text-sm">Comprehensive breakdown of project economics</p>
         </div>
       </div>
 
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
         {/* Cost Allocation Pie */}
-        <div className="bg-slate-800/30 rounded-xl p-4 border border-white/5">
-          <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-            <DollarSign size={16} className="text-blue-400" /> Capital Allocation
+        <div className="bg-slate-800/30 rounded-xl p-3 md:p-4 border border-white/5">
+          <h3 className="text-xs md:text-sm font-bold text-white mb-3 md:mb-4 flex items-center gap-2">
+            <DollarSign size={14} className="text-blue-400" /> Capital Allocation
           </h3>
-          <div className="h-[250px] w-full">
+          <div className="h-[200px] md:h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -89,11 +89,11 @@ const FinancialBreakdownCard = ({ deal, metrics, qualityScore }) => {
         </div>
 
         {/* Profit Waterfall */}
-        <div className="bg-slate-800/30 rounded-xl p-4 border border-white/5">
-          <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-             <TrendingUp size={16} className="text-green-400" /> Value Creation
+        <div className="bg-slate-800/30 rounded-xl p-3 md:p-4 border border-white/5">
+          <h3 className="text-xs md:text-sm font-bold text-white mb-3 md:mb-4 flex items-center gap-2">
+             <TrendingUp size={14} className="text-green-400" /> Value Creation
           </h3>
-          <div className="h-[250px] w-full">
+          <div className="h-[200px] md:h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={profitWaterfallData} margin={{top: 20, right: 30, left: 20, bottom: 5}}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
@@ -111,29 +111,29 @@ const FinancialBreakdownCard = ({ deal, metrics, qualityScore }) => {
         </div>
 
         {/* Key Metrics Grid */}
-        <div className="grid grid-cols-1 gap-4">
-           <div className="bg-slate-800/30 p-4 rounded-xl border border-white/5 flex justify-between items-center">
-             <div>
-               <p className="text-gray-400 text-xs">Net Profit</p>
-               <p className={`text-2xl font-bold ${netProfit > 0 ? 'text-green-400' : 'text-red-400'}`}>${netProfit.toLocaleString()}</p>
+        <div className="grid grid-cols-1 gap-3 md:gap-4">
+           <div className="bg-slate-800/30 p-3 md:p-4 rounded-xl border border-white/5 flex justify-between items-center">
+             <div className="min-w-0 flex-1">
+               <p className="text-gray-400 text-[10px] md:text-xs">Net Profit</p>
+               <p className={`text-lg md:text-2xl font-bold break-all ${netProfit > 0 ? 'text-green-400' : 'text-red-400'}`}>${netProfit.toLocaleString()}</p>
              </div>
-             <DollarSign className="text-green-500/50" size={32} />
+             <DollarSign className="text-green-500/50 shrink-0" size={24} />
            </div>
            
-           <div className="bg-slate-800/30 p-4 rounded-xl border border-white/5 flex justify-between items-center">
-             <div>
-               <p className="text-gray-400 text-xs">ROI</p>
-               <p className={`text-2xl font-bold ${roi > 10 ? 'text-blue-400' : 'text-yellow-400'}`}>{roi.toFixed(1)}%</p>
+           <div className="bg-slate-800/30 p-3 md:p-4 rounded-xl border border-white/5 flex justify-between items-center">
+             <div className="min-w-0 flex-1">
+               <p className="text-gray-400 text-[10px] md:text-xs">ROI</p>
+               <p className={`text-lg md:text-2xl font-bold ${roi > 10 ? 'text-blue-400' : 'text-yellow-400'}`}>{roi.toFixed(1)}%</p>
              </div>
-             <Activity className="text-blue-500/50" size={32} />
+             <Activity className="text-blue-500/50 shrink-0" size={24} />
            </div>
 
-           <div className="bg-slate-800/30 p-4 rounded-xl border border-white/5 flex justify-between items-center">
-             <div>
-               <p className="text-gray-400 text-xs">Gross Profit</p>
-               <p className="text-2xl font-bold text-yellow-400">${grossProfit.toLocaleString()}</p>
+           <div className="bg-slate-800/30 p-3 md:p-4 rounded-xl border border-white/5 flex justify-between items-center">
+             <div className="min-w-0 flex-1">
+               <p className="text-gray-400 text-[10px] md:text-xs">Gross Profit</p>
+               <p className="text-lg md:text-2xl font-bold text-yellow-400 break-all">${grossProfit.toLocaleString()}</p>
              </div>
-             <TrendingUp className="text-yellow-500/50" size={32} />
+             <TrendingUp className="text-yellow-500/50 shrink-0" size={24} />
            </div>
         </div>
       </div>

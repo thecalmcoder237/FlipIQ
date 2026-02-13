@@ -29,32 +29,32 @@ const MarketDataCard = ({ marketData, deal }) => {
       animate={{ opacity: 1, scale: 1 }}
       className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-2xl mb-6"
     >
-      <div className="p-6 border-b border-white/10 bg-gradient-to-r from-slate-900 to-slate-800/50">
+      <div className="p-4 md:p-6 border-b border-white/10 bg-gradient-to-r from-slate-900 to-slate-800/50">
          <div className="flex items-center gap-2 mb-1">
-            <MapPin className="text-gold-400 w-5 h-5" />
-            <h2 className="text-lg font-bold text-white uppercase tracking-wider">
+            <MapPin className="text-gold-400 w-4 h-4 md:w-5 md:h-5 shrink-0" />
+            <h2 className="text-base md:text-lg font-bold text-white uppercase tracking-wider break-words">
                {deal.zip_code || "Market"} Intelligence
             </h2>
          </div>
-         <p className="text-xs text-gray-400 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-            Last Updated: {marketData.timestamp ? new Date(marketData.timestamp).toLocaleDateString() : 'Just Now'}
+         <p className="text-[10px] md:text-xs text-gray-400 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0"></span>
+            <span className="truncate">Last Updated: {marketData.timestamp ? new Date(marketData.timestamp).toLocaleDateString() : 'Just Now'}</span>
          </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 p-4 md:p-6">
          {/* Left: Stats Grid */}
-         <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+         <div className="space-y-4 md:space-y-6">
+            <div className="grid grid-cols-2 gap-2 md:gap-4">
                <StatBox label="Market Trend" value={marketData.trend || "Stable"} color="text-green-400" />
                <StatBox label="Avg DOM" value={`${marketData.avgDom || 35} Days`} color="text-blue-400" />
                <StatBox label="Inventory" value={marketData.inventory || "Low"} color="text-orange-400" />
                <StatBox label="Appreciation" value={marketData.appreciation || "+3.5%"} color="text-purple-400" />
             </div>
             
-            <div className="bg-slate-800/30 p-4 rounded-xl border border-white/5">
-               <h3 className="text-xs uppercase text-gray-500 font-bold mb-3">Price History Trend</h3>
-               <div className="h-32 w-full">
+            <div className="bg-slate-800/30 p-3 md:p-4 rounded-xl border border-white/5">
+               <h3 className="text-[10px] md:text-xs uppercase text-gray-500 font-bold mb-2 md:mb-3">Price History Trend</h3>
+               <div className="h-24 md:h-32 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                      <AreaChart data={trendData}>
                         <defs>
@@ -75,10 +75,10 @@ const MarketDataCard = ({ marketData, deal }) => {
          </div>
 
          {/* Right: Comparative Analysis */}
-         <div className="space-y-4">
-            <div className="bg-slate-800/30 p-4 rounded-xl border border-white/5">
-               <h3 className="text-white font-bold mb-2 flex items-center gap-2">
-                  <Shield size={16} className="text-blue-400"/> Area Rating
+         <div className="space-y-3 md:space-y-4">
+            <div className="bg-slate-800/30 p-3 md:p-4 rounded-xl border border-white/5">
+               <h3 className="text-white text-sm md:text-base font-bold mb-2 flex items-center gap-2">
+                  <Shield size={14} className="text-blue-400 shrink-0"/> Area Rating
                </h3>
                <div className="flex items-center justify-between mb-2">
                   <span className="text-gray-400 text-sm">School District</span>
@@ -100,11 +100,11 @@ const MarketDataCard = ({ marketData, deal }) => {
                </div>
             </div>
 
-            <div className="bg-slate-800/30 p-4 rounded-xl border border-white/5">
-               <h3 className="text-white font-bold mb-3 flex items-center gap-2">
-                  <Users size={16} className="text-purple-400"/> Demographics
+            <div className="bg-slate-800/30 p-3 md:p-4 rounded-xl border border-white/5">
+               <h3 className="text-white text-sm md:text-base font-bold mb-2 md:mb-3 flex items-center gap-2">
+                  <Users size={14} className="text-purple-400 shrink-0"/> Demographics
                </h3>
-               <p className="text-sm text-gray-400 leading-relaxed">
+               <p className="text-xs md:text-sm text-gray-400 leading-relaxed">
                   {marketData.demographics || "Area populated by young professionals and first-time homebuyers. High demand for renovated starter homes."}
                </p>
             </div>
@@ -115,9 +115,9 @@ const MarketDataCard = ({ marketData, deal }) => {
 };
 
 const StatBox = ({ label, value, color }) => (
-   <div className="bg-slate-800/50 p-3 rounded-lg border border-white/5 text-center">
-      <p className="text-xs text-gray-500 uppercase font-bold">{label}</p>
-      <p className={`text-lg font-bold ${color}`}>{value}</p>
+   <div className="bg-slate-800/50 p-2 md:p-3 rounded-lg border border-white/5 text-center min-w-0">
+      <p className="text-[10px] md:text-xs text-gray-500 uppercase font-bold truncate">{label}</p>
+      <p className={`text-sm md:text-lg font-bold ${color} break-all`}>{value}</p>
    </div>
 );
 

@@ -17,14 +17,14 @@ const MetricDiff = ({ label, base, current, format = 'currency', inverse = false
   };
 
   return (
-    <div className="flex justify-between items-center py-2 border-b border-border last:border-0">
-       <span className="text-sm text-muted-foreground">{label}</span>
-       <div className="flex items-center gap-4">
-          <span className="text-sm font-mono text-muted-foreground line-through decoration-muted-foreground/40">{fmt(base)}</span>
-          <ArrowRight size={12} className="text-muted-foreground" />
-          <span className={`text-sm font-bold font-mono ${color} flex items-center gap-1`}>
+    <div className="flex justify-between items-center py-2 border-b border-border last:border-0 gap-2">
+       <span className="text-xs md:text-sm text-muted-foreground break-words flex-shrink-0 min-w-0">{label}</span>
+       <div className="flex items-center gap-1 md:gap-4 flex-shrink-0">
+          <span className="text-[10px] md:text-sm font-mono text-muted-foreground line-through decoration-muted-foreground/40 whitespace-nowrap">{fmt(base)}</span>
+          <ArrowRight size={10} className="text-muted-foreground hidden sm:block" />
+          <span className={`text-xs md:text-sm font-bold font-mono ${color} flex items-center gap-1 whitespace-nowrap`}>
              {fmt(current)}
-             {diff !== 0 && (inverse ? (diff > 0 ? <TrendingUp size={12}/> : <TrendingDown size={12}/>) : (diff > 0 ? <TrendingUp size={12}/> : <TrendingDown size={12}/>))}
+             {diff !== 0 && (inverse ? (diff > 0 ? <TrendingUp size={10}/> : <TrendingDown size={10}/>) : (diff > 0 ? <TrendingUp size={10}/> : <TrendingDown size={10}/>))}
           </span>
        </div>
     </div>
@@ -37,28 +37,28 @@ const ScenarioComparison = ({ baseMetrics, scenarioMetrics, scenarioName }) => {
   const isUnprofitable = scenarioMetrics.netProfit < 0;
   
   return (
-    <div className="bg-card border border-border rounded-xl p-6 mt-6 shadow-sm">
-       <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-          Scenario Impact Analysis: <span className="text-primary uppercase tracking-wider text-sm border border-primary/30 px-2 py-0.5 rounded bg-primary/10">{scenarioName}</span>
+    <div className="bg-card border border-border rounded-xl p-3 md:p-6 mt-6 shadow-sm">
+       <h3 className="text-base md:text-lg font-bold text-foreground mb-3 md:mb-4 flex flex-wrap items-center gap-2">
+          <span className="break-words">Scenario Impact Analysis:</span> <span className="text-primary uppercase tracking-wider text-xs md:text-sm border border-primary/30 px-2 py-0.5 rounded bg-primary/10 whitespace-nowrap">{scenarioName}</span>
        </h3>
 
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="bg-muted/50 p-4 rounded-lg border border-border">
-             <h4 className="text-xs font-bold text-muted-foreground uppercase mb-3">Financial Impact</h4>
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
+          <div className="bg-muted/50 p-3 md:p-4 rounded-lg border border-border min-w-0">
+             <h4 className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase mb-2 md:mb-3">Financial Impact</h4>
              <MetricDiff label="Total Project Cost" base={baseMetrics.totalProjectCost} current={scenarioMetrics.totalProjectCost} inverse={true} />
              <MetricDiff label="Net Profit" base={baseMetrics.netProfit} current={scenarioMetrics.netProfit} />
              <MetricDiff label="ROI" base={baseMetrics.roi} current={scenarioMetrics.roi} format="percent" />
           </div>
           
-          <div className="bg-muted/50 p-4 rounded-lg border border-border">
-             <h4 className="text-xs font-bold text-muted-foreground uppercase mb-3">Risk & Quality</h4>
+          <div className="bg-muted/50 p-3 md:p-4 rounded-lg border border-border min-w-0">
+             <h4 className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase mb-2 md:mb-3">Risk & Quality</h4>
              <MetricDiff label="Deal Score" base={baseMetrics.score} current={scenarioMetrics.score} format="number" />
-             <div className="flex justify-between items-center py-2 border-b border-border">
-                <span className="text-sm text-muted-foreground">Risk Level</span>
-                <div className="flex items-center gap-2">
-                   <span className="text-muted-foreground text-sm">{baseMetrics.risk}</span>
-                   <ArrowRight size={12} className="text-muted-foreground" />
-                   <span className={`text-sm font-bold ${scenarioMetrics.risk === 'High' ? 'text-destructive' : 'text-green-600'}`}>
+             <div className="flex justify-between items-center py-2 border-b border-border gap-2">
+                <span className="text-xs md:text-sm text-muted-foreground">Risk Level</span>
+                <div className="flex items-center gap-1 md:gap-2">
+                   <span className="text-muted-foreground text-xs md:text-sm">{baseMetrics.risk}</span>
+                   <ArrowRight size={10} className="text-muted-foreground hidden sm:block" />
+                   <span className={`text-xs md:text-sm font-bold ${scenarioMetrics.risk === 'High' ? 'text-destructive' : 'text-green-600'}`}>
                       {scenarioMetrics.risk}
                    </span>
                 </div>
@@ -67,9 +67,9 @@ const ScenarioComparison = ({ baseMetrics, scenarioMetrics, scenarioName }) => {
        </div>
 
        {isUnprofitable && (
-          <div className="mt-4 bg-destructive/10 border border-destructive/30 p-3 rounded-lg flex items-center gap-3 text-destructive">
-             <AlertTriangle className="shrink-0" />
-             <span className="font-bold text-sm">Warning: This scenario makes the deal unprofitable!</span>
+          <div className="mt-3 md:mt-4 bg-destructive/10 border border-destructive/30 p-2 md:p-3 rounded-lg flex items-center gap-2 md:gap-3 text-destructive">
+             <AlertTriangle className="shrink-0" size={16} />
+             <span className="font-bold text-xs md:text-sm">Warning: This scenario makes the deal unprofitable!</span>
           </div>
        )}
     </div>

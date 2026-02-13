@@ -209,11 +209,11 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Shield className="text-primary" />
-            Scenario Risk Model
+          <h2 className="text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
+            <Shield className="text-primary shrink-0" />
+            <span className="break-words">Scenario Risk Model</span>
           </h2>
-          <p className="text-muted-foreground text-sm mt-1">
+          <p className="text-muted-foreground text-xs md:text-sm mt-1">
             Dynamic probability-weighted risk analysis with market shock scenarios
           </p>
         </div>
@@ -237,8 +237,8 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
         </CardHeader>
         {showARVSolver && (
           <CardContent className="space-y-4">
-            <div className="bg-muted p-4 rounded-lg border border-border">
-              <p className="text-sm text-foreground mb-2">Target Profit</p>
+            <div className="bg-muted p-3 md:p-4 rounded-lg border border-border">
+              <p className="text-xs md:text-sm text-foreground mb-2">Target Profit</p>
               <Slider
                 value={[targetProfit]}
                 onValueChange={([val]) => setTargetProfit(val)}
@@ -247,24 +247,24 @@ const ScenarioRiskModel = ({ deal, metrics = {}, propertyIntelligence }) => {
                 step={5000}
                 className="mb-2"
               />
-              <p className="text-lg font-bold text-foreground">${targetProfit.toLocaleString()}</p>
+              <p className="text-base md:text-lg font-bold text-foreground break-all">${targetProfit.toLocaleString()}</p>
             </div>
-            <div className="bg-primary/10 border border-primary/30 p-4 rounded-lg">
-              <p className="text-sm text-foreground mb-1">Minimum ARV Needed</p>
-              <p className="text-3xl font-bold text-primary">{minARV.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground mt-2">
+            <div className="bg-primary/10 border border-primary/30 p-3 md:p-4 rounded-lg">
+              <p className="text-xs md:text-sm text-foreground mb-1">Minimum ARV Needed</p>
+              <p className="text-2xl md:text-3xl font-bold text-primary break-all">{minARV.toLocaleString()}</p>
+              <p className="text-[10px] md:text-xs text-muted-foreground mt-2 break-words">
                 Current ARV: {(metrics?.arv || 0).toLocaleString()} | 
                 Difference: {((metrics?.arv || 0) - minARV).toLocaleString()}
               </p>
-              <p className="text-xs text-muted-foreground mt-1 italic">
+              <p className="text-[10px] md:text-xs text-muted-foreground mt-1 italic">
                 Based on base deal only — not linked to sliders below
               </p>
             </div>
-            <div className="text-sm text-muted-foreground space-y-1">
-              <p>• Purchase Price: {(deal.purchasePrice || deal.purchase_price || 0).toLocaleString()}</p>
-              <p>• Rehab (base): {Math.round(metrics?.rehab?.total || 0).toLocaleString()}</p>
-              <p>• Holding ({deal.holdingMonths || deal.holding_months || 6} months): {Math.round(metrics?.holding?.total || 0).toLocaleString()}</p>
-              <p>• All Costs + Target Profit = {minARV.toLocaleString()}</p>
+            <div className="text-xs md:text-sm text-muted-foreground space-y-1">
+              <p className="break-words">• Purchase Price: {(deal.purchasePrice || deal.purchase_price || 0).toLocaleString()}</p>
+              <p className="break-words">• Rehab (base): {Math.round(metrics?.rehab?.total || 0).toLocaleString()}</p>
+              <p className="break-words">• Holding ({deal.holdingMonths || deal.holding_months || 6} months): {Math.round(metrics?.holding?.total || 0).toLocaleString()}</p>
+              <p className="break-words">• All Costs + Target Profit = {minARV.toLocaleString()}</p>
             </div>
           </CardContent>
         )}

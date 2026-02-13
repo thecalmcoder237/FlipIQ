@@ -124,7 +124,9 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
       const countySend = inputs.county || inputs.propertyIntelligence?.county;
       const stateSend = inputs.propertyIntelligence?.state || inputs.state;
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/c06921ed-47f4-4a39-a851-8dc1a5aa6177',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PropertyIntelligenceSection.jsx:requestParams',message:'refresh request body',data:{address,zipToSend,city:citySend,county:countySend,state:stateSend,cityWithoutCounty:!!(citySend&&!countySend)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+      if (import.meta.env.DEV) {
+        console.debug('[PropertyIntel] requestParams', { address, zipToSend, city: citySend, county: countySend, state: stateSend });
+      }
       // #endregion
 
       let propertyResponse = null;
@@ -151,16 +153,43 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
       const propertyIdForComps =
         propertyResponse?.propertyId ?? propertyResponse?.id ?? propertyResponse?.parcelId
         ?? inputs.propertyIntelligence?.propertyId ?? inputs.propertyIntelligence?.id ?? inputs.propertyIntelligence?.parcelId;
+      const subjectSpecsForComps = (propertyResponse?.bedrooms != null || propertyResponse?.bathrooms != null)
+        ? { bedrooms: propertyResponse?.bedrooms, bathrooms: propertyResponse?.bathrooms }
+        : undefined;
+      // #region agent log
+      if (import.meta.env.DEV) {
+        console.debug('[PropertyIntel] calling fetchComps', { address, zipToSend, subjectSpecs: subjectSpecsForComps });
+      }
+      // #endregion
       try {
         compsResponse = await fetchComps(address, zipToSend, {
           city: citySend,
           state: stateSend,
           propertyId: propertyIdForComps,
           subjectAddress: propertyResponse?.address ?? propertyResponse?.formattedAddress ?? propertyResponse?.streetAddress ?? address,
+          subjectSpecs: subjectSpecsForComps,
           userId: currentUser?.id,
         });
+        // #region agent log
+        if (import.meta.env.DEV) {
+          console.debug('[PropertyIntel] fetchComps returned', {
+            recentCompsLen: Array.isArray(compsResponse?.recentComps) ? compsResponse.recentComps.length : 0,
+            hasError: !!compsResponse?.error,
+          });
+        }
+        // #endregion
       } catch (compsErr) {
         console.warn('Comps fetch failed:', compsErr?.message);
+        // #region agent log
+        if (import.meta.env.DEV) {
+          console.debug('[PropertyIntel] fetchComps threw', { message: compsErr?.message, name: compsErr?.name });
+        }
+        // #endregion
+        toast({
+          variant: 'destructive',
+          title: 'Comps unavailable',
+          description: 'Property details loaded, but comparable sales could not be fetched. Try "Refresh comps" or check that fetch-comps is deployed.',
+        });
       }
       const data = {
         ...(propertyResponse || {}),
@@ -176,13 +205,17 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
       };
 
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/c06921ed-47f4-4a39-a851-8dc1a5aa6177',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PropertyIntelligenceSection.jsx:afterFetch',message:'raw edge response',data:{dataNull:!data,dataError:data?.error,topKeys:data?Object.keys(data):[],hasYearBuilt:!!(data?.yearBuilt??data?.year_built),hasPropertyType:!!(data?.propertyType??data?.property_type),recentCompsLen:Array.isArray(data?.recentComps)?data.recentComps.length:(Array.isArray(data?.recent_comps)?data.recent_comps.length:0),hasProperty:!!(data?.property&&typeof data.property==='object'),hasRealieData:data?.hasRealieData,rentCastCalled:data?.rentCastCalled},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2'})}).catch(()=>{}); fetch('http://127.0.0.1:7242/ingest/c06921ed-47f4-4a39-a851-8dc1a5aa6177',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PropertyIntelligenceSection.jsx:rawResponseDump',message:'full raw response (truncated)',data:{rawJson:data!=null?JSON.stringify(data).slice(0,2500):null,_debug:data?._debug},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2'})}).catch(()=>{});
+      if (import.meta.env.DEV) {
+        console.debug('[PropertyIntel] afterFetch', {
+          recentCompsLen: Array.isArray(data?.recentComps) ? data.recentComps.length : 0,
+          hasProperty: !!(propertyResponse && typeof propertyResponse === 'object'),
+          compsWarnings: compsResponse?.warnings,
+          _debugComps: compsResponse?._debugComps,
+        });
+      }
       // #endregion
 
       const normalized = normalizePropertyIntelligenceResponse(data || {});
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/c06921ed-47f4-4a39-a851-8dc1a5aa6177',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PropertyIntelligenceSection.jsx:afterNormalize',message:'normalized payload',data:{normKeys:Object.keys(normalized),propertyType:normalized?.propertyType,yearBuilt:normalized?.yearBuilt,recentCompsLen:normalized?.recentComps?.length??0},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2,H5'})}).catch(()=>{});
-      // #endregion
       const compsDropped = Array.isArray(data?.recentComps) ? data.recentComps.length - (normalized.recentComps?.length ?? 0) : 0;
       const hasUsableData =
         (normalized.recentComps?.length ?? 0) > 0 ||
@@ -206,9 +239,6 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
       }
 
       if (onPropertyDataFetch) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/c06921ed-47f4-4a39-a851-8dc1a5aa6177',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PropertyIntelligenceSection.jsx:beforeOnPropertyDataFetch',message:'calling onPropertyDataFetch',data:{hasUsableData,normKeys:Object.keys(normalized),recentCompsLen:normalized?.recentComps?.length??0,propertyType:normalized?.propertyType,yearBuilt:normalized?.yearBuilt},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3,H5'})}).catch(()=>{});
-        // #endregion
         onPropertyDataFetch(normalized);
       }
       if (data?.usage && currentUser?.id) {
@@ -255,6 +285,11 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
         ? { bedrooms: inputs.propertyIntelligence?.bedrooms, bathrooms: inputs.propertyIntelligence?.bathrooms }
         : undefined;
     try {
+      // #region agent log
+      if (import.meta.env.DEV) {
+        console.debug('[PropertyIntel] refreshComps request', { address, zipToSend, subjectSpecs: subjectSpecsRefresh });
+      }
+      // #endregion
       const compsResponse = await fetchComps(address, zipToSend, {
         city: citySend,
         state: stateSend,
@@ -263,6 +298,15 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
         subjectSpecs: subjectSpecsRefresh,
         userId: currentUser?.id,
       });
+      // #region agent log
+      if (import.meta.env.DEV) {
+        console.debug('[PropertyIntel] refreshComps response', {
+          recentCompsLen: Array.isArray(compsResponse?.recentComps) ? compsResponse.recentComps.length : 0,
+          warnings: compsResponse?.warnings,
+          hasError: !!compsResponse?.error,
+        });
+      }
+      // #endregion
       const merged = {
         ...(inputs.propertyIntelligence || {}),
         recentComps: Array.isArray(compsResponse?.recentComps) ? compsResponse.recentComps : [],
@@ -289,6 +333,11 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
       toast({ title: 'Comps refreshed', description: count ? `${count} comparable sale(s) loaded.` : 'No comparable sales found for this address.' });
     } catch (err) {
       console.error('❌ Comps refresh error:', err);
+      // #region agent log
+      if (import.meta.env.DEV) {
+        console.debug('[PropertyIntel] refreshComps error', { message: err?.message, name: err?.name, stack: err?.stack?.slice(0, 200) });
+      }
+      // #endregion
       toast({
         variant: 'destructive',
         title: 'Comps refresh failed',
@@ -300,9 +349,6 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
   };
 
   const hasData = !!propertyData;
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/c06921ed-47f4-4a39-a851-8dc1a5aa6177',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PropertyIntelligenceSection.jsx:render',message:'propertyData for display',data:{hasData,propertyDataKeys:propertyData?Object.keys(propertyData):[],hasPropertySpecs:!!(propertyData?.propertySpecs&&typeof propertyData.propertySpecs==='object'),hasProperty:!!(propertyData?.property&&typeof propertyData.property==='object')},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3,H4'})}).catch(()=>{});
-  // #endregion
   // Flatten: use top-level propertyData and merge nested propertySpecs/property (Realie) so display matches Rehab tab
   const flat = propertyData?.propertySpecs && typeof propertyData.propertySpecs === 'object'
     ? { ...propertyData, ...propertyData.propertySpecs }
@@ -312,9 +358,6 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
   const { recentComps, propertySpecs, property: _p, rawRentCastRecord, ...specs } = flat;
   const fullRecord = rawRentCastRecord && typeof rawRentCastRecord === 'object' ? rawRentCastRecord : null;
   const propertyHistory = Array.isArray(fullRecord?.history) ? fullRecord.history : Array.isArray(specs?.history) ? specs.history : [];
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/c06921ed-47f4-4a39-a851-8dc1a5aa6177',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PropertyIntelligenceSection.jsx:flatSpecs',message:'flat/specs/recentComps',data:{flatKeys:Object.keys(flat),specsKeys:Object.keys(specs),specsPropertyType:specs?.propertyType,specsYearBuilt:specs?.yearBuilt,recentCompsLen:recentComps?.length??0},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
-  // #endregion
   const rentcastAtLimit = apiUsage && apiUsage.rentcast_count >= (apiUsage.rentcast_limit ?? 50);
   const fetchDisabled = rentcastAtLimit;
 

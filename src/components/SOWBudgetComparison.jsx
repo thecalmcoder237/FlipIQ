@@ -150,25 +150,25 @@ const SOWBudgetComparison = ({ sowText, currentBudget, deal, onApplyRehabCost })
         )}
 
         {closestTier != null && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-card p-4 rounded-lg border border-border shadow-sm">
-              <p className="text-xs font-medium text-foreground uppercase tracking-wide mb-1">Your Rehab Budget</p>
-              <p className="text-2xl font-bold text-foreground">${budget.toLocaleString()}</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+            <div className="bg-card p-3 md:p-4 rounded-lg border border-border shadow-sm min-w-0">
+              <p className="text-[10px] md:text-xs font-medium text-foreground uppercase tracking-wide mb-1">Your Rehab Budget</p>
+              <p className="text-lg md:text-2xl font-bold text-foreground break-all">${budget.toLocaleString()}</p>
             </div>
-            <div className="bg-card p-4 rounded-lg border border-border shadow-sm">
-              <p className="text-xs font-medium text-foreground uppercase tracking-wide mb-1">Closest Tier</p>
-              <p className="text-2xl font-bold text-foreground">{closestTier.label}: ${closestTier.value.toLocaleString()}</p>
+            <div className="bg-card p-3 md:p-4 rounded-lg border border-border shadow-sm min-w-0">
+              <p className="text-[10px] md:text-xs font-medium text-foreground uppercase tracking-wide mb-1">Closest Tier</p>
+              <p className="text-sm md:text-2xl font-bold text-foreground break-words">{closestTier.label}: ${closestTier.value.toLocaleString()}</p>
             </div>
-            <div className={`p-4 rounded-lg border ${isOverBudget ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+            <div className={`p-3 md:p-4 rounded-lg border min-w-0 ${isOverBudget ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
               <div className="flex items-center gap-2 mb-1">
-                {isOverBudget ? <TrendingUp className="w-4 h-4 text-red-600" /> : <TrendingDown className="w-4 h-4 text-green-600" />}
-                <p className="text-xs font-medium text-foreground">Variance vs Closest Tier</p>
+                {isOverBudget ? <TrendingUp className="w-3 h-3 md:w-4 md:h-4 text-red-600 shrink-0" /> : <TrendingDown className="w-3 h-3 md:w-4 md:h-4 text-green-600 shrink-0" />}
+                <p className="text-[10px] md:text-xs font-medium text-foreground">Variance vs Closest Tier</p>
               </div>
-              <p className={`text-2xl font-bold ${isOverBudget ? 'text-red-600' : 'text-green-600'}`}>
+              <p className={`text-lg md:text-2xl font-bold break-all ${isOverBudget ? 'text-red-600' : 'text-green-600'}`}>
                 {isOverBudget ? '+' : ''}${variance.toLocaleString()}
               </p>
               {percentDifference != null && (
-                <p className={`text-xs mt-1 ${isOverBudget ? 'text-red-700' : 'text-green-700'}`}>
+                <p className={`text-[10px] md:text-xs mt-1 ${isOverBudget ? 'text-red-700' : 'text-green-700'}`}>
                   {isOverBudget ? `${percentDifference}% over budget` : `${Math.abs(percentDifference)}% under budget`}
                 </p>
               )}

@@ -243,3 +243,114 @@ export function extractSOWRemarks(sowText) {
 export function extractSOWRecommendations(sowText) {
   return extractSection(sowText, 'Pro Flipper Recommendations') || extractSection(sowText, 'Recommendations') || extractSection(sowText, 'Pro Flipper recommendations');
 }
+
+const parseDollar = (str) => {
+  const m = String(str || '').match(/\$?([\d,]+)/);
+  if (!m || !m[1]) return null;
+  const n = parseInt(m[1].replace(/,/g, ''), 10);
+  return !isNaN(n) && n >= 0 ? n : null;
+};
+
+/**
+ * Parses line items from SOW markdown. Extracts Item/Cost rows from tables under ## category headers.
+ * Returns flat array of { id, category, item, cost } for editing.
+ * @param {string} sowText
+ * @returns {{ lineItems: Array<{ id: string, category: string, item: string, cost: number }>, tiers: { budget: number|null, midGrade: number|null, highEnd: number|null }, timeline: { value: number, unit: string }|null }}
+ */
+export function parseSOWLineItems(sowText) {
+  const lineItems = [];
+  if (!sowText || typeof sowText !== 'string') {
+    return { lineItems, tiers: { budget: null, midGrade: null, highEnd: null }, timeline: null };
+  }
+
+  const lines = sowText.split('\n');
+  let currentCategory = 'General';
+  let idCounter = 0;
+  let inScopeSection = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const headerMatch = line.match(/^##\s+(.+)$/);
+    if (headerMatch) {
+      const title = headerMatch[1].trim();
+      if (/scope of work/i.test(title)) {
+        inScopeSection = true;
+        continue;
+      }
+      if (/pro flipper|recommendations/i.test(title)) {
+        inScopeSection = false;
+        continue;
+      }
+      if (inScopeSection && !/remarks/i.test(title)) {
+        currentCategory = title;
+      }
+      continue;
+    }
+
+    if (!inScopeSection || !line.includes('|')) continue;
+    const cols = line.split('|').map((c) => c.trim()).filter(Boolean);
+    if (cols.length < 2) continue;
+    const first = (cols[0] || '').toLowerCase();
+    if (/^-+$/.test(first) || /^item$/i.test(first) || /^est\.?\s*cost$/i.test(first) || /^cost$/i.test(first)) continue;
+    if (/^(budget|mid-?grade|high-?end|finish level)$/i.test(first)) continue;
+
+    const costCol = cols[cols.length - 1];
+    const cost = parseDollar(costCol);
+    if (cost === null && parseDollar(cols[0]) === null) continue;
+    const item = cols[0] || 'Line item';
+    const costVal = cost != null ? cost : 0;
+    lineItems.push({ id: `row-${++idCounter}`, category: currentCategory, item, cost: costVal });
+  }
+
+  const tiers = extractSOWTierBudgets(sowText);
+  const timeline = extractSOWTimeline(sowText);
+
+  return { lineItems, tiers, timeline };
+}
+
+/**
+ * Serializes edited line items back into SOW markdown. Replaces Scope of Work tables, updates total and tier table.
+ * @param {string} originalSow
+ * @param {Array<{ id?: string, category: string, item: string, cost: number }>} lineItems
+ * @param {{ budget?: number|null, midGrade?: number|null, highEnd?: number|null }} tierOverrides - new tier values (scaled if partial)
+ */
+export function serializeSOWWithLineItems(originalSow, lineItems, tierOverrides = {}) {
+  if (!originalSow || typeof originalSow !== 'string') return originalSow;
+  if (!Array.isArray(lineItems) || lineItems.length === 0) return originalSow;
+
+  const total = lineItems.reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
+  const origTiers = extractSOWTierBudgets(originalSow);
+  const origMid = origTiers.midGrade || total;
+  const scale = origMid > 0 ? total / origMid : 1;
+
+  const newTiers = {
+    budget: tierOverrides.budget != null ? tierOverrides.budget : (origTiers.budget != null ? Math.round(origTiers.budget * scale) : Math.round(total * 0.85)),
+    midGrade: tierOverrides.midGrade != null ? tierOverrides.midGrade : total,
+    highEnd: tierOverrides.highEnd != null ? tierOverrides.highEnd : (origTiers.highEnd != null ? Math.round(origTiers.highEnd * scale) : Math.round(total * 1.15)),
+  };
+
+  const categories = [...new Set(lineItems.map((r) => r.category || 'General'))];
+  let scopeBody = '';
+  for (const cat of categories) {
+    const items = lineItems.filter((r) => (r.category || 'General') === cat);
+    if (items.length === 0) continue;
+    scopeBody += `\n## ${cat}\n\n| Item | Est. Cost |\n|------|----------|\n`;
+    for (const row of items) {
+      scopeBody += `| ${String(row.item || '').replace(/\|/g, '\\|')} | $${(Number(row.cost) || 0).toLocaleString()} |\n`;
+    }
+  }
+
+  const timeline = extractSOWTimeline(originalSow);
+  const timelineStr = timeline ? `\n- Estimated timeline: ${timeline.value} ${timeline.unit}` : '';
+
+  const newTierTable = `\n| Finish Level | Total |\n|--------------|-------|\n| Budget | $${newTiers.budget.toLocaleString()} |\n| Mid-Grade | $${newTiers.midGrade.toLocaleString()} |\n| High-End | $${newTiers.highEnd.toLocaleString()} |`;
+  const scopeReplacement = `## Scope of Work${scopeBody}\n${timelineStr}\n- Total Estimated Cost: $${total.toLocaleString()}${newTierTable}\n`;
+
+  const hasProFlipper = /##\s+Pro Flipper Recommendations/i.test(originalSow);
+  const scopePattern = hasProFlipper
+    ? /##\s+Scope of Work[\s\S]*?(?=\n##\s+Pro Flipper Recommendations)/i
+    : /##\s+Scope of Work[\s\S]*/i;
+  const result = originalSow.replace(scopePattern, scopeReplacement);
+
+  return result;
+}

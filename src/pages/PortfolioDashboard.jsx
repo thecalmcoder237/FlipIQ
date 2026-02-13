@@ -79,7 +79,7 @@ const PortfolioDashboard = () => {
     const fetchPortfolio = async () => {
       if (!currentUser) return;
       try {
-        const data = await dealService.loadUserDeals(currentUser.id);
+        const data = await dealService.loadAllDeals();
         setDeals(data || []);
       } catch (e) {
         console.error(e);
@@ -363,6 +363,7 @@ const PortfolioDashboard = () => {
                   key={deal.id}
                   deal={deal}
                   metrics={metrics}
+                  isOwnDeal={deal.userId === currentUser?.id}
                   getStatusBadgeVariant={getStatusBadgeVariant}
                   getScoreColor={getScoreColor}
                   formatDate={formatDate}
@@ -454,6 +455,7 @@ function SnapshotMetric({ label, value, sub, positive, negative }) {
 function DealCard({
   deal,
   metrics,
+  isOwnDeal,
   getStatusBadgeVariant,
   getScoreColor,
   formatDate,
@@ -530,9 +532,11 @@ function DealCard({
             <Button size="sm" variant="outline" className="text-xs" onClick={onViewAnalysis}>
               <Eye size={12} className="mr-1" /> View Analysis
             </Button>
-            <Button size="sm" variant="ghost" className="text-xs" onClick={onSaveFavorite} title={isFavorite ? 'Remove from favorites' : 'Save to favorites'}>
-              <Star size={12} className={`mr-1 ${isFavorite ? 'fill-amber-500 text-amber-500' : ''}`} /> Save
-            </Button>
+            {isOwnDeal && (
+              <Button size="sm" variant="ghost" className="text-xs" onClick={onSaveFavorite} title={isFavorite ? 'Remove from favorites' : 'Save to favorites'}>
+                <Star size={12} className={`mr-1 ${isFavorite ? 'fill-amber-500 text-amber-500' : ''}`} /> Save
+              </Button>
+            )}
             <Button size="sm" variant="ghost" className="text-xs" onClick={onExportPdf}>
               <Download size={12} className="mr-1" /> Export PDF
             </Button>
