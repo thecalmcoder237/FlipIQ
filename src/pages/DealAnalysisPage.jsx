@@ -40,7 +40,7 @@ import DebugDashboard from '@/components/DebugDashboard';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const DealAnalysisPage = () => {
+const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initialMetrics }) => {
   const [searchParams] = useSearchParams();
   const dealId = searchParams.get('id');
   const navigate = useNavigate();
@@ -48,9 +48,9 @@ const DealAnalysisPage = () => {
   const { currentUser } = useAuth();
 
   // State
-  const [deal, setDeal] = useState(null);
-  const [inputs, setInputs] = useState(null);
-  const [metrics, setMetrics] = useState(null);
+  const [deal, setDeal] = useState(readOnly ? initialDeal : null);
+  const [inputs, setInputs] = useState(readOnly ? initialInputs : null);
+  const [metrics, setMetrics] = useState(readOnly ? initialMetrics : null);
   
   // Debug State
   const [loadedData, setLoadedData] = useState(null);
@@ -60,11 +60,12 @@ const DealAnalysisPage = () => {
   const [scenarioMode, setScenarioMode] = useState('worst'); // Default to 'Stress Test' view
 
   // Loading States
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!readOnly);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const pageContainerRef = useRef(null);
 
   useEffect(() => {
+    if (readOnly) return;
     if (!dealId) {
        logDataFlow('ERROR_MISSING_DEAL_ID', {}, new Date());
        navigate('/deal-input');
@@ -76,7 +77,7 @@ const DealAnalysisPage = () => {
     if (currentUser) {
        fetchDeal();
     }
-  }, [dealId, currentUser]);
+  }, [dealId, currentUser, readOnly]);
 
   const fetchDeal = async () => {
     try {
@@ -180,6 +181,45 @@ const DealAnalysisPage = () => {
     dealService.saveDeal(next, currentUser.id).catch((err) => console.error('Failed to save rehab updates', err));
   };
 
+  const handleSowContextUpdated = (sowContextMessages) => {
+    const updated = { ...deal, sowContextMessages };
+    setDeal(updated);
+    setInputs(updated);
+    dealService.saveDeal(updated, currentUser.id).catch((err) => {
+      console.error('Failed to save SOW context', err);
+      toast({ variant: "destructive", title: "Save failed", description: err.message });
+    });
+  };
+
+  const handleApplyRehabCost = (amount) => {
+    const updated = { ...deal, rehabCosts: amount };
+    setDeal(updated);
+    setInputs(updated);
+    setMetrics(calculateDealMetrics(updated));
+    dealService.saveDeal(updated, currentUser.id).catch((err) => {
+      console.error('Failed to save rehab cost', err);
+      toast({ variant: "destructive", title: "Save failed", description: err.message });
+    });
+    toast({ title: "Rehab budget updated", description: `Intelligence tab will reflect $${amount?.toLocaleString()}` });
+  };
+
+  const handleShare = async () => {
+    if (readOnly || !currentUser) return;
+    try {
+      let token = deal.shareToken || deal.share_token;
+      if (!token) {
+        const { shareToken } = await dealService.updateShareToken(deal.id, currentUser.id);
+        token = shareToken;
+        setDeal(prev => ({ ...prev, shareToken: token }));
+      }
+      const url = `${window.location.origin}/deal/share/${token}`;
+      await navigator.clipboard.writeText(url);
+      toast({ title: "Link copied", description: "Share this link for read-only access." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Failed to copy link", description: e.message });
+    }
+  };
+
   if (loading) {
     return <div className="min-h-[40vh] flex items-center justify-center bg-muted"><p className="text-foreground">Loading analysis...</p></div>;
   }
@@ -190,6 +230,7 @@ const DealAnalysisPage = () => {
   // We display the Base Metrics in the top cards, but the Scenario section below allows comparison.
   // The summary card usually shows "Current Plan".
   const displayMetrics = metrics || {};
+  const effectiveDealId = dealId || deal?.id;
 
   return (
     <div ref={pageContainerRef} className="min-h-screen bg-muted px-4 py-8 max-w-7xl mx-auto mb-20">
@@ -200,15 +241,21 @@ const DealAnalysisPage = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-foreground">Deal Analysis</h1>
         <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              className="text-foreground border-primary hover:bg-primary/10"
-              onClick={() => navigate(`/deal/action?id=${dealId}`)}
-            >
-              <Sparkles className="w-4 h-4 mr-2" />
-              Action Hub
-            </Button>
-            <Button variant="ghost" size="icon" className="text-foreground hover:bg-accent"><Share2/></Button>
+            {!readOnly && (
+              <Button 
+                variant="outline" 
+                className="text-foreground border-primary hover:bg-primary/10"
+                onClick={() => navigate(`/deal/action?id=${effectiveDealId}`)}
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Action Hub
+              </Button>
+            )}
+            {!readOnly && (
+              <Button variant="ghost" size="icon" className="text-foreground hover:bg-accent" onClick={handleShare} title="Copy share link">
+                <Share2/>
+              </Button>
+            )}
             <ExportAnalysisButton 
                deal={deal} 
                metrics={displayMetrics} 
@@ -219,7 +266,7 @@ const DealAnalysisPage = () => {
         </div>
       </div>
 
-      <DealSummaryCard deal={deal} metrics={displayMetrics} onEdit={() => setIsEditModalOpen(true)} />
+      <DealSummaryCard deal={deal} metrics={displayMetrics} onEdit={readOnly ? undefined : () => setIsEditModalOpen(true)} readOnly={readOnly} />
 
       <Tabs defaultValue="intelligence" className="mt-8">
          <TabsList className="bg-muted border border-border p-1 mb-6 flex flex-wrap h-auto shadow-sm">
@@ -259,8 +306,9 @@ const DealAnalysisPage = () => {
                     <PropertyIntelligenceSection 
                         inputs={inputs}
                         calculations={metrics}
-                        onPropertyDataFetch={handlePropertyDataFetch}
+                        onPropertyDataFetch={readOnly ? undefined : handlePropertyDataFetch}
                         propertyData={inputs.propertyIntelligence}
+                        readOnly={readOnly}
                     />
                  </div>
                  <div className="lg:col-span-1">
@@ -348,12 +396,15 @@ const DealAnalysisPage = () => {
              </div>
              <RehabPlanTab 
                 deal={deal} 
-                setDeal={handleRehabDealUpdate} 
+                setDeal={readOnly ? () => {} : handleRehabDealUpdate} 
                 isHighPotential={(metrics?.score ?? 0) >= 60}
                 inputs={inputs}
                 calculations={metrics}
                 propertyData={inputs?.propertyIntelligence}
-                onSowGenerated={handleSowGenerated}
+                onSowGenerated={readOnly ? undefined : handleSowGenerated}
+                onApplyRehabCost={readOnly ? undefined : handleApplyRehabCost}
+                onSowContextUpdated={readOnly ? undefined : handleSowContextUpdated}
+                readOnly={readOnly}
              />
          </TabsContent>
 
@@ -409,25 +460,31 @@ const DealAnalysisPage = () => {
          </TabsContent>
 
          <TabsContent value="notes">
-            <NotesPanel dealId={deal.id} initialNotes={deal.notes} />
+            <NotesPanel dealId={deal.id} initialNotes={deal.notes} readOnly={readOnly} sowContextMessages={deal.sowContextMessages} />
          </TabsContent>
       </Tabs>
 
-      <NavigationButtons 
-        backPath="/deal-input" 
-        nextPath={`/deal/action?id=${dealId}`}
-        nextLabel="Go to Action Hub"
-      />
-      <EditDealModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} deal={deal} onSave={handleDealUpdate} />
+      {!readOnly && (
+        <NavigationButtons 
+          backPath="/deal-input" 
+          nextPath={`/deal/action?id=${effectiveDealId}`}
+          nextLabel="Go to Action Hub"
+        />
+      )}
+      {!readOnly && (
+        <EditDealModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} deal={deal} onSave={handleDealUpdate} />
+      )}
       
-      <DebugDashboard 
-          formInputs={inputs}
-          loadedData={loadedData}
-          convertedInputs={inputs}
-          calculations={metrics}
-          propertyData={inputs.propertyIntelligence}
-          rehabSOW={inputs.rehabSow}
-      />
+      {!readOnly && (
+        <DebugDashboard 
+            formInputs={inputs}
+            loadedData={loadedData}
+            convertedInputs={inputs}
+            calculations={metrics}
+            propertyData={inputs.propertyIntelligence}
+            rehabSOW={inputs.rehabSow}
+        />
+      )}
     </div>
   );
 };

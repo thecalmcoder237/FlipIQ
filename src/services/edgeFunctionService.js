@@ -71,7 +71,7 @@ export const fetchPropertyIntelligence = async (address, zipCode, propertyType, 
  * Fetch comps only (RentCast listings/sale + fallbacks). Use with fetch-property-intelligence; UI merges property + comps.
  * @param {string} address - Property address
  * @param {string} zipCode - 5-digit ZIP
- * @param {{ city?: string, state?: string, propertyId?: string, subjectAddress?: string, userId?: string, debug?: boolean }} [options] - Optional: city, state, propertyId, subjectAddress (for excluding subject from comps), userId, debug
+ * @param {{ city?: string, state?: string, propertyId?: string, subjectAddress?: string, subjectSpecs?: { bedrooms?: number, bathrooms?: number }, userId?: string, debug?: boolean }} [options] - Optional: city, state, propertyId, subjectAddress (for excluding subject from comps), subjectSpecs (for broader bed/bath range matching), userId, debug
  */
 export const fetchComps = async (address, zipCode, options = {}) => {
     const body = {
@@ -82,6 +82,9 @@ export const fetchComps = async (address, zipCode, options = {}) => {
     if (options.state && String(options.state).trim().length >= 2) body.state = String(options.state).trim().slice(0, 2).toUpperCase();
     if (options.propertyId) body.propertyId = options.propertyId;
     if (options.subjectAddress) body.subjectAddress = options.subjectAddress;
+    if (options.subjectSpecs && typeof options.subjectSpecs === 'object' && (options.subjectSpecs.bedrooms != null || options.subjectSpecs.bathrooms != null)) {
+        body.subjectSpecs = options.subjectSpecs;
+    }
     if (options.userId) body.userId = options.userId;
     if (options.debug === true || (typeof localStorage !== 'undefined' && localStorage.getItem('propertyIntelDebug') === '1')) body.debug = true;
     return invokeEdgeFunction('fetch-comps', body);
@@ -143,6 +146,9 @@ export const generateRehabSOW = async (address, budget, propertyDetails, images 
     }
     if (typeof options.compsSummary === 'string' && options.compsSummary.trim()) {
         payload.compsSummary = options.compsSummary.trim();
+    }
+    if (Array.isArray(options.sowContextMessages) && options.sowContextMessages.length > 0) {
+        payload.sowContextMessages = options.sowContextMessages.filter((m) => typeof m === 'string' && m.trim());
     }
     return invokeEdgeFunction('generate-rehab-sow', payload);
 };

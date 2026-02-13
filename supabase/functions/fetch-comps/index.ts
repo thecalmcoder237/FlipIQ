@@ -32,6 +32,8 @@ function createSupabaseAdminClient() {
 const RENTCAST_BASE = "https://api.rentcast.io/v1";
 /** Up to 3 RentCast calls per request (avm/value first, then listings/sale and properties fallback, optional sale by id); limit is per month. */
 const RENTCAST_LIMIT = 50;
+/** Max comps to return per request; RentCast supports up to 500 per call, 50 is a reasonable default. */
+const COMPS_RESPONSE_LIMIT = 50;
 
 function yearMonth(): string {
   return new Date().toISOString().slice(0, 7);
@@ -41,8 +43,10 @@ function getRentCastKey(): string | null {
   return Deno.env.get("RENTCAST_API_KEY")?.trim() || null;
 }
 
+type SubjectSpecs = { bedrooms?: number; bathrooms?: number };
+
 /** Normalize and validate request data before calling RentCast. Returns 400 if invalid. */
-function validateAndNormalize(body: Record<string, unknown>): { valid: true; address: string; zipCode: string; city?: string; state?: string } | { valid: false; error: string } {
+function validateAndNormalize(body: Record<string, unknown>): { valid: true; address: string; zipCode: string; city?: string; state?: string; subjectSpecs?: SubjectSpecs } | { valid: false; error: string } {
   const rawAddress = String(body?.address ?? body?.formattedAddress ?? "").trim();
   const address = rawAddress.replace(/\s+/g, " ").trim();
   const zipRaw = String(body?.zipCode ?? body?.zip_code ?? "").trim().replace(/\D/g, "").slice(0, 5);
@@ -51,13 +55,65 @@ function validateAndNormalize(body: Record<string, unknown>): { valid: true; add
   const stateRaw = String(body?.state ?? body?.stateCode ?? body?.state_code ?? "").trim();
   const state = stateRaw ? stateRaw.slice(0, 2).toUpperCase() : undefined;
 
+  let subjectSpecs: SubjectSpecs | undefined;
+  const rawSpecs = body?.subjectSpecs ?? body?.subject_specs;
+  if (rawSpecs && typeof rawSpecs === "object" && !Array.isArray(rawSpecs)) {
+    const s = rawSpecs as Record<string, unknown>;
+    const bedrooms = s.bedrooms != null && s.bedrooms !== "" ? Number(s.bedrooms) : undefined;
+    const bathrooms = s.bathrooms != null && s.bathrooms !== "" ? Number(s.bathrooms) : undefined;
+    if (Number.isFinite(bedrooms) || Number.isFinite(bathrooms)) {
+      subjectSpecs = {};
+      if (Number.isFinite(bedrooms)) subjectSpecs.bedrooms = bedrooms;
+      if (Number.isFinite(bathrooms)) subjectSpecs.bathrooms = bathrooms;
+    }
+  }
+
   if (!address || address.length < 5) {
     return { valid: false, error: "address is required and must be at least 5 characters" };
   }
   if (zipCode.length !== 5) {
     return { valid: false, error: "zipCode must be a 5-digit US ZIP" };
   }
-  return { valid: true, address, zipCode, city, state };
+  return { valid: true, address, zipCode, city, state, subjectSpecs };
+}
+
+/** Build RentCast range strings for bedrooms and bathrooms to include similar comps (e.g. 2 baths when subject has 1.5 or 2.5). */
+function buildBedBathRanges(specs: SubjectSpecs | Record<string, unknown> | undefined): { bedrooms?: string; bathrooms?: string } {
+  if (!specs) return {};
+  const beds = specs.bedrooms;
+  const baths = specs.bathrooms;
+  const numBeds = beds != null && beds !== "" ? Number(beds) : NaN;
+  const numBaths = baths != null && baths !== "" ? Number(baths) : NaN;
+  const out: { bedrooms?: string; bathrooms?: string } = {};
+  if (Number.isFinite(numBeds)) {
+    const min = Math.max(1, numBeds - 1);
+    const max = numBeds + 2;
+    out.bedrooms = `${min}:${max}`;
+  }
+  if (Number.isFinite(numBaths)) {
+    const min = Math.max(1, numBaths - 0.5);
+    const max = numBaths + 1.5;
+    out.bathrooms = `${min}:${max}`;
+  }
+  return out;
+}
+
+/** Compute distance in miles between two lat/lng points using Haversine formula. */
+function computeDistanceFromCoords(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  if (!Number.isFinite(lat1) || !Number.isFinite(lon1) || !Number.isFinite(lat2) || !Number.isFinite(lon2)) return NaN;
+  const R = 3959; // Earth radius in miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
 async function getUsage(
@@ -182,15 +238,16 @@ function mapPropertyRecordToComp(p: Record<string, unknown> | null): Record<stri
   );
   const saleDate =
     p.lastSaleDate ?? p.last_sale_date ?? lastSale?.saleDate ?? lastSale?.closeDate ?? lastSale?.date ?? "";
-  const yearBuilt = p.yearBuilt ?? p.year_built;
+  const yearBuilt = p.yearBuilt ?? p.year_built ?? p.YearBuilt;
   const lat = p.latitude ?? p.lat;
   const lng = p.longitude ?? p.lng ?? p.lon;
-  const dist = p.distance;
+  const dist = p.distance ?? p.distance_in_miles ?? p.distanceMiles ?? p.milesFromSubject ?? p.distanceFromSubject;
+  const domVal = p.daysOnMarket ?? p.dom ?? p.days_on_market ?? p.listingAge ?? lastSale?.daysOnMarket ?? lastSale?.dom;
   return {
     address: a,
     salePrice: Number.isFinite(salePrice) ? salePrice : undefined,
     saleDate: saleDate ? String(saleDate).slice(0, 10) : undefined,
-    dom: p.daysOnMarket ?? p.dom ?? lastSale?.daysOnMarket ?? undefined,
+    dom: domVal,
     sqft: p.squareFootage ?? p.sqft ?? p.square_footage,
     beds: p.bedrooms ?? p.beds,
     baths: p.bathrooms ?? p.baths,
@@ -242,15 +299,16 @@ function mapRentCastToComp(item: Record<string, unknown>): Record<string, unknow
   const parkingType = item.garageType ?? item.garage_type ?? item.parkingType ?? item.parking_type ?? item.carport ?? item.streetParking;
   const parkingSpaces = item.parkingSpaces ?? item.parking_spaces ?? item.garageSpaces ?? item.numberOfParking ?? item.garage_spaces;
   const levels = item.levels ?? item.stories ?? item.numberOfStories ?? item.stories_count;
-  const yearBuilt = item.yearBuilt ?? item.year_built;
+  const yearBuilt = item.yearBuilt ?? item.year_built ?? item.YearBuilt;
   const lat = item.latitude ?? item.lat;
   const lng = item.longitude ?? item.lng ?? item.lon;
-  const dist = item.distance;
+  const dist = item.distance ?? item.distance_in_miles ?? item.distanceMiles ?? item.milesFromSubject ?? item.distanceFromSubject;
+  const domVal = item.daysOnMarket ?? item.dom ?? item.days_on_market ?? item.listingAge;
   return {
     address: a,
     salePrice: Number.isFinite(salePrice) ? salePrice : undefined,
     saleDate: saleDate || undefined,
-    dom: item.daysOnMarket ?? item.dom ?? item.days_on_market,
+    dom: domVal,
     sqft: item.squareFootage ?? item.sqft ?? item.square_footage,
     beds: item.bedrooms ?? item.beds,
     baths: item.bathrooms ?? item.baths,
@@ -268,7 +326,12 @@ function mapRentCastToComp(item: Record<string, unknown>): Record<string, unknow
   };
 }
 
-async function fetchRentCastCompsFromListings(address: string, zipCode: string, limit: number): Promise<Array<Record<string, unknown>>> {
+async function fetchRentCastCompsFromListings(
+  address: string,
+  zipCode: string,
+  limit: number,
+  opts?: { bedrooms?: string; bathrooms?: string }
+): Promise<Array<Record<string, unknown>>> {
   const apiKey = getRentCastKey();
   if (!apiKey) return [];
   const twelveMonthsAgo = new Date();
@@ -277,7 +340,9 @@ async function fetchRentCastCompsFromListings(address: string, zipCode: string, 
   const params = new URLSearchParams();
   if (address) params.set("address", address);
   if (zipCode) params.set("zipCode", zipCode);
-  params.set("limit", "20");
+  params.set("limit", String(Math.min(limit, 50)));
+  if (opts?.bedrooms) params.set("bedrooms", opts.bedrooms);
+  if (opts?.bathrooms) params.set("bathrooms", opts.bathrooms);
   const url = `${RENTCAST_BASE}/listings/sale?${params.toString()}`;
   const res = await fetch(url, { headers: { "X-Api-Key": apiKey, Accept: "application/json" } });
   if (!res.ok) return [];
@@ -296,7 +361,7 @@ async function fetchRentCastCompsFromListings(address: string, zipCode: string, 
 async function fetchRentCastCompsFromProperties(
   zipCode: string,
   limit: number,
-  opts?: { fullAddress?: string; city?: string; state?: string }
+  opts?: { fullAddress?: string; city?: string; state?: string; bedrooms?: string; bathrooms?: string }
 ): Promise<Array<Record<string, unknown>>> {
   const apiKey = getRentCastKey();
   if (!apiKey) return [];
@@ -307,7 +372,9 @@ async function fetchRentCastCompsFromProperties(
     if (opts?.city) params.set("city", opts.city.trim());
     if (opts?.state) params.set("state", opts.state.trim().slice(0, 2).toUpperCase());
     params.set("saleDateRange", "365");
-    params.set("limit", "20");
+    params.set("limit", String(Math.min(limit, 50)));
+    if (opts?.bedrooms) params.set("bedrooms", opts.bedrooms);
+    if (opts?.bathrooms) params.set("bathrooms", opts.bathrooms);
     const url = `${RENTCAST_BASE}/properties?${params.toString()}`;
     const res = await fetch(url, { headers: { "X-Api-Key": apiKey, Accept: "application/json" } });
     if (!res.ok) return [];
@@ -328,7 +395,7 @@ function buildFullAddress(opts: { address: string; zipCode: string; city?: strin
   return parts.join(", ");
 }
 
-/** Normalize AVM subject/property object to a minimal shape for comparison (address, squareFootage, bedrooms, bathrooms, yearBuilt). */
+/** Normalize AVM subject/property object to a minimal shape for comparison (address, squareFootage, bedrooms, bathrooms, yearBuilt, lat/lng for distance). */
 function mapAvmSubject(p: Record<string, unknown> | null): Record<string, unknown> | undefined {
   if (!p || typeof p !== "object") return undefined;
   const num = (v: unknown) => (v != null && v !== "" ? Number(v) : undefined);
@@ -338,13 +405,17 @@ function mapAvmSubject(p: Record<string, unknown> | null): Record<string, unknow
   const beds = p.bedrooms ?? p.beds;
   const baths = p.bathrooms ?? p.baths;
   const yearBuilt = num(p.yearBuilt ?? p.year_built ?? p.YearBuilt);
-  if (!addressStr && sqft == null && beds == null && baths == null && yearBuilt == null) return undefined;
+  const lat = num(p.latitude ?? p.lat);
+  const lng = num(p.longitude ?? p.lng ?? p.lon);
+  if (!addressStr && sqft == null && beds == null && baths == null && yearBuilt == null && lat == null && lng == null) return undefined;
   const out: Record<string, unknown> = {};
   if (addressStr) out.address = addressStr;
   if (sqft != null && Number.isFinite(sqft)) out.squareFootage = sqft;
   if (beds != null) out.bedrooms = beds;
   if (baths != null) out.bathrooms = baths;
   if (yearBuilt != null && Number.isFinite(yearBuilt)) out.yearBuilt = yearBuilt;
+  if (lat != null && Number.isFinite(lat)) out.latitude = lat;
+  if (lng != null && Number.isFinite(lng)) out.longitude = lng;
   return Object.keys(out).length ? out : undefined;
 }
 
@@ -383,29 +454,43 @@ async function fetchRentCastCompsFromAvmValue(address: string, zipCode: string):
   return { comparables: mapped, avmValue: numAvm, avmSubject };
 }
 
-type CompsFetchResult =
-  | { comps: Array<Record<string, unknown>>; source: "avm"; avmValue?: number; avmSubject?: Record<string, unknown> }
-  | { comps: Array<Record<string, unknown>>; source: "listings" | "properties" };
+type CompsFetchResult = {
+  comps: Array<Record<string, unknown>>;
+  source: "avm" | "listings" | "properties";
+  avmValue?: number;
+  avmSubject?: Record<string, unknown>;
+};
 
 async function fetchRentCastComps(
   address: string,
   zipCode: string,
   limit: number,
-  opts?: { fullAddress?: string; city?: string; state?: string }
+  opts?: { fullAddress?: string; city?: string; state?: string; subjectSpecs?: SubjectSpecs }
 ): Promise<CompsFetchResult> {
   const avm = await fetchRentCastCompsFromAvmValue(address, zipCode);
+  const effectiveSpecs = opts?.subjectSpecs ?? (avm.avmSubject ? { bedrooms: avm.avmSubject.bedrooms as number, bathrooms: avm.avmSubject.bathrooms as number } : undefined);
+  const ranges = buildBedBathRanges(effectiveSpecs);
+
+  // When we have subject beds/baths, prefer listings with ranges for broader comps
+  if (ranges.bedrooms || ranges.bathrooms) {
+    const listings = await fetchRentCastCompsFromListings(address, zipCode, limit, ranges);
+    if (listings.length > 0) {
+      return { comps: listings, source: "listings", avmValue: avm.avmValue, avmSubject: avm.avmSubject };
+    }
+    const props = await fetchRentCastCompsFromProperties(zipCode, limit, { fullAddress: opts?.fullAddress, city: opts?.city, state: opts?.state, ...ranges });
+    if (props.length > 0) {
+      return { comps: props, source: "properties", avmValue: avm.avmValue, avmSubject: avm.avmSubject };
+    }
+  }
+
+  // Fallback: use AVM comps if available, else listings/properties without filters
   if (avm.comparables.length > 0) {
-    return {
-      comps: avm.comparables.slice(0, limit),
-      source: "avm",
-      avmValue: avm.avmValue,
-      avmSubject: avm.avmSubject,
-    };
+    return { comps: avm.comparables.slice(0, limit), source: "avm", avmValue: avm.avmValue, avmSubject: avm.avmSubject };
   }
   const listings = await fetchRentCastCompsFromListings(address, zipCode, limit);
-  if (listings.length > 0) return { comps: listings, source: "listings" };
+  if (listings.length > 0) return { comps: listings, source: "listings", avmValue: avm.avmValue, avmSubject: avm.avmSubject };
   const props = await fetchRentCastCompsFromProperties(zipCode, limit, opts);
-  return { comps: props, source: "properties" };
+  return { comps: props, source: "properties", avmValue: avm.avmValue, avmSubject: avm.avmSubject };
 }
 
 /** GET /v1/listings/sale/{id} - returns single sale listing for that property ID. */
@@ -451,7 +536,7 @@ Deno.serve(async (req) => {
     if (!validation.valid) {
       return json({ error: validation.error }, { status: 400 });
     }
-    const { address, zipCode, city, state } = validation;
+    const { address, zipCode, city, state, subjectSpecs } = validation;
     const userId = String(body?.userId ?? body?.user_id ?? "").trim();
     const propertyId = String(body?.propertyId ?? body?.property_id ?? "").trim() || undefined;
     // Fallback to address if subjectAddress not provided (e.g. comps-only refresh without property response)
@@ -474,16 +559,34 @@ Deno.serve(async (req) => {
 
     if (getRentCastKey() && rentcastAllowed) {
       try {
-        // AVM first (returns comparables for this address), then listings/properties fallback
-        const fetchResult = await fetchRentCastComps(address, zipCode, 15, { fullAddress, city, state });
+        // AVM first (returns value + subject); then listings/properties with bed/bath ranges when subjectSpecs available
+        const fetchResult = await fetchRentCastComps(address, zipCode, COMPS_RESPONSE_LIMIT, {
+          fullAddress,
+          city,
+          state,
+          subjectSpecs,
+        });
         const compsRaw = fetchResult.comps;
-        if (fetchResult.source === "avm") {
-          avmValue = fetchResult.avmValue;
-          avmSubject = fetchResult.avmSubject;
-        }
+        avmValue = fetchResult.avmValue;
+        avmSubject = fetchResult.avmSubject;
 
         // Filter out the subject property by ID and normalized address (isSubjectComp)
         const notSubject = compsRaw.filter((c) => !isSubjectComp(c, subjectAddress, propertyId));
+
+        // Compute distance from subject when missing (Haversine from lat/lng)
+        const subjectLat = avmSubject?.latitude != null && Number.isFinite(Number(avmSubject.latitude)) ? Number(avmSubject.latitude) : undefined;
+        const subjectLng = avmSubject?.longitude != null && Number.isFinite(Number(avmSubject.longitude)) ? Number(avmSubject.longitude) : undefined;
+        if (subjectLat != null && subjectLng != null) {
+          for (const c of notSubject) {
+            if (c.distance != null && Number.isFinite(Number(c.distance))) continue;
+            const clat = c.latitude != null && Number.isFinite(Number(c.latitude)) ? Number(c.latitude) : undefined;
+            const clng = c.longitude != null && Number.isFinite(Number(c.longitude)) ? Number(c.longitude) : undefined;
+            if (clat != null && clng != null) {
+              const miles = computeDistanceFromCoords(subjectLat, subjectLng, clat, clng);
+              if (Number.isFinite(miles)) c.distance = Math.round(miles * 100) / 100;
+            }
+          }
+        }
 
         // Prefer comps within 12 months and not future; otherwise take any non-future comps (AVM listing dates vary)
         const oneYearAgoMs = Date.now() - 365 * 24 * 60 * 60 * 1000;
@@ -494,7 +597,7 @@ Deno.serve(async (req) => {
           if (saleMs > nowMs) return false;
           return saleMs >= oneYearAgoMs;
         });
-        recentComps = recentOnly.length > 0 ? recentOnly.slice(0, 5) : notSubject.filter((c) => !isSaleDateInFuture(c)).slice(0, 5);
+        recentComps = recentOnly.length > 0 ? recentOnly.slice(0, COMPS_RESPONSE_LIMIT) : notSubject.filter((c) => !isSaleDateInFuture(c)).slice(0, COMPS_RESPONSE_LIMIT);
 
         // If still no comps and we have a propertyId, try fetching the subject as a sale listing
         if (recentComps.length === 0 && propertyId) {

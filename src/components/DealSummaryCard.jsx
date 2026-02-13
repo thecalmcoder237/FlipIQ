@@ -13,7 +13,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-const DealSummaryCard = ({ deal, metrics, onEdit }) => {
+const DealSummaryCard = ({ deal, metrics, onEdit, readOnly }) => {
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
@@ -75,7 +75,8 @@ const DealSummaryCard = ({ deal, metrics, onEdit }) => {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
-           <Button
+           {!readOnly && (
+            <Button
               variant="ghost"
               size="icon"
               onClick={handleToggleFavorite}
@@ -83,6 +84,7 @@ const DealSummaryCard = ({ deal, metrics, onEdit }) => {
             >
               <Star className={`w-5 h-5 ${deal.isFavorite ? 'fill-primary-foreground text-primary-foreground' : ''}`} />
             </Button>
+           )}
             {onEdit && (
               <Button
                 size="sm"

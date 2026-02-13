@@ -18,6 +18,7 @@ import DealComparison from '@/pages/DealComparison';
 import PortfolioDashboard from '@/pages/PortfolioDashboard';
 import LoanProposalGenerator from '@/pages/LoanProposalGenerator';
 import DealActionHub from '@/pages/DealActionHub';
+import SharedDealView from '@/pages/SharedDealView';
 
 function App() {
   return (
@@ -30,7 +31,8 @@ function App() {
               <Route path="/" element={<Navigate to="/portfolio-dashboard" replace />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
-              
+              <Route path="/deal/share/:token" element={<SharedDealView />} />
+
               <Route path="/deal-input" element={<ProtectedRoute><DealInputForm /></ProtectedRoute>} />
               <Route path="/deal-analysis" element={<ProtectedRoute><DealAnalysisPage /></ProtectedRoute>} />
               <Route path="/report" element={<ProtectedRoute><PDFReportPage /></ProtectedRoute>} />

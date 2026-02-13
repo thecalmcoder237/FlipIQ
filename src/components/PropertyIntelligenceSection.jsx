@@ -65,7 +65,7 @@ function DetailValueCell({ value }) {
   return <span>{String(value)}</span>;
 }
 
-const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch, propertyData }) => {
+const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch, propertyData, readOnly }) => {
   const { currentUser } = useAuth();
   const [isSpecsOpen, setIsSpecsOpen] = useState(false);
   const [isCompsOpen, setIsCompsOpen] = useState(true);
@@ -248,12 +248,19 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
     // Pass propertyId from existing property intelligence so fetch-comps can exclude the subject by ID.
     const propertyIdForComps =
       inputs.propertyIntelligence?.propertyId ?? inputs.propertyIntelligence?.id ?? inputs.propertyIntelligence?.parcelId;
+    const avmSubj = inputs.propertyIntelligence?.avmSubject;
+    const subjectSpecsRefresh = (avmSubj && typeof avmSubj === 'object' && (avmSubj.bedrooms != null || avmSubj.bathrooms != null))
+      ? { bedrooms: avmSubj.bedrooms, bathrooms: avmSubj.bathrooms }
+      : (inputs.propertyIntelligence?.bedrooms != null || inputs.propertyIntelligence?.bathrooms != null)
+        ? { bedrooms: inputs.propertyIntelligence?.bedrooms, bathrooms: inputs.propertyIntelligence?.bathrooms }
+        : undefined;
     try {
       const compsResponse = await fetchComps(address, zipToSend, {
         city: citySend,
         state: stateSend,
         propertyId: propertyIdForComps,
         subjectAddress: inputs.propertyIntelligence?.address ?? inputs.propertyIntelligence?.formattedAddress ?? inputs.propertyIntelligence?.streetAddress ?? address,
+        subjectSpecs: subjectSpecsRefresh,
         userId: currentUser?.id,
       });
       const merged = {
@@ -323,9 +330,9 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
               </div>
               <h3 className="text-xl font-bold text-foreground mb-2">Property Data & Comps</h3>
               <p className="text-muted-foreground max-w-md mb-6">
-                Property data and comps from RentCast.
+                {readOnly ? 'No property data available for this deal.' : 'Property data and comps from RentCast.'}
               </p>
-              {apiUsage && (
+              {!readOnly && apiUsage && (
                 <div className="flex items-center gap-2 mb-2">
                   <p className="text-xs text-muted-foreground">
                     RentCast {apiUsage.rentcast_count}/{apiUsage.rentcast_limit ?? 50}
@@ -341,14 +348,16 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
                   </Button>
                 </div>
               )}
-              <Button 
-                onClick={handleFetchIntelligence} 
-                disabled={!inputs?.address || inputs.address.length < 3 || fetchDisabled}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground min-w-[200px]"
-                title={fetchDisabled ? 'Monthly API limit reached. Resets next month.' : undefined}
-              >
-                Fetch Property Data
-              </Button>
+              {!readOnly && (
+                <Button 
+                  onClick={handleFetchIntelligence} 
+                  disabled={!inputs?.address || inputs.address.length < 3 || fetchDisabled}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground min-w-[200px]"
+                  title={fetchDisabled ? 'Monthly API limit reached. Resets next month.' : undefined}
+                >
+                  Fetch Property Data
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}
@@ -388,7 +397,7 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
                 </CardTitle>
                 <p className="text-xs text-muted-foreground absolute right-4 top-14">Property data and comps from RentCast.</p>
                 <div className="flex items-center gap-2">
-                   {apiUsage && (
+                   {!readOnly && apiUsage && (
                      <>
                        <span className="text-xs text-muted-foreground mr-1">
                          RentCast {apiUsage.rentcast_count}/{apiUsage.rentcast_limit ?? 50}
@@ -404,16 +413,18 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
                        </Button>
                      </>
                    )}
-                   <Button 
-                     variant="ghost" 
-                     size="sm" 
-                     className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                     onClick={(e) => { e.stopPropagation(); handleFetchIntelligence(); }}
-                     disabled={fetchDisabled}
-                     title={fetchDisabled ? 'Monthly API limit reached.' : undefined}
-                   >
-                     <RefreshCw className="h-4 w-4" />
-                   </Button>
+                   {!readOnly && (
+                     <Button 
+                       variant="ghost" 
+                       size="sm" 
+                       className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                       onClick={(e) => { e.stopPropagation(); handleFetchIntelligence(); }}
+                       disabled={fetchDisabled}
+                       title={fetchDisabled ? 'Monthly API limit reached.' : undefined}
+                     >
+                       <RefreshCw className="h-4 w-4" />
+                     </Button>
+                   )}
                    {isSpecsOpen ? <ChevronUp className="text-muted-foreground" /> : <ChevronDown className="text-muted-foreground" />}
                 </div>
               </CardHeader>
@@ -545,21 +556,23 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
                   <DollarSign className="text-primary" /> Verified Recent Comps
                 </CardTitle>
                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="shrink-0 text-muted-foreground hover:text-foreground"
-                    onClick={handleRefreshComps}
-                    disabled={compsRefreshing || !inputs?.address?.trim() || (String(inputs?.zipCode ?? '').replace(/\D/g, '').slice(0, 5).length !== 5)}
-                    title="Refresh comps only"
-                  >
-                    {compsRefreshing ? (
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                  </Button>
+                  {!readOnly && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0 text-muted-foreground hover:text-foreground"
+                      onClick={handleRefreshComps}
+                      disabled={compsRefreshing || !inputs?.address?.trim() || (String(inputs?.zipCode ?? '').replace(/\D/g, '').slice(0, 5).length !== 5)}
+                      title="Refresh comps only"
+                    >
+                      {compsRefreshing ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
                   {isCompsOpen ? <ChevronUp className="text-muted-foreground" /> : <ChevronDown className="text-muted-foreground" />}
                 </div>
               </CardHeader>

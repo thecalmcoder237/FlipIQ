@@ -175,6 +175,7 @@ async function runSOWGeneration(body: {
   deal?: Record<string, unknown>;
   compsSummary?: string;
   recentComps?: unknown[];
+  sowContextMessages?: string[];
 }): Promise<string> {
   const apiKey = getApiKey();
   const address = body.userAddress || "Unknown";
@@ -183,6 +184,10 @@ async function runSOWGeneration(body: {
   const imageUrls: string[] = Array.isArray(body.images) ? body.images : [];
   const deal = body.deal || {};
   const compsSummary = body.compsSummary || summarizeComps(body.recentComps || []);
+  const sowContextMessages: string[] = Array.isArray(body.sowContextMessages) ? body.sowContextMessages.filter((m): m is string => typeof m === "string") : [];
+  const userContextBlock = sowContextMessages.length > 0
+    ? `\n\nIMPORTANT - User-provided property context (USE THESE to avoid errors):\n${sowContextMessages.map((m, i) => `${i + 1}. ${m}`).join("\n")}\n\nFollow these user notes when scoping. For example: if the user says "basement is crawl space", do NOT include basement finishing. If the user says "roof doesn't need full replacement", do NOT include full roof replacement—only repairs or partial work as appropriate.`
+    : "";
 
   const arv = deal.arv ?? 0;
   const purchasePrice = deal.purchasePrice ?? deal.purchase_price ?? 0;
@@ -242,7 +247,7 @@ Write 3–6 bullet or short paragraphs of pro flipper recommendations based on t
   const content: ({ type: "text"; text: string } | { type: "image"; source: { type: "base64"; media_type: string; data: string } })[] = [
     {
       type: "text",
-      text: `Deal and property context: ${dealContext}\n\nProperty description (full): ${desc}\n\n${compsSummary ? `Comps (use for ARV and value-add ideas):\n${compsSummary}\n\n` : ""}Generate the full SOW including SOW Remarks, Scope of Work with tables, timeline, total, tier table, and Pro Flipper Recommendations. Use the images and all data above for accuracy.`,
+      text: `Deal and property context: ${dealContext}\n\nProperty description (full): ${desc}\n\n${compsSummary ? `Comps (use for ARV and value-add ideas):\n${compsSummary}\n\n` : ""}${userContextBlock}\n\nGenerate the full SOW including SOW Remarks, Scope of Work with tables, timeline, total, tier table, and Pro Flipper Recommendations. Use the images and all data above for accuracy. Follow any user-provided context notes exactly.`,
     },
     ...imageBlocks,
   ];

@@ -13,7 +13,7 @@ import { analyzePropertyPhoto } from '@/services/claudeVisionService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 
-const PhotoUploadSection = ({ deal, onPhotosUpdated }) => {
+const PhotoUploadSection = ({ deal, onPhotosUpdated, readOnly }) => {
   const [uploading, setUploading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
@@ -158,6 +158,7 @@ const PhotoUploadSection = ({ deal, onPhotosUpdated }) => {
         <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
            <Camera className="w-5 h-5 text-primary" /> Site Photos & AI Analysis
         </h3>
+        {!readOnly && (
         <div className="flex items-center gap-2">
           {photos.length > 0 && (
             <Button
@@ -187,6 +188,7 @@ const PhotoUploadSection = ({ deal, onPhotosUpdated }) => {
              </Button>
           </div>
         </div>
+        )}
       </div>
 
       {photos.length === 0 ? (
@@ -205,6 +207,7 @@ const PhotoUploadSection = ({ deal, onPhotosUpdated }) => {
                   >
                     <img src={photo.url} alt="Property" className="w-full h-40 object-cover" />
                   </button>
+                  {!readOnly && (
                   <button 
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleDelete(photo.path); }}
@@ -212,6 +215,7 @@ const PhotoUploadSection = ({ deal, onPhotosUpdated }) => {
                   >
                     <X size={14} />
                   </button>
+                  )}
                   <div className="p-3">
                      <div className="flex justify-between items-start mb-1">
                         <span className={`text-xs font-bold px-2 py-0.5 rounded ${

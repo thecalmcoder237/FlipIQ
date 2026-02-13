@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Hammer, CheckCircle2, Loader2, RefreshCw, AlertTriangle, Lock, Sparkles, Camera, Building2 } from 'lucide-react';
+import { Hammer, CheckCircle2, Loader2, RefreshCw, AlertTriangle, Lock, Sparkles, Camera, Building2, MessageSquarePlus, Send } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { validateRehabInput } from "@/utils/validationUtils";
 import { useToast } from "@/components/ui/use-toast";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -16,10 +17,12 @@ function stripProFlipperSection(text) {
   return text.replace(re, '').trim();
 }
 
-const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, onSowGenerated, recentComps }) => {
+const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, onSowGenerated, recentComps, readOnly, sowContextMessages = [], onSowContextUpdated }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [contextInput, setContextInput] = useState('');
   const { toast } = useToast();
+  const messages = Array.isArray(sowContextMessages) ? sowContextMessages : [];
 
   // Check unlock conditions (advanced analysis unlocks at score ≥ 60)
   const dealScore = calculations?.score || 0;
@@ -32,6 +35,21 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
   useEffect(() => {
     logDataFlow('REHAB_SOW_PROPS', { propertyData, inputs, calculations }, new Date());
   }, [inputs, calculations, propertyData]);
+
+  const handleAddContextMessage = () => {
+    const trimmed = contextInput?.trim();
+    if (!trimmed || !onSowContextUpdated) return;
+    const next = [...messages, trimmed];
+    onSowContextUpdated(next);
+    setContextInput('');
+    toast({ title: "Context added", description: "This will guide Claude when generating the SOW." });
+  };
+
+  const handleRemoveContextMessage = (index) => {
+    if (!onSowContextUpdated) return;
+    const next = messages.filter((_, i) => i !== index);
+    onSowContextUpdated(next);
+  };
 
   const handleGenerateSOW = async () => {
     setError(null);
@@ -90,6 +108,9 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
           recentComps: Array.isArray(recentComps) ? recentComps : [],
         },
     };
+    if (messages.length > 0) {
+      requestPayload.options.sowContextMessages = messages;
+    }
 
     console.log('Rehab SOW Request with images and context:', { ...requestPayload, imagesCount: imageUrls.length });
 
@@ -182,8 +203,63 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
             </div>
           )}
 
+          {/* SOW Context Chat - guide Claude with property-specific notes */}
+          {!readOnly && onSowContextUpdated && (
+            <Card className="bg-card border-border shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
+                  <MessageSquarePlus className="w-4 h-4 text-primary" />
+                  SOW Context
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Add property-specific notes to guide Claude. Examples: &quot;Basement is crawl space, not full basement&quot;, &quot;Roof needs repair, not full replacement&quot;.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {messages.length > 0 && (
+                  <div className="space-y-2">
+                    {messages.map((msg, i) => (
+                      <div key={i} className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 border border-border text-sm">
+                        <span className="flex-1 text-foreground">{msg}</span>
+                        <Button variant="ghost" size="sm" className="shrink-0 h-7 text-muted-foreground hover:text-destructive" onClick={() => handleRemoveContextMessage(i)}>
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Textarea
+                    value={contextInput}
+                    onChange={(e) => setContextInput(e.target.value)}
+                    placeholder="e.g. Basement is crawl space. Roof needs repair only, not replacement."
+                    className="min-h-[60px] resize-none bg-background border-input text-foreground"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleAddContextMessage();
+                      }
+                    }}
+                  />
+                  <Button size="sm" onClick={handleAddContextMessage} disabled={!contextInput?.trim()} className="shrink-0 self-end bg-primary text-primary-foreground hover:bg-primary/90">
+                    <Send className="w-4 h-4 mr-1" /> Add
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Read-only with no SOW */}
+          {readOnly && !savedSow && (
+            <Card className="bg-card border-border border-dashed shadow-sm">
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <p className="text-muted-foreground">No scope of work available for this deal.</p>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Locked State - Requirements not met */}
-          {!isUnlocked && !savedSow && !loading && !error && (
+          {!readOnly && !isUnlocked && !savedSow && !loading && !error && (
             <Card className="bg-card border-border border-dashed shadow-sm">
               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                 <div className="p-4 bg-muted rounded-full mb-4 relative">
@@ -237,7 +313,7 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
           )}
 
           {/* Unlocked State / CTA */}
-          {isUnlocked && !savedSow && !loading && !error && (
+          {!readOnly && isUnlocked && !savedSow && !loading && !error && (
             <Card className="bg-card border-border border-dashed shadow-sm">
               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                 <div className="p-4 bg-primary/10 rounded-full mb-4">
@@ -274,6 +350,7 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
                   <Hammer className="text-primary" /> 
                   AI-Generated Scope of Work
                 </CardTitle>
+                {!readOnly && (
                 <Button 
                   variant="outline" 
                   size="sm"
@@ -282,6 +359,7 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
                 >
                   <RefreshCw className="w-4 h-4 mr-2" /> Regenerate
                 </Button>
+                )}
               </CardHeader>
               <CardContent className="p-6 bg-background">
                 <div className="prose max-w-none">

@@ -73,7 +73,7 @@ function normalizeComp(raw) {
   const sqft = raw.sqft != null ? (Number(raw.sqft) || raw.sqft) : (raw.squareFootage ?? raw.square_footage);
   const beds = raw.beds ?? raw.bedrooms ?? raw.beds;
   const baths = raw.baths ?? raw.bathrooms ?? raw.baths;
-  const dom = raw.dom ?? raw.daysOnMarket ?? raw.days_on_market;
+  const dom = raw.dom ?? raw.daysOnMarket ?? raw.days_on_market ?? raw.listingAge;
   const saleDate = safeStr(raw.saleDate ?? raw.sale_date ?? raw.sold_date ?? raw.soldDate ?? raw.close_date ?? raw.closeDate);
   const basement = safeStr(raw.basement ?? raw.basement_type);
   const basementType = safeStr(raw.basementType ?? raw.basement_type);
@@ -81,10 +81,11 @@ function normalizeComp(raw) {
   const parkingType = safeStr(raw.parkingType ?? raw.parking_type ?? raw.garageType ?? raw.garage_type);
   const parkingSpaces = raw.parkingSpaces != null ? (Number(raw.parkingSpaces) || raw.parkingSpaces) : (raw.parking_spaces ?? raw.garageSpaces ?? raw.numberOfParking);
   const levels = raw.levels != null ? (Number(raw.levels) || raw.levels) : (raw.stories ?? raw.numberOfStories ?? raw.stories_count);
-  const yearBuilt = raw.yearBuilt != null ? safeNum(raw.yearBuilt, MIN_YEAR, MAX_YEAR) : (raw.year_built != null ? safeNum(raw.year_built, MIN_YEAR, MAX_YEAR) : undefined);
+  const yearBuilt = raw.yearBuilt != null ? safeNum(raw.yearBuilt, MIN_YEAR, MAX_YEAR) : (raw.year_built != null ? safeNum(raw.year_built, MIN_YEAR, MAX_YEAR) : (raw.YearBuilt != null ? safeNum(raw.YearBuilt, MIN_YEAR, MAX_YEAR) : undefined));
   const latitude = raw.latitude != null ? safeNum(raw.latitude, -90, 90) : (raw.lat != null ? safeNum(raw.lat, -90, 90) : undefined);
   const longitude = raw.longitude != null ? safeNum(raw.longitude, -180, 180) : (raw.lng != null ? safeNum(raw.lng, -180, 180) : (raw.lon != null ? safeNum(raw.lon, -180, 180) : undefined));
-  const distance = raw.distance != null ? safeNum(raw.distance, 0, 1e6) : undefined;
+  const distVal = raw.distance ?? raw.distance_in_miles ?? raw.distanceMiles ?? raw.milesFromSubject ?? raw.distanceFromSubject;
+  const distance = distVal != null ? safeNum(distVal, 0, 1e6) : undefined;
 
   return {
     address,

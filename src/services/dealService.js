@@ -145,6 +145,54 @@ export const dealService = {
   },
 
   /**
+   * Generates and saves a share token for a deal. Only the owner can update.
+   * @param {string} dealId - The deal UUID.
+   * @param {string} userId - The current user's ID (must own the deal).
+   * @returns {Promise<{ shareToken: string }>} The new share token.
+   */
+  async updateShareToken(dealId, userId) {
+    if (!dealId) throw new Error("Deal ID is required.");
+    if (!userId) throw new Error("User ID is required.");
+
+    const shareToken = crypto.randomUUID();
+    const { error } = await supabase
+      .from('deals')
+      .update({
+        share_token: shareToken,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', dealId)
+      .eq('user_id', userId);
+
+    if (error) throw error;
+    return { shareToken };
+  },
+
+  /**
+   * Loads a deal by share token (public, no auth required).
+   * Uses edge function to bypass RLS.
+   * @param {string} token - The share token from the deal.
+   * @returns {Promise<Object|null>} The deal in camelCase format, or null if not found.
+   */
+  async loadSharedDeal(token) {
+    if (!token || typeof token !== 'string') return null;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('get-shared-deal', {
+        body: { token: token.trim() },
+      });
+
+      if (error) return null;
+      const res = data;
+      if (!res?.deal || res?.error) return null;
+      return databaseToInputs(res.deal);
+    } catch (err) {
+      console.error('dealService.loadSharedDeal Error:', err);
+      return null;
+    }
+  },
+
+  /**
    * Deletes a deal by ID.
    * @param {string} dealId 
    * @param {string} userId 

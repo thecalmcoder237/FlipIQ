@@ -1,13 +1,14 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, DollarSign, BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
-import { extractSOWTierBudgets } from '@/utils/sowParser';
+import { extractSOWTierBudgets, extractSOWTotalCost } from '@/utils/sowParser';
 
 const TIER_LABELS = { budget: 'Budget Tier', midGrade: 'Mid-Grade Tier', highEnd: 'High-End Tier' };
 
-const SOWBudgetComparison = ({ sowText, currentBudget, deal }) => {
+const SOWBudgetComparison = ({ sowText, currentBudget, deal, onApplyRehabCost }) => {
   if (!sowText) return null;
 
   const tiers = extractSOWTierBudgets(sowText);
@@ -90,6 +91,32 @@ const SOWBudgetComparison = ({ sowText, currentBudget, deal }) => {
                 <TableCell className="text-foreground">{formatDollar(tiers.midGrade)}</TableCell>
                 <TableCell className="text-foreground">{formatDollar(tiers.highEnd)}</TableCell>
               </TableRow>
+              {onApplyRehabCost && (
+                <TableRow className="border-border bg-muted/30">
+                  <TableCell className="text-muted-foreground text-xs">Apply to Deal</TableCell>
+                  <TableCell>
+                    {tiers.budget != null && tiers.budget > 0 && (
+                      <Button variant="outline" size="sm" onClick={() => onApplyRehabCost(tiers.budget)} className="text-xs">
+                        Apply
+                      </Button>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {tiers.midGrade != null && tiers.midGrade > 0 && (
+                      <Button variant="outline" size="sm" onClick={() => onApplyRehabCost(tiers.midGrade)} className="text-xs">
+                        Apply
+                      </Button>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {tiers.highEnd != null && tiers.highEnd > 0 && (
+                      <Button variant="outline" size="sm" onClick={() => onApplyRehabCost(tiers.highEnd)} className="text-xs">
+                        Apply
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </div>
@@ -191,11 +218,23 @@ const SOWBudgetComparison = ({ sowText, currentBudget, deal }) => {
 
         <div className="bg-primary/10 border border-primary/30 p-4 rounded-lg">
           <h4 className="text-sm font-bold text-foreground mb-2">Recommendations</h4>
-          <ul className="text-xs text-foreground space-y-1 list-disc list-inside">
+          <ul className="text-xs text-foreground space-y-1 list-disc list-inside mb-3">
             <li>Compare your budget to Budget, Mid-Grade, and High-End tiers above</li>
             <li>Get 2–3 contractor quotes to validate tier estimates</li>
             <li>Update your deal analysis with the tier that matches your plan</li>
           </ul>
+          {onApplyRehabCost && (() => {
+            const sowTotal = extractSOWTotalCost(sowText);
+            if (sowTotal == null || sowTotal <= 0) return null;
+            return (
+              <div className="pt-2 border-t border-primary/20">
+                <p className="text-xs text-foreground mb-2">Apply SOW total as rehab budget:</p>
+                <Button variant="outline" size="sm" onClick={() => onApplyRehabCost(sowTotal)} className="text-xs">
+                  Apply SOW Total (${sowTotal.toLocaleString()})
+                </Button>
+              </div>
+            );
+          })()}
         </div>
       </CardContent>
     </Card>

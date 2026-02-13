@@ -10,21 +10,21 @@ import AdvancedAnalysisModal from '@/components/AdvancedAnalysisModal';
 import { extractSOWRecommendations } from '@/utils/sowParser';
 import { useToast } from '@/components/ui/use-toast';
 
-const RehabPlanTab = ({ deal, setDeal, isHighPotential, inputs, calculations, propertyData, onSowGenerated }) => {
+const RehabPlanTab = ({ deal, setDeal, isHighPotential, inputs, calculations, propertyData, onSowGenerated, onApplyRehabCost, onSowContextUpdated, readOnly }) => {
   const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
   const [isPropertyDetailsOpen, setIsPropertyDetailsOpen] = useState(false);
   const { toast } = useToast();
 
   const handleAnalysisComplete = (details) => {
-    setDeal(prev => ({ ...prev, property_details: details }));
+    if (!readOnly) setDeal(prev => ({ ...prev, property_details: details }));
     toast({ title: "Analysis Integrated", description: "Rehab plan updated with AI insights." });
   };
 
   const handlePhotosUpdated = (newPhotos) => {
-    setDeal(prev => ({ ...prev, photos: newPhotos }));
+    if (!readOnly) setDeal(prev => ({ ...prev, photos: newPhotos }));
   };
   
-  if (!isHighPotential && !deal.property_details) {
+  if (!readOnly && !isHighPotential && !deal.property_details) {
      return (
         <div className="flex flex-col items-center justify-center py-16 bg-card rounded-2xl border border-border text-center px-4 shadow-sm">
            <div className="bg-muted p-6 rounded-full mb-6 relative">
@@ -113,10 +113,10 @@ const RehabPlanTab = ({ deal, setDeal, isHighPotential, inputs, calculations, pr
         ) : null}
 
        {/* 2. Photo Upload first (vision-first flow) */}
-       <PhotoUploadSection deal={deal} onPhotosUpdated={handlePhotosUpdated} />
+       <PhotoUploadSection deal={deal} onPhotosUpdated={readOnly ? undefined : handlePhotosUpdated} readOnly={readOnly} />
 
        {/* 3. Start AI Analysis (enabled when photos uploaded) */}
-       {!deal.property_details && (
+       {!readOnly && !deal.property_details && (
           <div className="flex justify-end">
              <Button onClick={() => setIsAdvancedModalOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
                 <Sparkles className="w-4 h-4 mr-2" /> Start AI Analysis
@@ -133,14 +133,18 @@ const RehabPlanTab = ({ deal, setDeal, isHighPotential, inputs, calculations, pr
                 calculations={calculations}
                 propertyData={propertyData}
                 savedSow={inputs.rehabSow}
-                onSowGenerated={onSowGenerated}
+                onSowGenerated={readOnly ? undefined : onSowGenerated}
                 recentComps={inputs.propertyIntelligence?.recentComps}
+                readOnly={readOnly}
+                sowContextMessages={inputs.sowContextMessages ?? deal.sowContextMessages}
+                onSowContextUpdated={readOnly ? undefined : onSowContextUpdated}
              />
-             {inputs.rehabSow && onSowGenerated && (
+             {inputs.rehabSow && (
                 <SOWBudgetComparison 
                   sowText={inputs.rehabSow}
                   currentBudget={inputs.rehabCosts}
                   deal={deal}
+                  onApplyRehabCost={readOnly ? undefined : onApplyRehabCost}
                 />
              )}
              {/* Pro Flipper Recommendations: analysis + comps + SOW */}

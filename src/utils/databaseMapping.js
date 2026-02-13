@@ -82,6 +82,7 @@ export const inputsToDatabase = (inputs) => {
     property_intelligence: inputs.propertyIntelligence || null,
     rehab_sow: inputs.rehabSow || null,
     recent_comps: inputs.recentComps || [],
+    sow_context_messages: Array.isArray(inputs.sowContextMessages) ? inputs.sowContextMessages : [],
 
     // Photos and scan results (stored per deal to avoid repeated API calls)
     photos: Array.isArray(inputs.photos) ? inputs.photos : [],
@@ -120,6 +121,9 @@ export const inputsToDatabase = (inputs) => {
     is_closed: inputs.isClosed === true,
     is_funded: inputs.isFunded === true,
     funded_terms: inputs.fundedTerms || null,
+
+    // Share
+    share_token: inputs.shareToken ?? inputs.share_token ?? null,
   };
 
   return payload;
@@ -205,6 +209,7 @@ export const databaseToInputs = (dbRecord) => {
     propertyIntelligence: dbRecord.property_intelligence || null,
     rehabSow: dbRecord.rehab_sow || null,
     recentComps: dbRecord.recent_comps || [],
+    sowContextMessages: Array.isArray(dbRecord.sow_context_messages) ? dbRecord.sow_context_messages : [],
 
     // Photos and scan results (loaded with deal)
     photos: Array.isArray(dbRecord.photos) ? dbRecord.photos : [],
@@ -243,5 +248,9 @@ export const databaseToInputs = (dbRecord) => {
     isClosed: dbRecord.is_closed === true,
     isFunded: dbRecord.is_funded === true,
     fundedTerms: dbRecord.funded_terms || null,
+
+    // Share
+    shareToken: dbRecord.share_token || null,
+    share_token: dbRecord.share_token || null,
   };
 };
