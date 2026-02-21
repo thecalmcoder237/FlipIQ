@@ -1,8 +1,8 @@
 import { corsHeaders, handleCors, json } from "../_shared/cors.ts";
 import { createSupabaseAdminClient } from "../_shared/supabaseAdmin.ts";
 
-/** Realie no longer used; kept for response shape compatibility. */
-const REALIE_LIMIT = 0;
+/** Realie free tier: 25/month. Adjust if on a paid plan ($50/mo = 1250, $150/mo = 6000). */
+const REALIE_LIMIT = 25;
 const RENTCAST_LIMIT = 50;
 
 function yearMonth(): string {

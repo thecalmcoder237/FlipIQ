@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { calculateDealMetrics } from '@/utils/dealCalculations';
 import { applyScenarioAdjustments } from '@/utils/advancedDealCalculations';
 import { dealService } from '@/services/dealService';
+import { updateDealSowContext } from '@/services/edgeFunctionService';
 import { logDataFlow, validateCalculations } from '@/utils/dataFlowDebug';
 
 // Components
@@ -34,6 +35,7 @@ import SOWBudgetComparison from '@/components/SOWBudgetComparison';
 import PhotoUploadSection from '@/components/PhotoUploadSection';
 import ScenarioRiskModel from '@/components/ScenarioRiskModel';
 import ARVSensitivityHeatmap from '@/components/ARVSensitivityHeatmap';
+import NeighborhoodIntelligenceCard from '@/components/NeighborhoodIntelligenceCard';
 import MarketStrengthGauge from '@/components/MarketStrengthGauge';
 import SeventyPercentRule from '@/components/SeventyPercentRule';
 import DebugDashboard from '@/components/DebugDashboard';
@@ -181,14 +183,24 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
     dealService.saveDeal(next, currentUser.id).catch((err) => console.error('Failed to save rehab updates', err));
   };
 
-  const handleSowContextUpdated = (sowContextMessages) => {
+  const isOwner = (deal?.userId ?? deal?.user_id) === currentUser?.id;
+
+  const handleSowContextUpdated = async (sowContextMessages) => {
     const updated = { ...deal, sowContextMessages };
     setDeal(updated);
     setInputs(updated);
-    dealService.saveDeal(updated, currentUser.id).catch((err) => {
+
+    try {
+      if (isOwner) {
+        await dealService.saveDeal(updated, currentUser.id);
+      } else {
+        await updateDealSowContext(deal.id, sowContextMessages);
+      }
+      toast({ title: "SOW context saved", description: "Your changes have been saved." });
+    } catch (err) {
       console.error('Failed to save SOW context', err);
       toast({ variant: "destructive", title: "Save failed", description: err.message });
-    });
+    }
   };
 
   const handleApplyRehabCost = (amount) => {
@@ -316,7 +328,14 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
                  </div>
              </div>
 
-             {/* 3. 70% Rule Analysis */}
+             {/* 3. Neighborhood & Location Intelligence */}
+             <NeighborhoodIntelligenceCard
+               inputs={inputs}
+               propertyData={inputs.propertyIntelligence}
+               readOnly={readOnly}
+             />
+
+             {/* 4. 70% Rule Analysis */}
              <Card className="bg-card border-border shadow-sm">
                <CardContent className="pt-6">
                  <SeventyPercentRule 
@@ -333,7 +352,7 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
                </CardContent>
              </Card>
 
-             {/* 4. ARV Sensitivity Heat Map (left) */}
+             {/* 5. ARV Sensitivity Heat Map (left) */}
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                  <div className="lg:col-span-2">
                     <ARVSensitivityHeatmap deal={deal} metrics={displayMetrics} />
@@ -396,13 +415,13 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
              </div>
              <RehabPlanTab 
                 deal={deal} 
-                setDeal={readOnly ? () => {} : handleRehabDealUpdate} 
+                setDeal={readOnly || !isOwner ? () => {} : handleRehabDealUpdate} 
                 isHighPotential={(metrics?.score ?? 0) >= 60}
                 inputs={inputs}
                 calculations={metrics}
                 propertyData={inputs?.propertyIntelligence}
-                onSowGenerated={readOnly ? undefined : handleSowGenerated}
-                onApplyRehabCost={readOnly ? undefined : handleApplyRehabCost}
+                onSowGenerated={readOnly || !isOwner ? undefined : handleSowGenerated}
+                onApplyRehabCost={readOnly || !isOwner ? undefined : handleApplyRehabCost}
                 onSowContextUpdated={readOnly ? undefined : handleSowContextUpdated}
                 readOnly={readOnly}
              />
@@ -434,7 +453,7 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
                comps={inputs.propertyIntelligence?.recentComps || deal.comps} 
                loading={false}
                onRefresh={() => { /* Trigger refresh in child */ }}
-               source={inputs.propertyIntelligence?.recentComps?.length ? "RentCast" : "Manual/Legacy"}
+               source={inputs.propertyIntelligence?.recentComps?.length ? (inputs.propertyIntelligence?.source ?? "Realie/RentCast") : "Manual/Legacy"}
                subjectAddress={deal?.address ?? inputs?.address ?? ''}
                subjectSpecs={(() => {
                  const pi = inputs?.propertyIntelligence;

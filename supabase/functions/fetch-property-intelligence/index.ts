@@ -32,10 +32,13 @@ function createSupabaseAdminClient() {
 }
 
 const RENTCAST_BASE = "https://api.rentcast.io/v1";
+const REALIE_BASE = "https://app.realie.ai/api";
 /** Up to 2 RentCast calls per request (property search, optional property by id); limit is per month. Comps come from fetch-comps only. */
 const RENTCAST_LIMIT = 50;
+/** Realie free tier: 25/month. Adjust if on a paid plan. */
+const REALIE_LIMIT = 25;
 
-/** Normalize and validate request data before calling RentCast. Returns 400 if invalid. */
+/** Normalize and validate request data before calling APIs. Returns 400 if invalid. */
 function validateAndNormalize(body: Record<string, unknown>): { valid: true; address: string; zipCode: string; city?: string; state?: string } | { valid: false; error: string } {
   const rawAddress = String(body?.address ?? body?.formattedAddress ?? "").trim();
   const address = rawAddress.replace(/\s+/g, " ").trim();
@@ -59,6 +62,171 @@ function yearMonth(): string {
 
 function getRentCastKey(): string | null {
   return Deno.env.get("RENTCAST_API_KEY")?.trim() || null;
+}
+
+function getRealieKey(): string | null {
+  return Deno.env.get("REALIE_API_KEY")?.trim() || null;
+}
+
+/**
+ * Extract just the street address from a full address string.
+ * Realei requires street-only in the address param (e.g. "123 Main St", not "123 Main St, City, ST 12345").
+ */
+function extractStreetAddress(fullAddress: string): string {
+  const commaIdx = fullAddress.indexOf(",");
+  if (commaIdx > 0) return fullAddress.substring(0, commaIdx).trim();
+  return fullAddress.trim();
+}
+
+/** Map Realie property response to our normalized property schema. */
+function mapRealieToProperty(p: Record<string, unknown> | null): Record<string, unknown> {
+  if (!p || typeof p !== "object") return {};
+  const num = (v: unknown) => (v != null && v !== "" ? Number(v) : undefined);
+  const str = (v: unknown) => (v != null && String(v).trim() ? String(v).trim() : undefined);
+
+  // Coordinates: Realie returns top-level lat/lng or in `location.coordinates: [lng, lat]`
+  let lat: number | undefined = num(p.latitude);
+  let lng: number | undefined = num(p.longitude);
+  if ((lat == null || lng == null) && p.location && typeof p.location === "object") {
+    const loc = p.location as Record<string, unknown>;
+    const coords = Array.isArray(loc.coordinates) ? loc.coordinates : null;
+    if (coords && coords.length >= 2) {
+      lng = num(coords[0]);
+      lat = num(coords[1]);
+    }
+  }
+
+  // Full address: Realie's fullAddress field or construct from parts
+  const fullAddr = str(p.fullAddress) ?? str(p.addressWithUnit) ?? str(p.address);
+  const cityStr = str(p.city);
+  const stateStr = str(p.state);
+  const zipStr = str(p.zipCode);
+  const addressStr = fullAddr ?? [str(p.address), cityStr, stateStr, zipStr].filter(Boolean).join(", ");
+
+  // Sale history from transfers array
+  const transfers = Array.isArray(p.transfers) ? p.transfers : [];
+  const lastTransfer = transfers.length ? (transfers[0] as Record<string, unknown>) : null;
+  const lastSalePrice = num(p.transferPrice ?? lastTransfer?.transferPrice ?? 0);
+  const lastSaleDateRaw = p.transferDateObject ?? p.transferDate ?? lastTransfer?.transferDateObject ?? lastTransfer?.transferDate;
+  const lastSaleDate = lastSaleDateRaw ? String(lastSaleDateRaw).slice(0, 10) : undefined;
+
+  // Map Realie useCode to a readable property type
+  const useCode = p.useCode != null ? String(p.useCode) : undefined;
+  const propertyTypeStr = mapRealieUseCode(useCode);
+
+  const base: Record<string, unknown> = {
+    address: addressStr || undefined,
+    streetAddress: str(p.address) ?? str(p.streetLine1) ?? undefined,
+    city: cityStr ?? undefined,
+    state: stateStr ?? undefined,
+    zipCode: zipStr ?? undefined,
+    county: str(p.county) ?? undefined,
+    yearBuilt: num(p.yearBuilt) ?? undefined,
+    squareFootage: num(p.buildingArea) ?? undefined,
+    bedrooms: p.totalBedrooms ?? undefined,
+    bathrooms: p.totalBathrooms ?? undefined,
+    propertyType: propertyTypeStr ?? useCode ?? undefined,
+    zoning: str(p.zoningCode ?? p.zoning) ?? undefined,
+    annualPropertyTaxes: num(p.lastTaxAmount) ?? undefined,
+    assessedValue: num(p.lastAssessedValue ?? p.lastMarketValue) ?? undefined,
+    parcelId: str(p.apn) ?? undefined,
+    propertyId: str(p.siteId ?? p.apn) ?? undefined,
+    latitude: lat != null && Number.isFinite(lat) ? lat : undefined,
+    longitude: lng != null && Number.isFinite(lng) ? lng : undefined,
+    lastSalePrice: lastSalePrice != null && Number.isFinite(lastSalePrice) && lastSalePrice > 0 ? lastSalePrice : undefined,
+    lastSaleDate: lastSaleDate ?? undefined,
+    // Additional Realie fields
+    stories: num(p.stories) ?? undefined,
+    pool: p.pool != null ? Boolean(p.pool) : undefined,
+    garage: p.garage != null ? Boolean(p.garage) : undefined,
+    garageCount: num(p.garageCount) ?? undefined,
+    garageType: str(p.garageType) ?? undefined,
+    fireplaceCount: num(p.fireplaceCount) ?? undefined,
+    basement: p.basementType != null ? String(p.basementType) : undefined,
+    roofType: str(p.roofType) ?? undefined,
+    constructionType: str(p.constructionType) ?? undefined,
+    neighborhood: str(p.neighborhood) ?? undefined,
+    subdivision: str(p.subdivision) ?? undefined,
+    acres: num(p.acres) ?? undefined,
+    landArea: num(p.landArea) ?? undefined,
+    modelValue: num(p.modelValue) ?? undefined,
+    modelValueMin: num(p.modelValueMin) ?? undefined,
+    modelValueMax: num(p.modelValueMax) ?? undefined,
+  };
+
+  // Attach transfer history mapped to RentCast-style history for compatibility
+  if (transfers.length > 0) {
+    base.history = transfers.map((t: unknown) => {
+      const tr = t as Record<string, unknown>;
+      return {
+        date: tr.transferDateObject ?? tr.transferDate,
+        saleDate: tr.transferDateObject ?? tr.transferDate,
+        price: tr.transferPrice,
+        salePrice: tr.transferPrice,
+        grantee: tr.grantee,
+        grantor: tr.grantor,
+      };
+    });
+  }
+
+  if (Array.isArray(p.assessments) && p.assessments.length > 0) {
+    base.assessments = p.assessments;
+  }
+
+  // Remove undefined keys
+  return Object.fromEntries(Object.entries(base).filter(([, v]) => v !== undefined));
+}
+
+/** Map Realie use code to a human-readable property type string. */
+function mapRealieUseCode(useCode: string | undefined): string | undefined {
+  if (!useCode) return undefined;
+  const code = parseInt(useCode, 10);
+  if (isNaN(code)) return useCode;
+  // Common residential use codes
+  if (code >= 1000 && code <= 1099) return "Single-Family";
+  if (code >= 1100 && code <= 1199) return "Condo";
+  if (code >= 1200 && code <= 1299) return "Townhouse";
+  if (code >= 1300 && code <= 1399) return "Multi-Family";
+  if (code >= 1400 && code <= 1499) return "Mobile Home";
+  if (code >= 2000 && code <= 2999) return "Commercial";
+  if (code >= 3000 && code <= 3999) return "Industrial";
+  if (code >= 4000 && code <= 4999) return "Agricultural";
+  if (code >= 5000 && code <= 5999) return "Vacant Land";
+  return undefined;
+}
+
+/** Fetch property from Realie address lookup endpoint. */
+async function fetchRealieProperty(
+  streetAddress: string,
+  state: string,
+  opts?: { county?: string; city?: string }
+): Promise<{ property: Record<string, unknown>; callsUsed: number }> {
+  const apiKey = getRealieKey();
+  if (!apiKey || !state || state.length < 2) return { property: {}, callsUsed: 0 };
+
+  const params = new URLSearchParams();
+  params.set("state", state.slice(0, 2).toUpperCase());
+  params.set("address", streetAddress);
+  if (opts?.county) params.set("county", opts.county.toUpperCase());
+  if (opts?.city) params.set("city", opts.city.toUpperCase());
+
+  const url = `${REALIE_BASE}/public/property/address/?${params.toString()}`;
+  const res = await fetch(url, {
+    headers: { "Authorization": apiKey, "Accept": "application/json" },
+  });
+  if (!res.ok) {
+    if (res.status === 404) return { property: {}, callsUsed: 1 };
+    const errText = await res.text().catch(() => "");
+    console.warn(`Realie property lookup failed (${res.status}): ${errText}`);
+    return { property: {}, callsUsed: 1 };
+  }
+  const data = await res.json();
+  if (!data || typeof data !== "object") return { property: {}, callsUsed: 1 };
+  const d = data as Record<string, unknown>;
+  // Realie returns { property: {...} } for address lookup
+  const record = (d.property && typeof d.property === "object" ? d.property : d) as Record<string, unknown>;
+  const mapped = mapRealieToProperty(record);
+  return { property: mapped, callsUsed: 1 };
 }
 
 /** Fetch full property record by id (GET /v1/properties/{id}). Returns { mapped, raw } API record. */
@@ -198,12 +366,11 @@ async function getUsage(
   return { realie_count: 0, rentcast_count: 0 };
 }
 
-/** Increment rentcast_count (realie_count kept for DB compatibility but not used). */
 async function incrementUsage(
   supabase: ReturnType<typeof createSupabaseAdminClient>,
   userId: string,
   ym: string,
-  type: "rentcast"
+  type: "rentcast" | "realie"
 ): Promise<void> {
   const { data: row } = await supabase
     .from("api_usage")
@@ -212,13 +379,14 @@ async function incrementUsage(
     .eq("year_month", ym)
     .maybeSingle();
   const rentcast = ((row?.rentcast_count ?? 0) as number) + (type === "rentcast" ? 1 : 0);
+  const realie = ((row?.realie_count ?? 0) as number) + (type === "realie" ? 1 : 0);
   await supabase
     .from("api_usage")
     .upsert(
       {
         user_id: userId,
         year_month: ym,
-        realie_count: (row?.realie_count ?? 0) as number,
+        realie_count: realie,
         rentcast_count: rentcast,
         updated_at: new Date().toISOString(),
       },
@@ -247,28 +415,57 @@ Deno.serve(async (req) => {
     const ym = yearMonth();
     const supabase = createSupabaseAdminClient();
     const usage = userId ? await getUsage(supabase, userId, ym) : { realie_count: 0, rentcast_count: 0 };
+
+    const realieAllowed = !userId || usage.realie_count + 1 <= REALIE_LIMIT;
     /** Up to 2 RentCast calls per request (property search, optional property by id). Comps come from fetch-comps only. */
     const rentcastAllowed = !userId || usage.rentcast_count + 2 <= RENTCAST_LIMIT;
 
     let property: Record<string, unknown> = {};
     const errors: string[] = [];
-
-    const rentCastOpts = {
-      fullAddress: buildRentCastAddress({
-        street: address,
-        zipCode,
-        city: city ?? undefined,
-        state: stateFromBody ?? undefined,
-      }),
-      city: city ?? undefined,
-      state: stateFromBody ?? undefined,
-    };
-
+    let dataSource = "unknown";
     let rawRentCastRecord: Record<string, unknown> | null = null;
-    
-    // Fetch property details
-    if (getRentCastKey() && rentcastAllowed) {
+
+    // ── Realie first (primary source) ────────────────────────────────────────
+    // Realie address lookup requires state (2-letter) + street-only address.
+    const streetOnly = extractStreetAddress(address);
+    if (getRealieKey() && stateFromBody && realieAllowed) {
       try {
+        const { property: prop, callsUsed } = await fetchRealieProperty(streetOnly, stateFromBody, {
+          county,
+          city,
+        });
+        if (prop && Object.keys(prop).length > 0) {
+          property = prop;
+          dataSource = "Realie";
+          if (userId && callsUsed > 0) {
+            for (let i = 0; i < callsUsed; i++) {
+              await incrementUsage(supabase, userId, ym, "realie");
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Realie property fetch error:", e);
+        errors.push("Realie property: " + (e as Error).message);
+      }
+    } else if (getRealieKey() && !stateFromBody) {
+      errors.push("Realie: state is required for property lookup (not provided).");
+    } else if (getRealieKey() && userId && !realieAllowed) {
+      errors.push(`Realie monthly limit (${REALIE_LIMIT}) reached.`);
+    }
+
+    // ── RentCast fallback ────────────────────────────────────────────────────
+    if (Object.keys(property).length === 0 && getRentCastKey() && rentcastAllowed) {
+      try {
+        const rentCastOpts = {
+          fullAddress: buildRentCastAddress({
+            street: address,
+            zipCode,
+            city: city ?? undefined,
+            state: stateFromBody ?? undefined,
+          }),
+          city: city ?? undefined,
+          state: stateFromBody ?? undefined,
+        };
         const { property: prop, rawRentCastRecord: raw, callsUsed } = await fetchRentCastProperty(
           rentCastOpts.fullAddress,
           zipCode,
@@ -276,6 +473,7 @@ Deno.serve(async (req) => {
         );
         property = prop;
         rawRentCastRecord = raw ?? null;
+        dataSource = "RentCast";
         for (let i = 0; i < callsUsed; i++) {
           if (userId) await incrementUsage(supabase, userId, ym, "rentcast");
         }
@@ -283,30 +481,39 @@ Deno.serve(async (req) => {
         console.error("RentCast property fetch error:", e);
         errors.push("RentCast property: " + (e as Error).message);
       }
-    } else if (userId && !rentcastAllowed) {
+    } else if (Object.keys(property).length === 0 && userId && !rentcastAllowed && !getRealieKey()) {
       errors.push(`RentCast monthly limit (${RENTCAST_LIMIT}) reached.`);
     }
 
-    if (getRentCastKey() && Object.keys(property).length === 0 && !errors.some((e) => e.includes("property fetch"))) {
-      errors.push("Property search returned no results for this address.");
+    if (Object.keys(property).length === 0 && !errors.some((e) => e.includes("property fetch"))) {
+      if (getRealieKey() || getRentCastKey()) {
+        errors.push("Property search returned no results for this address.");
+      } else {
+        errors.push("No property API key configured (REALIE_API_KEY or RENTCAST_API_KEY required).");
+      }
     }
 
     const result: Record<string, unknown> = {
       ...property,
-      source: "RentCast",
+      source: dataSource,
     };
     if (rawRentCastRecord != null && Object.keys(rawRentCastRecord).length > 0) {
       result.rawRentCastRecord = rawRentCastRecord;
     }
     if (propertyId && !result.propertyId) result.propertyId = propertyId;
     if (debugRequested) {
-      result._debug = { 
-        address, 
-        zipCode, 
-        city: city ?? null, 
+      result._debug = {
+        address,
+        streetOnly,
+        zipCode,
+        city: city ?? null,
         county: county ?? null,
-        fullAddress: rentCastOpts.fullAddress,
+        state: stateFromBody ?? null,
+        fullAddress: buildRentCastAddress({ street: address, zipCode, city, state: stateFromBody }),
         subjectPropertyId: property.propertyId ?? property.id ?? propertyId,
+        dataSource,
+        realieKeyPresent: !!getRealieKey(),
+        rentcastKeyPresent: !!getRentCastKey(),
       };
     }
     if (lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng)) {
@@ -323,7 +530,7 @@ Deno.serve(async (req) => {
       result.usage = {
         realie_count: (finalUsage?.realie_count ?? usage.realie_count) as number,
         rentcast_count: (finalUsage?.rentcast_count ?? usage.rentcast_count) as number,
-        realie_limit: 0,
+        realie_limit: REALIE_LIMIT,
         rentcast_limit: RENTCAST_LIMIT,
       };
     }

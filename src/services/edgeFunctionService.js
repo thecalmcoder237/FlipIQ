@@ -6,6 +6,18 @@ import { supabase } from '@/lib/customSupabaseClient';
  * Includes logging, error handling, and standardized response parsing.
  */
 
+/**
+ * Updates deal SOW context (sow_context_messages) via edge function.
+ * Uses service role to bypass RLS so any authenticated user who can view the deal can add/remove context.
+ * @param {string} dealId
+ * @param {string[]} sowContextMessages
+ */
+export const updateDealSowContext = async (dealId, sowContextMessages) => {
+  const body = { dealId, sowContextMessages: Array.isArray(sowContextMessages) ? sowContextMessages : [] };
+  const data = await invokeEdgeFunction('update-deal-sow-context', body);
+  return data?.deal ?? data;
+};
+
 export const invokeEdgeFunction = async (functionName, payload) => {
   const timestamp = new Date().toISOString();
   console.log(`📤 [Edge Service] Request to '${functionName}' at ${timestamp}`, payload);
@@ -68,10 +80,10 @@ export const fetchPropertyIntelligence = async (address, zipCode, propertyType, 
 };
 
 /**
- * Fetch comps only (RentCast listings/sale + fallbacks). Use with fetch-property-intelligence; UI merges property + comps.
+ * Fetch comps only (Realie Premium Comparables with RentCast fallback). Use with fetch-property-intelligence; UI merges property + comps.
  * @param {string} address - Property address
  * @param {string} zipCode - 5-digit ZIP
- * @param {{ city?: string, state?: string, propertyId?: string, subjectAddress?: string, subjectSpecs?: { bedrooms?: number, bathrooms?: number }, userId?: string, debug?: boolean }} [options] - Optional: city, state, propertyId, subjectAddress (for excluding subject from comps), subjectSpecs (for broader bed/bath range matching), userId, debug
+ * @param {{ city?: string, state?: string, propertyId?: string, subjectAddress?: string, subjectSpecs?: { bedrooms?: number, bathrooms?: number }, lat?: number, lng?: number, userId?: string, debug?: boolean }} [options] - Optional: city, state, propertyId, subjectAddress (for excluding subject from comps), subjectSpecs (for bed/bath filtering), lat/lng (required for Realie comps - pass from property response), userId, debug
  */
 export const fetchComps = async (address, zipCode, options = {}) => {
     const body = {
@@ -84,6 +96,11 @@ export const fetchComps = async (address, zipCode, options = {}) => {
     if (options.subjectAddress) body.subjectAddress = options.subjectAddress;
     if (options.subjectSpecs && typeof options.subjectSpecs === 'object' && (options.subjectSpecs.bedrooms != null || options.subjectSpecs.bathrooms != null)) {
         body.subjectSpecs = options.subjectSpecs;
+    }
+    // lat/lng enables Realie Premium Comparables (coordinate-based search); pass from property response when available
+    if (options.lat != null && options.lng != null && Number.isFinite(Number(options.lat)) && Number.isFinite(Number(options.lng))) {
+        body.lat = Number(options.lat);
+        body.lng = Number(options.lng);
     }
     if (options.userId) body.userId = options.userId;
     if (options.debug === true || (typeof localStorage !== 'undefined' && localStorage.getItem('propertyIntelDebug') === '1')) body.debug = true;
@@ -175,6 +192,29 @@ export const runAdvancedRehabAnalysis = async (deal, photoUrls = [], perPhotoAna
         perPhotoAnalysis: Array.isArray(perPhotoAnalysis) ? perPhotoAnalysis : []
     };
     return invokeEdgeFunction('generate-rehab-sow', payload);
+};
+
+/**
+ * Fetch neighborhood and location intelligence for a property address.
+ * Returns demographics, purchasing power, schools, landmarks, shopping, neighboring towns,
+ * road type/traffic context, and Street View URL (if Google Maps key is configured).
+ * @param {string} address - Full property address
+ * @param {string} zipCode - 5-digit ZIP code
+ * @param {{ city?: string, state?: string, county?: string, lat?: number, lng?: number }} [options]
+ */
+export const fetchNeighborhoodIntelligence = async (address, zipCode, options = {}) => {
+    const body = {
+        address,
+        zipCode: String(zipCode ?? '').trim().replace(/\D/g, '').slice(0, 5),
+    };
+    if (options.city) body.city = options.city;
+    if (options.state && String(options.state).trim().length >= 2) body.state = String(options.state).trim().slice(0, 2).toUpperCase();
+    if (options.county) body.county = options.county;
+    if (options.lat != null && options.lng != null && Number.isFinite(Number(options.lat)) && Number.isFinite(Number(options.lng))) {
+        body.lat = Number(options.lat);
+        body.lng = Number(options.lng);
+    }
+    return invokeEdgeFunction('fetch-neighborhood-intelligence', body);
 };
 
 export const calculateCostBreakdown = async (dealData) => {

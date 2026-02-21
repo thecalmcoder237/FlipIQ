@@ -91,7 +91,7 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
     const data = await resetPropertyApiUsage(currentUser.id);
     if (data) {
       setApiUsage(data);
-      toast({ title: "Count reset", description: "RentCast API usage count has been reset to 0." });
+      toast({ title: "Count reset", description: "API usage counts have been reset to 0." });
     } else {
       toast({ variant: "destructive", title: "Reset failed", description: "Could not reset usage count." });
     }
@@ -161,6 +161,9 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
         console.debug('[PropertyIntel] calling fetchComps', { address, zipToSend, subjectSpecs: subjectSpecsForComps });
       }
       // #endregion
+      // Extract lat/lng from property response to enable Realie coordinate-based comps
+      const propLat = propertyResponse?.latitude != null && Number.isFinite(Number(propertyResponse.latitude)) ? Number(propertyResponse.latitude) : undefined;
+      const propLng = propertyResponse?.longitude != null && Number.isFinite(Number(propertyResponse.longitude)) ? Number(propertyResponse.longitude) : undefined;
       try {
         compsResponse = await fetchComps(address, zipToSend, {
           city: citySend,
@@ -168,6 +171,8 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
           propertyId: propertyIdForComps,
           subjectAddress: propertyResponse?.address ?? propertyResponse?.formattedAddress ?? propertyResponse?.streetAddress ?? address,
           subjectSpecs: subjectSpecsForComps,
+          lat: propLat,
+          lng: propLng,
           userId: currentUser?.id,
         });
         // #region agent log
@@ -290,12 +295,16 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
         console.debug('[PropertyIntel] refreshComps request', { address, zipToSend, subjectSpecs: subjectSpecsRefresh });
       }
       // #endregion
+      const refreshLat = inputs.propertyIntelligence?.latitude != null && Number.isFinite(Number(inputs.propertyIntelligence.latitude)) ? Number(inputs.propertyIntelligence.latitude) : undefined;
+      const refreshLng = inputs.propertyIntelligence?.longitude != null && Number.isFinite(Number(inputs.propertyIntelligence.longitude)) ? Number(inputs.propertyIntelligence.longitude) : undefined;
       const compsResponse = await fetchComps(address, zipToSend, {
         city: citySend,
         state: stateSend,
         propertyId: propertyIdForComps,
         subjectAddress: inputs.propertyIntelligence?.address ?? inputs.propertyIntelligence?.formattedAddress ?? inputs.propertyIntelligence?.streetAddress ?? address,
         subjectSpecs: subjectSpecsRefresh,
+        lat: refreshLat,
+        lng: refreshLng,
         userId: currentUser?.id,
       });
       // #region agent log
@@ -359,7 +368,9 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
   const fullRecord = rawRentCastRecord && typeof rawRentCastRecord === 'object' ? rawRentCastRecord : null;
   const propertyHistory = Array.isArray(fullRecord?.history) ? fullRecord.history : Array.isArray(specs?.history) ? specs.history : [];
   const rentcastAtLimit = apiUsage && apiUsage.rentcast_count >= (apiUsage.rentcast_limit ?? 50);
-  const fetchDisabled = rentcastAtLimit;
+  const realieAtLimit = apiUsage && (apiUsage.realie_limit ?? 0) > 0 && apiUsage.realie_count >= (apiUsage.realie_limit ?? 25);
+  // Disable fetch only when ALL available APIs are at their monthly limit
+  const fetchDisabled = rentcastAtLimit && realieAtLimit;
 
   return (
     <ErrorBoundary>
@@ -373,10 +384,15 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
               </div>
               <h3 className="text-xl font-bold text-foreground mb-2">Property Data & Comps</h3>
               <p className="text-muted-foreground max-w-md mb-6">
-                {readOnly ? 'No property data available for this deal.' : 'Property data and comps from RentCast.'}
+                {readOnly ? 'No property data available for this deal.' : 'Property data and comps via Realie (with RentCast fallback).'}
               </p>
               {!readOnly && apiUsage && (
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-3 mb-2 flex-wrap justify-center">
+                  {(apiUsage.realie_limit ?? 0) > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Realie {apiUsage.realie_count}/{apiUsage.realie_limit ?? 25}
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     RentCast {apiUsage.rentcast_count}/{apiUsage.rentcast_limit ?? 50}
                   </p>
@@ -438,10 +454,15 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
                 <CardTitle className="text-xl font-bold text-foreground flex items-center gap-2">
                   <Building2 className="text-primary" /> Property Details
                 </CardTitle>
-                <p className="text-xs text-muted-foreground absolute right-4 top-14">Property data and comps from RentCast.</p>
+                <p className="text-xs text-muted-foreground absolute right-4 top-14">Realie + RentCast</p>
                 <div className="flex items-center gap-2">
                    {!readOnly && apiUsage && (
                      <>
+                       {(apiUsage.realie_limit ?? 0) > 0 && (
+                         <span className="text-xs text-muted-foreground mr-1">
+                           Realie {apiUsage.realie_count}/{apiUsage.realie_limit ?? 25}
+                         </span>
+                       )}
                        <span className="text-xs text-muted-foreground mr-1">
                          RentCast {apiUsage.rentcast_count}/{apiUsage.rentcast_limit ?? 50}
                        </span>
