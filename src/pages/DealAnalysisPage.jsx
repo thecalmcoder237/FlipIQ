@@ -158,6 +158,18 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
       }
   };
 
+  const handleNeighborhoodDataFetch = async (data) => {
+      const updatedInputs = { ...inputs, neighborhoodIntelligence: data };
+      setInputs(updatedInputs);
+      setDeal(updatedInputs);
+
+      try {
+         await dealService.saveDeal(updatedInputs, currentUser.id);
+      } catch (error) {
+         console.error("Failed to save neighborhood intelligence", error);
+      }
+  };
+
   const handleSowGenerated = async (sowText) => {
       const updatedInputs = { ...inputs, rehabSow: sowText };
       setInputs(updatedInputs);
@@ -332,6 +344,8 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
              <NeighborhoodIntelligenceCard
                inputs={inputs}
                propertyData={inputs.propertyIntelligence}
+               initialData={inputs.neighborhoodIntelligence}
+               onDataFetch={readOnly ? undefined : handleNeighborhoodDataFetch}
                readOnly={readOnly}
              />
 

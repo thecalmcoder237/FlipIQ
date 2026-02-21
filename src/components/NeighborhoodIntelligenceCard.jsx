@@ -99,8 +99,8 @@ const ROAD_COLORS = {
   gray:   { dot: "bg-muted-foreground",   text: "text-muted-foreground" },
 };
 
-const NeighborhoodIntelligenceCard = ({ inputs, propertyData, readOnly }) => {
-  const [data, setData] = useState(null);
+const NeighborhoodIntelligenceCard = ({ inputs, propertyData, initialData, onDataFetch, readOnly }) => {
+  const [data, setData] = useState(initialData ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showStreetView, setShowStreetView] = useState(true);
@@ -115,6 +115,11 @@ const NeighborhoodIntelligenceCard = ({ inputs, propertyData, readOnly }) => {
     setLightboxLabel(label);
     setLightboxOpen(true);
   }, []);
+
+  // Sync if parent loads saved data after initial render (e.g. deal loaded async)
+  React.useEffect(() => {
+    if (initialData && !data) setData(initialData);
+  }, [initialData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasAddress = !!(inputs?.address && inputs?.zipCode);
 
@@ -134,6 +139,7 @@ const NeighborhoodIntelligenceCard = ({ inputs, propertyData, readOnly }) => {
       });
       if (!result) throw new Error("No data returned from neighborhood service");
       setData(result);
+      if (onDataFetch) onDataFetch(result);
     } catch (err) {
       setError(err.message);
       toast({ variant: "destructive", title: "Neighborhood data error", description: err.message });
