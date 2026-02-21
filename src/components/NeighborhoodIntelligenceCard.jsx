@@ -1,15 +1,22 @@
-﻿import React, { useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MapPin, Users, DollarSign, School, ShoppingBag,
   TreePine, Navigation, RefreshCw, Sparkles, AlertTriangle,
   TrendingUp, ChevronDown, ChevronUp, Car,
-  XCircle, Info, Map, Globe
+  XCircle, Info, Map, Globe, Maximize2, X
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { fetchNeighborhoodIntelligence } from "@/services/edgeFunctionService";
+
+/** Swap the static image size to a larger resolution for the lightbox. */
+function toLargeUrl(url) {
+  if (!url) return url;
+  return url.replace(/size=\d+x\d+/, "size=1280x720");
+}
 
 const TrafficBadge = ({ risk, color }) => {
   const cls = {
@@ -66,7 +73,7 @@ const DemandBadge = ({ level }) => {
     "Moderate":  "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
     "Low":       "bg-red-500/20 text-red-400 border-red-500/30",
   }[level] ?? "bg-muted text-muted-foreground border-border";
-  return <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${cls}`}>{level ?? "â€”"}</span>;
+  return <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${cls}`}>{level ?? "—"}</span>;
 };
 
 const InsightBlock = ({ text, icon: Icon, accent }) => {
@@ -98,7 +105,16 @@ const NeighborhoodIntelligenceCard = ({ inputs, propertyData, readOnly }) => {
   const [error, setError] = useState(null);
   const [showStreetView, setShowStreetView] = useState(true);
   const [schoolsExpanded, setSchoolsExpanded] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [lightboxLabel, setLightboxLabel] = useState("");
   const { toast } = useToast();
+
+  const openLightbox = useCallback((src, label) => {
+    setLightboxSrc(toLargeUrl(src));
+    setLightboxLabel(label);
+    setLightboxOpen(true);
+  }, []);
 
   const hasAddress = !!(inputs?.address && inputs?.zipCode);
 
@@ -228,15 +244,29 @@ const NeighborhoodIntelligenceCard = ({ inputs, propertyData, readOnly }) => {
                       )}
                     </div>
                   </div>
-                  <div className="relative rounded-xl overflow-hidden border border-border bg-muted h-48">
+                  <div
+                    className="relative rounded-xl overflow-hidden border border-border bg-muted h-48 cursor-pointer group"
+                    onClick={() => {
+                      const src = showStreetView ? loc.streetViewUrl : loc.staticMapUrl;
+                      const label = showStreetView ? "Street View" : "Map View";
+                      openLightbox(src, label);
+                    }}
+                  >
                     <img
                       src={showStreetView ? loc.streetViewUrl : loc.staticMapUrl}
                       alt={showStreetView ? "Street View" : "Map View"}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                       onError={(e) => { e.currentTarget.parentElement.style.display = "none"; }}
                     />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200" />
                     <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-md backdrop-blur-sm">
                       {inputs?.address}
+                    </div>
+                    <div className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-md backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <Maximize2 className="w-4 h-4" />
+                    </div>
+                    <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-md backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      Click to enlarge
                     </div>
                   </div>
                 </div>
@@ -288,7 +318,7 @@ const NeighborhoodIntelligenceCard = ({ inputs, propertyData, readOnly }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="rounded-xl border border-border bg-muted/30 p-4">
                   <SectionHeader icon={MapPin} title="County" />
-                  <p className="text-base font-semibold text-foreground">{nb.county ?? "â€”"}</p>
+                  <p className="text-base font-semibold text-foreground">{nb.county ?? "—"}</p>
                   {nb.neighborhoodVibe && (
                     <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{nb.neighborhoodVibe}</p>
                   )}
@@ -427,6 +457,39 @@ const NeighborhoodIntelligenceCard = ({ inputs, propertyData, readOnly }) => {
           )}
         </AnimatePresence>
       </CardContent>
+
+      {/* Lightbox */}
+      <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
+        <DialogContent className="max-w-4xl w-full p-0 overflow-hidden bg-black border-border">
+          <div className="relative">
+            <button
+              onClick={() => setLightboxOpen(false)}
+              className="absolute top-3 right-3 z-10 bg-black/70 hover:bg-black/90 text-white rounded-full p-1.5 transition-colors backdrop-blur-sm"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            {lightboxLabel && (
+              <div className="absolute top-3 left-3 z-10 bg-black/70 text-white text-xs px-2.5 py-1 rounded-md backdrop-blur-sm font-medium">
+                {lightboxLabel}
+              </div>
+            )}
+            {lightboxSrc && (
+              <img
+                src={lightboxSrc}
+                alt={lightboxLabel}
+                className="w-full h-auto max-h-[80vh] object-contain"
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
+              />
+            )}
+            {inputs?.address && (
+              <div className="absolute bottom-3 left-3 bg-black/70 text-white text-xs px-2.5 py-1 rounded-md backdrop-blur-sm">
+                {inputs.address}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
