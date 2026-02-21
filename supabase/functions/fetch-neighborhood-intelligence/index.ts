@@ -17,9 +17,9 @@ function json(data: unknown, init?: ResponseInit): Response {
     headers: { "Content-Type": "application/json", ...(init?.headers || {}), ...corsHeaders },
   });
 }
-function getAnthropicKey(): string {
-  const key = Deno.env.get("ANTHROPIC_API_KEY") ?? Deno.env.get("CLAUDE_API_KEY");
-  if (!key) throw new Error("ANTHROPIC_API_KEY is required");
+function getOpenAIKey(): string {
+  const key = Deno.env.get("OPENAI_API_KEY");
+  if (!key) throw new Error("OPENAI_API_KEY is required");
   return key;
 }
 function getGoogleMapsKey(): string | null {
@@ -78,33 +78,34 @@ async function fetchOsmRoadContext(lat: number, lng: number): Promise<Record<str
 
 function interpretRoadClass(roadClass: string): { label: string; trafficRisk: string; riskColor: string; description: string } {
   const map: Record<string, { label: string; trafficRisk: string; riskColor: string; description: string }> = {
-    motorway: { label: "Highway / Interstate", trafficRisk: "Very High", riskColor: "red", description: "Major highway â€” significant noise and traffic impact on value" },
-    trunk: { label: "Major Arterial Road", trafficRisk: "Very High", riskColor: "red", description: "High-volume trunk road â€” expect heavy traffic and noise" },
-    primary: { label: "Primary Road (Double Yellow)", trafficRisk: "High", riskColor: "orange", description: "Main arterial road with double yellow lines â€” high traffic volume" },
-    secondary: { label: "Secondary Road", trafficRisk: "Moderate", riskColor: "yellow", description: "Secondary arterial â€” moderate traffic, some noise impact" },
-    tertiary: { label: "Neighborhood Collector", trafficRisk: "Low-Moderate", riskColor: "yellow", description: "Collector street â€” light to moderate neighborhood traffic" },
-    residential: { label: "Residential Street", trafficRisk: "Low", riskColor: "green", description: "Quiet residential street â€” minimal traffic, ideal for owner-occupants" },
-    living_street: { label: "Living / Shared Zone", trafficRisk: "Very Low", riskColor: "green", description: "Pedestrian-priority zone â€” very quiet and walkable" },
-    unclassified: { label: "Local Road", trafficRisk: "Low", riskColor: "green", description: "Low-volume local road" },
-    service: { label: "Service / Access Road", trafficRisk: "Low", riskColor: "green", description: "Access or service road" },
+    motorway:     { label: "Highway / Interstate",         trafficRisk: "Very High",    riskColor: "red",    description: "Major highway - significant noise and traffic impact on value" },
+    trunk:        { label: "Major Arterial Road",          trafficRisk: "Very High",    riskColor: "red",    description: "High-volume trunk road - expect heavy traffic and noise" },
+    primary:      { label: "Primary Road (Double Yellow)", trafficRisk: "High",         riskColor: "orange", description: "Main arterial road with double yellow lines - high traffic volume" },
+    secondary:    { label: "Secondary Road",               trafficRisk: "Moderate",     riskColor: "yellow", description: "Secondary arterial - moderate traffic, some noise impact" },
+    tertiary:     { label: "Neighborhood Collector",       trafficRisk: "Low-Moderate", riskColor: "yellow", description: "Collector street - light to moderate neighborhood traffic" },
+    residential:  { label: "Residential Street",           trafficRisk: "Low",          riskColor: "green",  description: "Quiet residential street - minimal traffic, ideal for owner-occupants" },
+    living_street:{ label: "Living / Shared Zone",         trafficRisk: "Very Low",     riskColor: "green",  description: "Pedestrian-priority zone - very quiet and walkable" },
+    unclassified: { label: "Local Road",                   trafficRisk: "Low",          riskColor: "green",  description: "Low-volume local road" },
+    service:      { label: "Service / Access Road",        trafficRisk: "Low",          riskColor: "green",  description: "Access or service road" },
   };
   return map[roadClass] ?? { label: "Unknown Road Type", trafficRisk: "Unknown", riskColor: "gray", description: "Road classification unavailable" };
 }
 
-async function fetchNeighborhoodFromClaude(
+async function fetchNeighborhoodFromOpenAI(
   address: string, city: string | undefined, state: string | undefined,
   zipCode: string, county: string | undefined, roadContext: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  const apiKey = getAnthropicKey();
+  const apiKey = getOpenAIKey();
   const locationStr = [address, city, state ? `${state} ${zipCode}` : zipCode].filter(Boolean).join(", ");
   const roadClassLabel = roadContext.roadClass ? interpretRoadClass(String(roadContext.roadClass)).label : "unknown";
-  const prompt = `You are a real estate neighborhood analyst. Analyze this US property location and return ONLY valid JSON, no markdown.
+
+  const prompt = `You are a real estate neighborhood analyst. Analyze this US property location and return a neighborhood intelligence report as a JSON object.
 
 Property: ${locationStr}
 County: ${county ?? "unknown"}
-Road on: ${roadContext.roadName ?? "unknown"} (${roadClassLabel})
+Road: ${roadContext.roadName ?? "unknown"} (${roadClassLabel})
 
-Return this exact JSON:
+Return this exact JSON structure:
 {
   "county": "Full county name, State",
   "demographics": {
@@ -123,7 +124,7 @@ Return this exact JSON:
     "investorActivity": "Low | Moderate | High",
     "economicTrend": "one sentence"
   },
-  "landmarks": ["4-6 notable landmarks, parks within 2 miles"],
+  "landmarks": ["4-6 notable landmarks or parks within 2 miles"],
   "neighboringTowns": ["4-6 neighboring cities within 10 miles"],
   "shoppingCenters": ["3-5 shopping centers or retail districts nearby"],
   "schools": [
@@ -131,33 +132,37 @@ Return this exact JSON:
   ],
   "roadImpactAssessment": "2-3 sentences on how road type affects buyer appeal and resale value",
   "neighborhoodVibe": "2-3 sentences describing the area character",
-  "investorInsight": "2-3 sentences of strategic insight for flip or rental investor"
+  "investorInsight": "2-3 sentences of strategic insight for a flip or rental investor"
 }`;
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "claude-3-5-haiku-20241022",
-      max_tokens: 1500,
-      messages: [{ role: "user", content: prompt }],
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+      messages: [
+        {
+          role: "system",
+          content: "You are a real estate neighborhood analyst. Always respond with valid JSON only.",
+        },
+        { role: "user", content: prompt },
+      ],
     }),
   });
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`Anthropic API error ${response.status}: ${err}`);
+    throw new Error(`OpenAI API error ${response.status}: ${err}`);
   }
   const result = await response.json();
-  const rawText: string = result?.content?.[0]?.text ?? "";
-  const firstBrace = rawText.indexOf("{");
-  const lastBrace = rawText.lastIndexOf("}");
-  if (firstBrace === -1 || lastBrace === -1) throw new Error("No JSON in Claude response");
-  return JSON.parse(rawText.substring(firstBrace, lastBrace + 1));
+  const rawText: string = result?.choices?.[0]?.message?.content ?? "";
+  if (!rawText) throw new Error("Empty response from OpenAI");
+  return JSON.parse(rawText);
 }
 
 function buildStreetViewUrl(lat: number, lng: number, key: string): string {
@@ -193,38 +198,38 @@ Deno.serve(async (req: Request) => {
     }
 
     const resolvedCounty = county ?? (osmData.county ? String(osmData.county) : undefined);
-    const neighborhoodData = await fetchNeighborhoodFromClaude(address, city, stateRaw, zipCode, resolvedCounty, osmData);
+    const neighborhoodData = await fetchNeighborhoodFromOpenAI(address, city, stateRaw, zipCode, resolvedCounty, osmData);
 
     const roadClass = String(osmData.roadClass ?? "unknown");
     const roadInterpretation = interpretRoadClass(roadClass);
 
     const locationIntelligence = {
-      roadName: osmData.roadName ?? null,
+      roadName:        osmData.roadName ?? null,
       roadClass,
-      roadTypeLabel: roadInterpretation.label,
-      trafficRisk: roadInterpretation.trafficRisk,
-      trafficRiskColor: roadInterpretation.riskColor,
+      roadTypeLabel:   roadInterpretation.label,
+      trafficRisk:     roadInterpretation.trafficRisk,
+      trafficRiskColor:roadInterpretation.riskColor,
       roadDescription: roadInterpretation.description,
-      speedLimit: osmData.speedLimit ?? null,
-      lanes: osmData.lanes ?? null,
-      sidewalk: osmData.sidewalk ?? null,
-      surface: osmData.surface ?? null,
-      suburb: osmData.suburb ?? null,
-      streetViewUrl: (hasCoords && googleMapsKey) ? buildStreetViewUrl(lat as number, lng as number, googleMapsKey) : null,
-      staticMapUrl: (hasCoords && googleMapsKey) ? buildStaticMapUrl(lat as number, lng as number, googleMapsKey) : null,
+      speedLimit:      osmData.speedLimit ?? null,
+      lanes:           osmData.lanes ?? null,
+      sidewalk:        osmData.sidewalk ?? null,
+      surface:         osmData.surface ?? null,
+      suburb:          osmData.suburb ?? null,
+      streetViewUrl:   (hasCoords && googleMapsKey) ? buildStreetViewUrl(lat as number, lng as number, googleMapsKey) : null,
+      staticMapUrl:    (hasCoords && googleMapsKey) ? buildStaticMapUrl(lat as number, lng as number, googleMapsKey) : null,
       hasGoogleMapsKey: !!googleMapsKey,
     };
 
     return json({
       neighborhood: neighborhoodData,
-      location: locationIntelligence,
+      location:     locationIntelligence,
       meta: {
         address, city, state: stateRaw, zipCode,
         county: resolvedCounty,
-        lat: hasCoords ? lat : null,
-        lng: hasCoords ? lng : null,
+        lat:   hasCoords ? lat : null,
+        lng:   hasCoords ? lng : null,
         fetchedAt: new Date().toISOString(),
-        sources: ["OpenStreetMap/Overpass", "Anthropic Claude"],
+        sources: ["OpenStreetMap/Overpass", "OpenAI GPT-4o-mini"],
       },
     });
   } catch (e) {
