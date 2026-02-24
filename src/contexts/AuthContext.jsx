@@ -20,8 +20,10 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     });
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Listen for auth changes — ignore silent token refreshes to avoid
+    // triggering re-fetches across the app for the same signed-in user.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'TOKEN_REFRESHED') return;
       setCurrentUser(session?.user ?? null);
       setLoading(false);
     });

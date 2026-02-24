@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, LogOut, Home, TrendingUp, History, PieChart, User } from 'lucide-react';
+import { Menu, X, LogOut, Home, TrendingUp, History, PieChart, Hammer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import QuickAccessSidebar from './QuickAccessSidebar';
@@ -69,6 +69,7 @@ const Navbar = () => {
                 <NavLink to="/deal-input" icon={Home} label="New Deal" active={location.pathname === '/deal-input'} />
                 <NavLink to="/deal-history" icon={History} label="History" active={location.pathname === '/deal-history'} />
                 <NavLink to="/portfolio-dashboard" icon={PieChart} label="Portfolio" active={location.pathname === '/portfolio-dashboard'} />
+                <NavLink to="/project-management" icon={Hammer} label="Projects" active={location.pathname.startsWith('/project-management')} />
                 
                 <div className="h-6 w-px bg-border mx-2" />
                 
@@ -119,6 +120,7 @@ const Navbar = () => {
                 <MobileNavLink to="/deal-input" icon={Home} label="New Deal" onClick={() => setIsOpen(false)} />
                 <MobileNavLink to="/deal-history" icon={History} label="History" onClick={() => setIsOpen(false)} />
                 <MobileNavLink to="/portfolio-dashboard" icon={PieChart} label="Portfolio" onClick={() => setIsOpen(false)} />
+                <MobileNavLink to="/project-management" icon={Hammer} label="Projects" onClick={() => setIsOpen(false)} />
                 <hr className="border-border my-2" />
                 <button
                   onClick={() => { handleSignOut(); setIsOpen(false); }}

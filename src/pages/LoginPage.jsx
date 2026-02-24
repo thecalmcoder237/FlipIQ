@@ -20,7 +20,7 @@ const LoginPage = () => {
     const { error } = await signIn(email, password);
     
     if (!error) {
-      navigate('/deal-input');
+      navigate('/');
     }
     
     setIsLoading(false);

@@ -29,24 +29,32 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const dealId = body?.dealId ?? body?.deal_id;
     const sowContextMessages = body?.sowContextMessages ?? body?.sow_context_messages;
+    const rehabSow = body?.rehabSow ?? body?.rehab_sow;
 
     if (!dealId || typeof dealId !== "string" || dealId.trim() === "") {
       return json({ error: "dealId is required" }, { status: 400 });
     }
 
-    const messages = Array.isArray(sowContextMessages)
-      ? sowContextMessages.filter((m: unknown) => typeof m === "string")
-      : [];
+    const updatePayload: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (sowContextMessages !== undefined) {
+      updatePayload.sow_context_messages = Array.isArray(sowContextMessages)
+        ? sowContextMessages.filter((m: unknown) => typeof m === "string")
+        : [];
+    }
+
+    if (typeof rehabSow === "string") {
+      updatePayload.rehab_sow = rehabSow;
+    }
 
     const admin = createSupabaseAdminClient();
     const { data, error } = await admin
       .from("deals")
-      .update({
-        sow_context_messages: messages,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", dealId.trim())
-      .select("id, sow_context_messages, updated_at")
+      .select("id, sow_context_messages, rehab_sow, updated_at")
       .single();
 
     if (error) throw error;

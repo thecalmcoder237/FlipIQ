@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { validatePropertyInput } from "@/utils/validationUtils";
+import { formatDateUS } from "@/utils/dateUtils";
 import { normalizePropertyIntelligenceResponse } from "@/utils/propertyIntelligenceSchema";
 import { useToast } from "@/components/ui/use-toast";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -593,7 +594,7 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
                                   const type = row.type ?? row.transactionType ?? '—';
                                   return (
                                     <TableRow key={i} className="border-border hover:bg-accent/50">
-                                      <TableCell className="text-foreground">{typeof date === 'string' ? date.slice(0, 10) : String(date)}</TableCell>
+                                      <TableCell className="text-foreground">{formatDateUS(date)}</TableCell>
                                       <TableCell className="font-medium text-foreground">{price != null ? `$${Number(price).toLocaleString()}` : '—'}</TableCell>
                                       <TableCell className="text-muted-foreground">{String(type)}</TableCell>
                                     </TableRow>
@@ -669,7 +670,7 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
                                   <TableCell className="text-muted-foreground">{comp.sqft}</TableCell>
                                   <TableCell className="text-muted-foreground">{comp.beds} / {comp.baths}</TableCell>
                                   <TableCell className="text-muted-foreground">{comp.dom}</TableCell>
-                                  <TableCell className="text-muted-foreground">{comp.saleDate}</TableCell>
+                                  <TableCell className="text-muted-foreground">{formatDateUS(comp.saleDate)}</TableCell>
                                 </TableRow>
                               ))
                             ) : (

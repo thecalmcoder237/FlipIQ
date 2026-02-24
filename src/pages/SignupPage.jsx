@@ -42,7 +42,7 @@ const SignupPage = () => {
     const { error } = await signUp(email, password);
     
     if (!error) {
-      navigate('/deal-input');
+      navigate('/');
     }
     
     setIsLoading(false);

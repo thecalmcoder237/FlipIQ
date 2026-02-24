@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Hammer, Sparkles, Lock, Building2, ChevronDown, ChevronUp, Lightbulb } from 'lucide-react';
+import { Hammer, Sparkles, Lock, Building2, ChevronDown, ChevronUp, Lightbulb, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import PhotoUploadSection from '@/components/PhotoUploadSection';
@@ -14,6 +14,18 @@ const RehabPlanTab = ({ deal, setDeal, isHighPotential, inputs, calculations, pr
   const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
   const [isPropertyDetailsOpen, setIsPropertyDetailsOpen] = useState(false);
   const { toast } = useToast();
+  
+  // Track how many context messages existed when the SOW was last generated
+  const [sowGenContextCount, setSowGenContextCount] = useState(0);
+  const prevSowRef = useRef(inputs?.rehabSow);
+  
+  useEffect(() => {
+    if (inputs?.rehabSow && inputs.rehabSow !== prevSowRef.current) {
+      const contextMessages = inputs?.sowContextMessages ?? deal?.sowContextMessages ?? [];
+      setSowGenContextCount(Array.isArray(contextMessages) ? contextMessages.length : 0);
+      prevSowRef.current = inputs.rehabSow;
+    }
+  }, [inputs?.rehabSow, inputs?.sowContextMessages, deal?.sowContextMessages]);
 
   const handleAnalysisComplete = (details) => {
     if (!readOnly) setDeal(prev => ({ ...prev, property_details: details }));
@@ -152,12 +164,27 @@ const RehabPlanTab = ({ deal, setDeal, isHighPotential, inputs, calculations, pr
                 const recs = extractSOWRecommendations(inputs.rehabSow);
                 if (!recs) return null;
                 const lines = recs.split(/\n/).filter((l) => l.trim());
+                const currentContextCount = (inputs?.sowContextMessages ?? deal?.sowContextMessages ?? []).length;
+                const isStale = currentContextCount > sowGenContextCount;
                 return (
                   <Card className="bg-card border-border shadow-sm">
-                    <CardHeader>
-                      <CardTitle className="flex gap-2 items-center text-foreground">
-                        <Lightbulb className="text-primary" /> Pro Flipper Recommendations
-                      </CardTitle>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <CardTitle className="text-xl font-bold flex gap-2 items-center text-foreground">
+                          <Lightbulb className="text-primary w-5 h-5" /> Pro Flipper Recommendations
+                        </CardTitle>
+                        {isStale && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 border border-yellow-300 px-2.5 py-0.5 text-xs font-semibold text-yellow-700 shrink-0">
+                            <RefreshCw className="w-3 h-3" /> Stale
+                          </span>
+                        )}
+                      </div>
+                      {isStale && (
+                        <div className="flex items-start gap-2 mt-2 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm">
+                          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                          <span>Context updated since last SOW generation — click <strong>Regenerate</strong> in the Scope of Work above to refresh recommendations.</span>
+                        </div>
+                      )}
                     </CardHeader>
                     <CardContent>
                       <ul className="space-y-2 list-none pl-0 text-foreground">

@@ -352,6 +352,17 @@ function parsePropertiesList(data: unknown): Array<Record<string, unknown>> {
   return list.filter((x): x is Record<string, unknown> => x != null && typeof x === "object");
 }
 
+/** Returns true if the RentCast item appears to be an active listing rather than a closed sale. */
+function isActiveListing(item: Record<string, unknown>): boolean {
+  const status = String(item.status ?? item.listingStatus ?? item.mls_status ?? "").toLowerCase();
+  if (status && (status.includes("active") || status.includes("for sale") || status.includes("listed") || status.includes("new"))) return true;
+  // If it has no sold/close date and has a listed price but no sale price, it's likely still active
+  const hasSoldDate = !!(item.soldDate ?? item.saleDate ?? item.sale_date ?? item.lastSaleDate ?? item.closeDate);
+  const hasListedDate = !!item.listedDate;
+  if (!hasSoldDate && hasListedDate) return true;
+  return false;
+}
+
 function mapRentCastToComp(item: Record<string, unknown>): Record<string, unknown> | null {
   if (!item || typeof item !== "object") return null;
   const street = item.formattedAddress ?? item.address ?? item.streetAddress ?? item.addressLine1 ?? (item as Record<string, unknown>).street_line_1;
@@ -359,13 +370,9 @@ function mapRentCastToComp(item: Record<string, unknown>): Record<string, unknow
   const a = (address || String(item.address ?? item.formattedAddress ?? item.addressLine1 ?? "")).trim();
   if (!a) return null;
   const salePrice = Number(item.price ?? item.salePrice ?? item.sale_price ?? item.lastSalePrice ?? 0);
+  // Only use actual closed/sold dates — never fall back to listedDate (active listings have no sold date)
   const saleDateRaw = item.soldDate ?? item.saleDate ?? item.sale_date ?? item.lastSaleDate ?? item.closeDate ?? "";
-  const listedDateMs = parseSaleDate(item.listedDate);
-  const saleDate = saleDateRaw
-    ? String(saleDateRaw).trim().slice(0, 10)
-    : listedDateMs > 0 && listedDateMs <= Date.now()
-      ? String(item.listedDate).trim().slice(0, 10)
-      : "";
+  const saleDate = saleDateRaw ? String(saleDateRaw).trim().slice(0, 10) : "";
   const basement = item.basement ?? item.basementType ?? item.basement_type;
   const basementType = item.basementType ?? item.basement_type;
   const basementCondition = item.basementCondition ?? item.basement_condition;
@@ -421,8 +428,10 @@ async function fetchRentCastCompsFromListings(
   const res = await fetch(url, { headers: { "X-Api-Key": apiKey, Accept: "application/json" } });
   if (!res.ok) return [];
   const data = await res.json();
-  const list = Array.isArray(data) ? data : data?.listings ?? data?.comps ?? data?.data ?? [];
-  const mapped = list.map(mapRentCastToComp).filter(Boolean) as Array<Record<string, unknown>>;
+  const rawList = Array.isArray(data) ? data : data?.listings ?? data?.comps ?? data?.data ?? [];
+  // Exclude active listings — /listings/sale returns for-sale properties; only keep records with a real sold/close date
+  const soldOnly = (rawList as Record<string, unknown>[]).filter((item) => !isActiveListing(item));
+  const mapped = soldOnly.map(mapRentCastToComp).filter(Boolean) as Array<Record<string, unknown>>;
   const nowMs = Date.now();
   const within12mo = mapped.filter((c) => {
     const ts = parseSaleDate(c.saleDate ?? c.soldDate);
@@ -524,7 +533,9 @@ async function fetchRentCastCompsFromAvmValue(address: string, zipCode: string):
     : Array.isArray((d as Record<string, unknown>).comparable_sales) ? (d as Record<string, unknown>).comparable_sales as unknown[]
     : [];
   const mapped = comparables
-    .map((item: unknown) => mapRentCastToComp(item as Record<string, unknown>))
+    .map((item: unknown) => item as Record<string, unknown>)
+    .filter((item) => !isActiveListing(item))
+    .map((item) => mapRentCastToComp(item))
     .filter(Boolean) as Array<Record<string, unknown>>;
 
   const rawValue = d.value ?? d.price ?? d.avmValue ?? d.estimatedValue;
@@ -541,7 +552,7 @@ async function fetchRentCastCompsFromAvmValue(address: string, zipCode: string):
 
 type CompsFetchResult = {
   comps: Array<Record<string, unknown>>;
-  source: "realie" | "avm" | "listings" | "properties";
+  source: "realie" | "avm" | "properties";
   avmValue?: number;
   avmSubject?: Record<string, unknown>;
   avmResponseKeys?: string[];
@@ -553,12 +564,13 @@ async function fetchRentCastComps(
   limit: number,
   opts?: { fullAddress?: string; city?: string; state?: string; subjectSpecs?: SubjectSpecs }
 ): Promise<CompsFetchResult> {
+  // Try AVM first — returns sold comparables used for RentCast's valuation model (1 API call)
   const avm = await fetchRentCastCompsFromAvmValue(address, zipCode);
   if (avm.comparables.length > 0) {
     return { comps: avm.comparables.slice(0, limit), source: "avm", avmValue: avm.avmValue, avmSubject: avm.avmSubject };
   }
-  const listings = await fetchRentCastCompsFromListings(address, zipCode, limit, { fullAddress: opts?.fullAddress });
-  if (listings.length > 0) return { comps: listings, source: "listings", avmValue: avm.avmValue, avmSubject: avm.avmSubject, avmResponseKeys: avm.avmResponseKeys };
+  // Skip /listings/sale — that endpoint returns active for-sale listings, not closed sales.
+  // Fall back directly to /properties with saleDateRange=365 which returns recently sold records.
   const props = await fetchRentCastCompsFromProperties(zipCode, limit, opts);
   return { comps: props, source: "properties", avmValue: avm.avmValue, avmSubject: avm.avmSubject, avmResponseKeys: avm.avmResponseKeys };
 }

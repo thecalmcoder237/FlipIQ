@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { fetchNeighborhoodIntelligence } from "@/services/edgeFunctionService";
+import PropertyLocationMap from "./PropertyLocationMap";
 
 /** Swap the static image size to a larger resolution for the lightbox. */
 function toLargeUrl(url) {
@@ -154,6 +155,9 @@ const NeighborhoodIntelligenceCard = ({ inputs, propertyData, initialData, onDat
   const visibleSchools = schoolsExpanded ? schoolList : schoolList.slice(0, 3);
   const roadColors   = ROAD_COLORS[loc.trafficRiskColor] ?? ROAD_COLORS.gray;
 
+  const mapLat = propertyData?.latitude ?? loc.lat ?? inputs?.lat;
+  const mapLng = propertyData?.longitude ?? loc.lng ?? inputs?.lng;
+
   return (
     <Card className="bg-card border-border shadow-sm">
       <CardHeader className="pb-4">
@@ -162,7 +166,7 @@ const NeighborhoodIntelligenceCard = ({ inputs, propertyData, initialData, onDat
             <div className="p-2 rounded-lg bg-primary/10">
               <Globe className="w-5 h-5 text-primary" />
             </div>
-            Neighborhood &amp; Location Intelligence
+            Location Info
           </CardTitle>
           {!readOnly && (
             <Button
@@ -188,6 +192,14 @@ const NeighborhoodIntelligenceCard = ({ inputs, propertyData, initialData, onDat
       </CardHeader>
 
       <CardContent>
+
+        {/* Interactive Google Map with Street View toggle */}
+        <PropertyLocationMap
+          lat={mapLat}
+          lng={mapLng}
+          address={inputs?.address ? inputs.address + (inputs.zipCode ? ' ' + inputs.zipCode : '') : null}
+        />
+
         <AnimatePresence mode="wait">
 
           {loading && (

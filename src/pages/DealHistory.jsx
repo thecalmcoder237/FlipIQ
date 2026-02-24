@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import { Search, Eye, Edit, Trash2, Star } from 'lucide-react';
+import { Search, Eye, Edit, Trash2, Star, Tag } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -22,7 +22,7 @@ const DealHistory = () => {
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
-  const [viewFilter, setViewFilter] = useState('Mine');
+  const [viewFilter, setViewFilter] = useState('All');
   const [selectedUserFilter, setSelectedUserFilter] = useState('all');
   const [profiles, setProfiles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -86,6 +86,16 @@ const DealHistory = () => {
     } catch (error) {
       console.error(error);
       toast({ variant: "destructive", title: "Update failed", description: "Could not update favorite status." });
+    }
+  };
+
+  const handleStatusChange = async (deal, newStatus) => {
+    try {
+      const saved = await dealService.updateDealFields(deal.id, { status: newStatus }, currentUser.id);
+      setDeals(deals.map(d => d.id === deal.id ? saved : d));
+      toast({ title: "Status updated", description: `"${deal.address}" marked as ${newStatus}.` });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Update failed", description: error.message });
     }
   };
 
@@ -157,7 +167,7 @@ const DealHistory = () => {
                 />
             </div>
             <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
-                {['All', 'Favorites', 'Analyzing', 'Under Contract', 'Completed'].map(f => (
+                {['All', 'Favorites', 'Analyzing', 'Under Contract', 'Funded', 'Closed', 'Completed', 'Passed'].map(f => (
                 <button
                     key={f}
                     onClick={() => setFilter(f)}
@@ -205,8 +215,9 @@ const DealHistory = () => {
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-xl font-bold text-foreground">{deal.address}</h3>
                         <span className={`text-xs px-2 py-0.5 rounded-full border ${
-                          deal.status === 'Completed' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 
-                          deal.status === 'Under Contract' ? 'bg-accentBrand/20 text-accentBrand border-accentBrand/30' :
+                          deal.status === 'Completed' || deal.status === 'Closed' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 
+                          deal.status === 'Under Contract' || deal.status === 'Funded' ? 'bg-accentBrand/20 text-accentBrand border-accentBrand/30' :
+                          deal.status === 'Passed' ? 'bg-muted text-muted-foreground border-border' :
                           'bg-primary/20 text-primary border-primary/30'
                         }`}>
                           {deal.status || 'Analyzing'}
@@ -246,11 +257,32 @@ const DealHistory = () => {
                           <Button
                             variant="ghost"
                             size="icon"
+                            title="Edit inputs"
                             onClick={() => navigate(`/deal-input?id=${deal.id}&edit=true`)}
                             className="text-muted-foreground hover:text-foreground"
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
+                          <Select
+                            value={deal.status || 'Analyzing'}
+                            onValueChange={(val) => handleStatusChange(deal, val)}
+                          >
+                            <SelectTrigger
+                              className="h-8 w-auto gap-1.5 px-2.5 border-border bg-card text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent focus:ring-0 focus:ring-offset-0"
+                              title="Change deal status"
+                            >
+                              <Tag className="w-3.5 h-3.5 shrink-0" />
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent align="end" className="bg-card border-border text-foreground">
+                              <SelectItem value="Analyzing">Analyzing</SelectItem>
+                              <SelectItem value="Under Contract">Under Contract</SelectItem>
+                              <SelectItem value="Funded">Funded</SelectItem>
+                              <SelectItem value="Closed">Closed</SelectItem>
+                              <SelectItem value="Completed">Completed</SelectItem>
+                              <SelectItem value="Passed">Passed</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <Button
                             variant="ghost"
                             size="icon"

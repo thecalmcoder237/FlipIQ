@@ -18,6 +18,18 @@ export const updateDealSowContext = async (dealId, sowContextMessages) => {
   return data?.deal ?? data;
 };
 
+/**
+ * Saves generated SOW text via admin-client edge function (bypasses RLS).
+ * Use when dealService.saveDeal may be blocked by user_id mismatch.
+ * @param {string} dealId
+ * @param {string} rehabSow - The generated SOW markdown text
+ */
+export const updateDealRehabSow = async (dealId, rehabSow) => {
+  const body = { dealId, rehabSow };
+  const data = await invokeEdgeFunction('update-deal-sow-context', body);
+  return data?.deal ?? data;
+};
+
 export const invokeEdgeFunction = async (functionName, payload) => {
   const timestamp = new Date().toISOString();
   console.log(`📤 [Edge Service] Request to '${functionName}' at ${timestamp}`, payload);

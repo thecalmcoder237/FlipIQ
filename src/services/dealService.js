@@ -23,23 +23,53 @@ export const dealService = {
   async saveDeal(inputs, userId) {
     if (!userId) throw new Error("User ID is required to save a deal.");
 
-    const doUpsert = (includeFundingContactStatus = true) => {
-      const payload = inputsToDatabase(inputs, { includeFundingContactStatus });
-      payload.user_id = userId;
-      payload.updated_at = new Date().toISOString();
-      if (!inputs.id) {
-        payload.created_at = new Date().toISOString();
-      } else {
-        payload.id = inputs.id;
-      }
-      return supabase.from('deals').upsert(payload).select().single();
-    };
-
     try {
-      // Omit funding/contact/status columns until migration 20260131120000_deals_funding_contact_status.sql is applied
-      const { data, error } = await doUpsert(false);
-      if (error) throw error;
-      return databaseToInputs(data);
+      const payload = inputsToDatabase(inputs);
+      payload.updated_at = new Date().toISOString();
+
+      if (!inputs.id) {
+        // ── INSERT new deal ──────────────────────────────────────────────────
+        // Set ownership only on creation. RLS WITH CHECK: auth.uid() = user_id.
+        payload.user_id = userId;
+        payload.created_at = new Date().toISOString();
+        const { data, error } = await supabase
+          .from('deals')
+          .insert(payload)
+          .select()
+          .single();
+        if (error) throw error;
+        return databaseToInputs(data);
+      } else {
+        // ── UPDATE existing deal ─────────────────────────────────────────────
+        // First try a direct RLS-checked update (fast path for properly-owned deals).
+        // If 0 rows are returned (PGRST116) the deal's user_id in the DB is stale
+        // or null — fall back to the admin edge function which handles this case.
+        delete payload.id; // never send id in the update SET clause
+        const { data: directData, error: directError } = await supabase
+          .from('deals')
+          .update(payload)
+          .eq('id', inputs.id)
+          .eq('user_id', userId)
+          .select()
+          .maybeSingle(); // maybeSingle won't throw PGRST116 for 0 rows
+
+        if (directError) throw directError;
+
+        if (directData) {
+          return databaseToInputs(directData);
+        }
+
+        // Fast path returned no rows — use admin edge function (handles stale user_id).
+        const { data: edgeData, error: edgeError } = await supabase.functions.invoke('update-deal', {
+          body: { dealId: inputs.id, ...payload },
+        });
+        if (edgeError) throw new Error(`Update failed: ${edgeError.message}`);
+        if (edgeData?.error) throw new Error(edgeData.error);
+        // Edge function returns the full snake_case row; reload to get full camelCase state.
+        const reloaded = await dealService.loadDeal(inputs.id, userId);
+        if (!reloaded) throw new Error('Update failed: deal not found after save.');
+        return reloaded;
+      }
     } catch (error) {
       console.error("dealService.saveDeal Error:", error);
       throw error;
@@ -72,6 +102,14 @@ export const dealService = {
       return databaseToInputs(data);
     } catch (error) {
       console.error("dealService.loadDeal Error:", error);
+      // Map "Failed to fetch" to a user-friendly message for network/connectivity issues
+      const isNetworkError = error?.message === 'Failed to fetch' || error?.name === 'TypeError';
+      if (isNetworkError) {
+        throw new Error(
+          "Unable to connect. Check your internet connection, disable ad blockers for this site, " +
+          "and ensure Supabase is reachable. If the issue persists, your Supabase project may be paused."
+        );
+      }
       throw error;
     }
   },
@@ -145,6 +183,39 @@ export const dealService = {
   },
 
   /**
+   * Updates specific small fields on a deal (status, isFavorite, isClosed, isFunded, etc.)
+   * via the admin-client edge function so that deals with a stale/null user_id
+   * (created before ownership tracking) still work correctly.
+   *
+   * @param {string} dealId - The deal UUID.
+   * @param {Object} fields - camelCase fields to update (e.g. { status: 'Completed' }).
+   * @returns {Promise<Object>} The updated deal in camelCase format (reloaded from DB).
+   */
+  async updateDealFields(dealId, fields, userId) {
+    if (!dealId) throw new Error('Deal ID is required.');
+
+    // Map camelCase fields to snake_case for the edge function payload.
+    const snakeFields = {};
+    if ('status' in fields) snakeFields.status = fields.status;
+    if ('isFavorite' in fields) snakeFields.is_favorite = fields.isFavorite;
+    if ('isClosed' in fields) snakeFields.is_closed = fields.isClosed;
+    if ('isFunded' in fields) snakeFields.is_funded = fields.isFunded;
+    if ('fundedTerms' in fields) snakeFields.funded_terms = fields.fundedTerms;
+
+    const { data, error } = await supabase.functions.invoke('update-deal', {
+      body: { dealId, ...snakeFields },
+    });
+
+    if (error) throw new Error(`Update failed: ${error.message}`);
+    if (data?.error) throw new Error(data.error);
+
+    // Reload the full deal to get all camelCase fields.
+    const reloaded = await dealService.loadDeal(dealId, userId);
+    if (!reloaded) throw new Error('Update failed: deal not found after save.');
+    return reloaded;
+  },
+
+  /**
    * Generates and saves a share token for a deal. Only the owner can update.
    * @param {string} dealId - The deal UUID.
    * @param {string} userId - The current user's ID (must own the deal).
@@ -154,18 +225,15 @@ export const dealService = {
     if (!dealId) throw new Error("Deal ID is required.");
     if (!userId) throw new Error("User ID is required.");
 
-    const shareToken = crypto.randomUUID();
-    const { error } = await supabase
-      .from('deals')
-      .update({
-        share_token: shareToken,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', dealId)
-      .eq('user_id', userId);
+    // Uses edge function with admin client to bypass RLS (avoids silent failures
+    // when user_id in DB is stale or mismatched with current auth session).
+    const { data, error } = await supabase.functions.invoke('update-share-token', {
+      body: { dealId },
+    });
 
-    if (error) throw error;
-    return { shareToken };
+    if (error) throw new Error(`Share token error: ${error.message}`);
+    if (!data?.shareToken) throw new Error(data?.error || 'Failed to save share token.');
+    return { shareToken: data.shareToken };
   },
 
   /**

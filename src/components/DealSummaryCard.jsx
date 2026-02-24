@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, DollarSign, TrendingUp, Star, Edit2, User, Mail, Wallet, Building, ArrowRight, HelpCircle, Phone, CheckCircle, Banknote } from 'lucide-react';
+import { MapPin, DollarSign, TrendingUp, Star, Edit2, User, Mail, Wallet, Building, ArrowRight, HelpCircle, Phone, CheckCircle, Banknote, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { dealService } from '@/services/dealService';
@@ -11,9 +11,16 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-const DealSummaryCard = ({ deal, metrics, onEdit, readOnly }) => {
+const DealSummaryCard = ({ deal, metrics, onEdit, onDealUpdate, readOnly }) => {
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
@@ -21,11 +28,21 @@ const DealSummaryCard = ({ deal, metrics, onEdit, readOnly }) => {
 
   const handleToggleFavorite = async () => {
     try {
-      const updatedDeal = { ...deal, isFavorite: !deal.isFavorite };
-      await dealService.saveDeal(updatedDeal, currentUser.id);
-      toast({ title: updatedDeal.isFavorite ? "Added to favorites" : "Removed from favorites" });
+      const saved = await dealService.updateDealFields(deal.id, { isFavorite: !deal.isFavorite }, currentUser.id);
+      toast({ title: !deal.isFavorite ? "Added to favorites" : "Removed from favorites" });
+      onDealUpdate?.(saved);
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "Failed to update status" });
+      toast({ variant: "destructive", title: "Error", description: "Failed to update favorite" });
+    }
+  };
+
+  const handleStatusChange = async (newStatus) => {
+    try {
+      const saved = await dealService.updateDealFields(deal.id, { status: newStatus }, currentUser.id);
+      toast({ title: "Status updated", description: `Deal marked as ${newStatus}.` });
+      onDealUpdate?.(saved);
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: error.message });
     }
   };
 
@@ -74,7 +91,7 @@ const DealSummaryCard = ({ deal, metrics, onEdit, readOnly }) => {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
            {!readOnly && (
             <Button
               variant="ghost"
@@ -84,6 +101,22 @@ const DealSummaryCard = ({ deal, metrics, onEdit, readOnly }) => {
             >
               <Star className={`w-5 h-5 ${deal.isFavorite ? 'fill-primary-foreground text-primary-foreground' : ''}`} />
             </Button>
+           )}
+           {!readOnly && (
+             <Select value={deal.status || 'Analyzing'} onValueChange={handleStatusChange}>
+               <SelectTrigger className="h-8 w-auto gap-1.5 px-2.5 bg-white/15 hover:bg-white/25 border-white/30 text-white text-xs font-medium focus:ring-0 focus:ring-offset-0">
+                 <Tag className="w-3.5 h-3.5 shrink-0" />
+                 <SelectValue />
+               </SelectTrigger>
+               <SelectContent align="end" className="bg-card border-border text-foreground">
+                 <SelectItem value="Analyzing">Analyzing</SelectItem>
+                 <SelectItem value="Under Contract">Under Contract</SelectItem>
+                 <SelectItem value="Funded">Funded</SelectItem>
+                 <SelectItem value="Closed">Closed</SelectItem>
+                 <SelectItem value="Completed">Completed</SelectItem>
+                 <SelectItem value="Passed">Passed</SelectItem>
+               </SelectContent>
+             </Select>
            )}
             {onEdit && (
               <Button

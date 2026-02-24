@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { BarChart3, Hammer, Home, FileText, Share2, Sparkles, Building2, Table as TableIcon, Settings2, Shield } from 'lucide-react';
+import { BarChart3, Hammer, Home, FileText, Share2, Sparkles, Building2, Table as TableIcon, Settings2, Shield, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { calculateDealMetrics } from '@/utils/dealCalculations';
 import { applyScenarioAdjustments } from '@/utils/advancedDealCalculations';
 import { dealService } from '@/services/dealService';
-import { updateDealSowContext } from '@/services/edgeFunctionService';
+import { updateDealSowContext, updateDealRehabSow } from '@/services/edgeFunctionService';
 import { logDataFlow, validateCalculations } from '@/utils/dataFlowDebug';
 
 // Components
@@ -61,10 +61,18 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
   const [activeScenarioMetrics, setActiveScenarioMetrics] = useState(null);
   const [scenarioMode, setScenarioMode] = useState('worst'); // Default to 'Stress Test' view
 
+  // Controlled tab state — persists across loading cycles so switching tabs
+  // while idle (e.g. during a background token refresh) never resets position.
+  const [activeTab, setActiveTab] = useState('intelligence');
+
   // Loading States
   const [loading, setLoading] = useState(!readOnly);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const pageContainerRef = useRef(null);
+  // Track the user id that last triggered a fetch so re-rendering with
+  // the same logged-in user (e.g. after a background token refresh) does
+  // not re-fetch and reset the page.
+  const lastFetchedUserIdRef = useRef(null);
 
   useEffect(() => {
     if (readOnly) return;
@@ -77,7 +85,11 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
     logDataFlow('DEAL_ID_FROM_URL', dealId, new Date());
 
     if (currentUser) {
-       fetchDeal();
+      // Skip re-fetch if we already loaded for this user + deal combination
+      const fetchKey = `${currentUser.id}:${dealId}`;
+      if (lastFetchedUserIdRef.current === fetchKey) return;
+      lastFetchedUserIdRef.current = fetchKey;
+      fetchDeal();
     }
   }, [dealId, currentUser, readOnly]);
 
@@ -121,30 +133,39 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
     }
   };
 
-  // Automatically calculate scenario whenever metrics or mode changes
-  useEffect(() => {
-    if (!deal || !scenarioMode) return;
+  // Automatically calculate scenario whenever metrics, inputs, or mode changes
+  const recalculateScenario = (currentDeal, currentInputs, currentScenarioMode) => {
+    const effectiveDeal = currentDeal || deal;
+    const effectiveMode = currentScenarioMode ?? scenarioMode;
+    if (!effectiveDeal || !effectiveMode) return;
 
-    let adjustments = {
-        rehabOverrunPercent: 0,
-        holdingPeriodAdjustment: 0,
-        marketAppreciationPercent: 0,
-        permitDelayDays: 0
-    };
+    // Merge freshest input values so purchase/rehab changes reflect immediately
+    const mergedDeal = currentInputs
+      ? {
+          ...effectiveDeal,
+          purchasePrice: currentInputs.purchasePrice ?? effectiveDeal.purchasePrice,
+          purchase_price: currentInputs.purchasePrice ?? effectiveDeal.purchase_price,
+          rehabCosts: currentInputs.rehabCosts ?? effectiveDeal.rehabCosts,
+          rehab_costs: currentInputs.rehabCosts ?? effectiveDeal.rehab_costs,
+          arv: currentInputs.arv ?? effectiveDeal.arv,
+        }
+      : effectiveDeal;
 
-    if (scenarioMode === 'best') {
+    let adjustments = { rehabOverrunPercent: 0, holdingPeriodAdjustment: 0, marketAppreciationPercent: 0, permitDelayDays: 0 };
+    if (effectiveMode === 'best') {
       adjustments = { rehabOverrunPercent: -10, holdingPeriodAdjustment: -1, marketAppreciationPercent: 5, permitDelayDays: 0 };
-    } else if (scenarioMode === 'worst') {
+    } else if (effectiveMode === 'worst') {
       adjustments = { rehabOverrunPercent: 25, holdingPeriodAdjustment: 3, marketAppreciationPercent: -10, permitDelayDays: 0 };
-    } else if (scenarioMode === 'base') {
-      // Base case is essentially 0 adjustments, same as current metrics
-      adjustments = { rehabOverrunPercent: 0, holdingPeriodAdjustment: 0, marketAppreciationPercent: 0, permitDelayDays: 0 };
     }
 
-    const results = applyScenarioAdjustments(deal, adjustments);
+    const results = applyScenarioAdjustments(mergedDeal, adjustments);
     setActiveScenarioMetrics(results);
+  };
 
-  }, [deal, metrics, scenarioMode]);
+  useEffect(() => {
+    recalculateScenario(deal, inputs, scenarioMode);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deal, metrics, scenarioMode, inputs]);
 
   const handlePropertyDataFetch = async (data) => {
       const updatedInputs = { ...inputs, propertyIntelligence: data };
@@ -175,10 +196,17 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
       setInputs(updatedInputs);
       setDeal(updatedInputs);
 
+      const effectiveId = inputs?.id ?? deal?.id ?? dealId;
+      if (!effectiveId) {
+        toast({ variant: "destructive", title: "Save failed", description: "Deal ID not found — SOW displayed but not saved." });
+        return;
+      }
+
       try {
-         await dealService.saveDeal(updatedInputs, currentUser.id);
+         await updateDealRehabSow(effectiveId, sowText);
       } catch (error) {
          console.error("Failed to save SOW", error);
+         toast({ variant: "destructive", title: "Save failed", description: error.message || "Could not persist generated SOW." });
       }
   };
 
@@ -290,15 +318,29 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
         </div>
       </div>
 
-      <DealSummaryCard deal={deal} metrics={displayMetrics} onEdit={readOnly ? undefined : () => setIsEditModalOpen(true)} readOnly={readOnly} />
+      <DealSummaryCard
+        deal={deal}
+        metrics={displayMetrics}
+        onEdit={readOnly ? undefined : () => setIsEditModalOpen(true)}
+        onDealUpdate={readOnly ? undefined : (updated) => { setDeal(updated); setInputs(updated); }}
+        readOnly={readOnly}
+      />
 
-      <Tabs defaultValue="intelligence" className="mt-8">
-         <TabsList className="bg-muted border border-border p-1 mb-6 flex flex-wrap h-auto shadow-sm">
-            <TabsTrigger value="intelligence" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-orange-600 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-sm"><BarChart3 size={16}/> Intelligence</TabsTrigger>
-            <TabsTrigger value="rehab-insights" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-orange-600 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-sm"><Sparkles size={16}/> Rehab Insights</TabsTrigger>
-            <TabsTrigger value="comps" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-orange-600 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-sm"><Home size={16}/> Comps</TabsTrigger>
-            <TabsTrigger value="scenario-risk" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-orange-600 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-sm"><Shield size={16}/> Scenario Risk Model</TabsTrigger>
-            <TabsTrigger value="notes" className="gap-2 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-orange-600 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:shadow-sm"><FileText size={16}/> Notes</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-8">
+         <div className="mb-2">
+           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Analysis Sections</p>
+         </div>
+         <TabsList className="bg-muted border border-border p-1.5 mb-6 flex flex-wrap h-auto shadow-md gap-1 w-full">
+            <TabsTrigger value="intelligence" className="gap-2 font-semibold text-sm py-2.5 px-4 text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=active]:bg-background data-[state=active]:text-orange-600 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:font-bold data-[state=active]:shadow-md"><BarChart3 size={18}/> Intelligence</TabsTrigger>
+            <TabsTrigger value="rehab-insights" className="gap-2 font-semibold text-sm py-2.5 px-4 text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=active]:bg-background data-[state=active]:text-orange-600 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:font-bold data-[state=active]:shadow-md"><Sparkles size={18}/> Rehab Insights</TabsTrigger>
+            <TabsTrigger value="comps" className="gap-2 font-semibold text-sm py-2.5 px-4 text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=active]:bg-background data-[state=active]:text-orange-600 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:font-bold data-[state=active]:shadow-md"><Home size={18}/> Comps</TabsTrigger>
+            <TabsTrigger value="scenario-risk" className="gap-2 font-semibold text-sm py-2.5 px-4 text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=active]:bg-background data-[state=active]:text-orange-600 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:font-bold data-[state=active]:shadow-md"><Shield size={18}/> Scenario Risk Model</TabsTrigger>
+            <TabsTrigger value="notes" className="gap-2 font-semibold text-sm py-2.5 px-4 text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=active]:bg-background data-[state=active]:text-orange-600 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:font-bold data-[state=active]:shadow-md"><FileText size={18}/> Notes</TabsTrigger>
+            {!readOnly && (deal?.status === 'Funded' || deal?.status === 'Closed' || deal?.status === 'Completed' || deal?.isFunded || deal?.isClosed) && (
+              <TabsTrigger value="project-mgmt" className="gap-2 font-semibold text-sm py-2.5 px-4 text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=active]:bg-background data-[state=active]:text-orange-600 data-[state=active]:border-b-2 data-[state=active]:border-orange-500 data-[state=active]:font-bold data-[state=active]:shadow-md">
+                <Hammer size={18}/> Project Management
+              </TabsTrigger>
+            )}
          </TabsList>
 
          <TabsContent value="intelligence" className="space-y-8 animate-in fade-in">
@@ -314,19 +356,11 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
                  })}
                />
              </div>
-             {/* 1. Detailed Cost Break (left) - Deal Quality Score (right) */}
-             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                 <div className="lg:col-span-2">
+             {/* 1+2. Combined layout: left 2/3 stacked, right 1/3 stacked (Deal Score → MAO → Market Gauge) */}
+             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                 {/* Left column: Financial Breakdown + Property Intelligence stacked */}
+                 <div className="lg:col-span-2 space-y-6 min-w-0">
                     <ComprehensiveFinancialBreakdown deal={deal} metrics={displayMetrics} />
-                 </div>
-                 <div className="lg:col-span-1">
-                     <DealQualityScore score={displayMetrics.score} riskLevel={displayMetrics.risk} />
-                 </div>
-             </div>
-
-             {/* 2. Property Intelligence - Market Strength Gauge (right) */}
-             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                 <div className="lg:col-span-2">
                     <PropertyIntelligenceSection 
                         inputs={inputs}
                         calculations={metrics}
@@ -335,7 +369,21 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
                         readOnly={readOnly}
                     />
                  </div>
-                 <div className="lg:col-span-1">
+                 {/* Right column: Deal Score (stretches to fill) → MAO → Market Strength Gauge */}
+                 <div className="lg:col-span-1 flex flex-col gap-6 min-w-0 lg:sticky lg:top-4">
+                     <DealQualityScore score={displayMetrics.score} riskLevel={displayMetrics.risk} />
+                     <SeventyPercentRule
+                       compact
+                       deal={{
+                         purchase_price: deal.purchasePrice || deal.purchase_price || 0,
+                         ...deal
+                       }}
+                       metrics={{
+                         arv: metrics?.arv || deal.arv || 0,
+                         rehabCosts: metrics?.rehabCosts || metrics?.rehab?.total || deal.rehab_costs || deal.rehabCosts || 0,
+                         ...metrics
+                       }}
+                     />
                      <MarketStrengthGauge deal={deal} propertyIntelligence={inputs.propertyIntelligence} />
                  </div>
              </div>
@@ -349,24 +397,7 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
                readOnly={readOnly}
              />
 
-             {/* 4. 70% Rule Analysis */}
-             <Card className="bg-card border-border shadow-sm">
-               <CardContent className="pt-6">
-                 <SeventyPercentRule 
-                   deal={{
-                     purchase_price: deal.purchasePrice || deal.purchase_price || 0,
-                     ...deal
-                   }}
-                   metrics={{
-                     arv: metrics?.arv || deal.arv || 0,
-                     rehabCosts: metrics?.rehabCosts || metrics?.rehab?.total || deal.rehab_costs || deal.rehabCosts || 0,
-                     ...metrics
-                   }}
-                 />
-               </CardContent>
-             </Card>
-
-             {/* 5. ARV Sensitivity Heat Map (left) */}
+             {/* 4. ARV Sensitivity Heat Map (left) */}
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                  <div className="lg:col-span-2">
                     <ARVSensitivityHeatmap deal={deal} metrics={displayMetrics} />
@@ -376,20 +407,30 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
             {/* Always Visible Scenario Section */}
             <div className="pt-8 border-t border-border mt-8">
                 <Card className="bg-card border-border shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2 pb-2">
                         <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
                             <Settings2 className="text-primary" /> Scenario Modeling
                         </CardTitle>
-                        <Select value={scenarioMode} onValueChange={setScenarioMode}>
-                          <SelectTrigger className="w-[180px] bg-background border-input text-foreground">
-                            <SelectValue placeholder="Select Scenario" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-card border-border text-foreground">
-                            <SelectItem value="base">Base Case</SelectItem>
-                            <SelectItem value="best">Best Case</SelectItem>
-                            <SelectItem value="worst">Worst Case</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Select value={scenarioMode} onValueChange={setScenarioMode}>
+                            <SelectTrigger className="w-[180px] bg-background border-input text-foreground">
+                              <SelectValue placeholder="Select Scenario" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border-border text-foreground">
+                              <SelectItem value="base">Base Case</SelectItem>
+                              <SelectItem value="best">Best Case</SelectItem>
+                              <SelectItem value="worst">Worst Case</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => recalculateScenario(deal, inputs, scenarioMode)}
+                            className="border-border text-foreground hover:bg-accent gap-1.5"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" /> Recalculate
+                          </Button>
+                        </div>
                     </CardHeader>
                     <CardContent>
                        {activeScenarioMetrics && (
@@ -405,37 +446,34 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
          </TabsContent>
 
          <TabsContent value="rehab-insights" className="space-y-8">
-             <div className="flex justify-between items-center">
-               <h2 className="text-2xl font-bold text-foreground">Rehab & Property Insights</h2>
-               <div className="flex gap-2">
-                 <PrintTabButton
-                   label="Print"
-                   onPrint={() => printRehabInsightsReport({
-                     deal,
-                     metrics: displayMetrics,
-                     propertyIntelligence: inputs.propertyIntelligence,
-                     sowData: inputs.rehabSow,
-                     photos: deal.photos,
-                   })}
-                 />
-                 <RehabInsightsExportButton 
-                    deal={deal} 
-                    metrics={displayMetrics} 
-                    propertyIntelligence={inputs.propertyIntelligence}
-                    sowData={inputs.rehabSow}
-                    photos={deal.photos}
-                 />
-               </div>
+             <div className="flex justify-end gap-2">
+               <PrintTabButton
+                 label="Print"
+                 onPrint={() => printRehabInsightsReport({
+                   deal,
+                   metrics: displayMetrics,
+                   propertyIntelligence: inputs.propertyIntelligence,
+                   sowData: inputs.rehabSow,
+                   photos: deal.photos,
+                 })}
+               />
+               <RehabInsightsExportButton 
+                  deal={deal} 
+                  metrics={displayMetrics} 
+                  propertyIntelligence={inputs.propertyIntelligence}
+                  sowData={inputs.rehabSow}
+                  photos={deal.photos}
+               />
              </div>
              <RehabPlanTab 
                 deal={deal} 
-                setDeal={readOnly || !isOwner ? () => {} : handleRehabDealUpdate} 
+                setDeal={readOnly ? () => {} : handleRehabDealUpdate} 
                 isHighPotential={(metrics?.score ?? 0) >= 60}
                 inputs={inputs}
                 calculations={metrics}
                 propertyData={inputs?.propertyIntelligence}
-                onSowGenerated={readOnly || !isOwner ? undefined : handleSowGenerated}
-                onApplyRehabCost={readOnly || !isOwner ? undefined : handleApplyRehabCost}
+                onSowGenerated={readOnly ? undefined : handleSowGenerated}
+                onApplyRehabCost={readOnly ? undefined : handleApplyRehabCost}
                 onSowContextUpdated={readOnly ? undefined : handleSowContextUpdated}
                 readOnly={readOnly}
              />
@@ -464,11 +502,14 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
               />
             </div>
             <CompsDisplay 
+               tableOnly
                comps={inputs.propertyIntelligence?.recentComps || deal.comps} 
                loading={false}
                onRefresh={() => { /* Trigger refresh in child */ }}
                source={inputs.propertyIntelligence?.recentComps?.length ? (inputs.propertyIntelligence?.source ?? "Realie/RentCast") : "Manual/Legacy"}
                subjectAddress={deal?.address ?? inputs?.address ?? ''}
+               subjectLat={inputs.propertyIntelligence?.latitude ?? inputs.propertyIntelligence?.avmSubject?.latitude}
+               subjectLng={inputs.propertyIntelligence?.longitude ?? inputs.propertyIntelligence?.avmSubject?.longitude}
                subjectSpecs={(() => {
                  const pi = inputs?.propertyIntelligence;
                  const avm = pi?.avmSubject;
@@ -495,6 +536,27 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
          <TabsContent value="notes">
             <NotesPanel dealId={deal.id} initialNotes={deal.notes} readOnly={readOnly} sowContextMessages={deal.sowContextMessages} />
          </TabsContent>
+
+         {!readOnly && (deal?.status === 'Funded' || deal?.status === 'Closed' || deal?.status === 'Completed' || deal?.isFunded || deal?.isClosed) && (
+           <TabsContent value="project-mgmt">
+             <div className="rounded-2xl border border-border bg-card p-8 text-center space-y-4">
+               <div className="p-3 bg-accentBrand/10 rounded-xl w-fit mx-auto">
+                 <Hammer className="w-8 h-8 text-accentBrand" />
+               </div>
+               <h2 className="text-xl font-bold text-foreground">Rehab Project Management</h2>
+               <p className="text-muted-foreground text-sm max-w-sm mx-auto">
+                 Track tasks, budget vs actual, materials, photos, and issues for this active rehab.
+               </p>
+               <Button
+                 onClick={() => navigate(`/project-management/deal?id=${deal.id}`)}
+                 className="gap-2"
+               >
+                 <Hammer className="w-4 h-4" />
+                 Open Project Dashboard
+               </Button>
+             </div>
+           </TabsContent>
+         )}
       </Tabs>
 
       {!readOnly && (

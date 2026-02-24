@@ -184,9 +184,9 @@ async function runSOWGeneration(body: {
   const imageUrls: string[] = Array.isArray(body.images) ? body.images : [];
   const deal = body.deal || {};
   const compsSummary = body.compsSummary || summarizeComps(body.recentComps || []);
-  const sowContextMessages: string[] = Array.isArray(body.sowContextMessages) ? body.sowContextMessages.filter((m): m is string => typeof m === "string") : [];
+  const sowContextMessages: string[] = Array.isArray(body.sowContextMessages) ? body.sowContextMessages.filter((m): m is string => typeof m === "string" && m.trim() !== "") : [];
   const userContextBlock = sowContextMessages.length > 0
-    ? `\n\nIMPORTANT - User-provided property context (USE THESE to avoid errors):\n${sowContextMessages.map((m, i) => `${i + 1}. ${m}`).join("\n")}\n\nFollow these user notes when scoping. For example: if the user says "basement is crawl space", do NOT include basement finishing. If the user says "roof doesn't need full replacement", do NOT include full roof replacement—only repairs or partial work as appropriate.`
+    ? `## USER-PROVIDED CONTEXT (HIGHEST PRIORITY — MUST FOLLOW EXACTLY)\n${sowContextMessages.map((m, i) => `${i + 1}. ${m}`).join("\n")}\n\nYou MUST incorporate every note above into the SOW. Override any default assumptions with these. For example: if a note says "basement is crawl space", do NOT include basement finishing. If a note says "roof is new", do NOT include roof replacement. If a note says a system was recently replaced, reflect that in your scope and cost.`
     : "";
 
   const arv = deal.arv ?? 0;
@@ -221,6 +221,8 @@ async function runSOWGeneration(body: {
 
   const systemPrompt = `You are a rehab scope-of-work writer. Use ALL property data, deal context, comps (if provided), AND the uploaded photos to produce an accurate Scope of Work.
 
+CRITICAL: If the user message contains a section titled "## USER-PROVIDED CONTEXT", you MUST treat every item in it as a hard constraint that overrides your default assumptions. These are corrections or clarifications from someone who has physically inspected or knows the property. Apply each note exactly when writing the scope and cost estimates.
+
 Respect the deal's Rehab type (user): Cosmetic, Moderate, or Heavy. Use it when scoping: Cosmetic = paint, flooring, minor fixtures, no structural or major systems work; Moderate = kitchen/bath updates, some systems, no major structural; Heavy = structural work, full systems, major rehabs. Align line items, tier totals (Budget / Mid-Grade / High-End), and estimated timeline with this level (e.g. Cosmetic shorter and lower cost, Heavy longer and higher).
 
 Structure your response with these sections IN ORDER:
@@ -247,7 +249,7 @@ Write 3–6 bullet or short paragraphs of pro flipper recommendations based on t
   const content: ({ type: "text"; text: string } | { type: "image"; source: { type: "base64"; media_type: string; data: string } })[] = [
     {
       type: "text",
-      text: `Deal and property context: ${dealContext}\n\nProperty description (full): ${desc}\n\n${compsSummary ? `Comps (use for ARV and value-add ideas):\n${compsSummary}\n\n` : ""}${userContextBlock}\n\nGenerate the full SOW including SOW Remarks, Scope of Work with tables, timeline, total, tier table, and Pro Flipper Recommendations. Use the images and all data above for accuracy. Follow any user-provided context notes exactly.`,
+      text: `${userContextBlock ? `${userContextBlock}\n\n` : ""}Deal and property context: ${dealContext}\n\nProperty description: ${desc}\n\n${compsSummary ? `Comps (use for ARV and value-add ideas):\n${compsSummary}\n\n` : ""}Generate the full SOW including SOW Remarks, Scope of Work with tables, timeline, total, tier table, and Pro Flipper Recommendations. Use the images and all data above for accuracy.${userContextBlock ? " IMPORTANT: Re-read the USER-PROVIDED CONTEXT at the top of this message and ensure every note is applied in the SOW before finalizing." : ""}`,
     },
     ...imageBlocks,
   ];
@@ -261,7 +263,7 @@ Write 3–6 bullet or short paragraphs of pro flipper recommendations based on t
     },
     body: JSON.stringify({
       model: VISION_MODEL,
-      max_tokens: 2048,
+      max_tokens: 4096,
       system: systemPrompt,
       messages: [{ role: "user", content }],
     }),

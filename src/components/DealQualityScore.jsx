@@ -48,7 +48,7 @@ const DealQualityScore = ({ score, riskLevel }) => {
   }
 
   return (
-    <Card className="bg-card border-border h-full overflow-hidden relative shadow-sm">
+    <Card className="bg-card border-border w-full overflow-hidden relative shadow-sm">
       <div className={`absolute top-0 left-0 w-full h-1 ${bgClass} ${colorClass}`}></div>
       <CardContent className="p-6">
         <div className="flex items-center gap-2 mb-6">

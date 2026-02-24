@@ -10,6 +10,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 // Pages
 import LoginPage from '@/pages/LoginPage';
 import SignupPage from '@/pages/SignupPage';
+import HomeLanding from '@/pages/HomeLanding';
 import DealInputForm from '@/pages/DealInputForm';
 import DealAnalysisPage from '@/pages/DealAnalysisPage';
 import PDFReportPage from '@/pages/PDFReportPage';
@@ -19,6 +20,8 @@ import PortfolioDashboard from '@/pages/PortfolioDashboard';
 import LoanProposalGenerator from '@/pages/LoanProposalGenerator';
 import DealActionHub from '@/pages/DealActionHub';
 import SharedDealView from '@/pages/SharedDealView';
+import ProjectManagementList from '@/pages/ProjectManagementList';
+import ProjectManagementDealPage from '@/pages/ProjectManagementDealPage';
 
 function App() {
   return (
@@ -28,7 +31,7 @@ function App() {
           <Navbar />
           <main className="flex-1 pt-20">
             <Routes>
-              <Route path="/" element={<Navigate to="/portfolio-dashboard" replace />} />
+              <Route path="/" element={<ProtectedRoute><HomeLanding /></ProtectedRoute>} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
               <Route path="/deal/share/:token" element={<SharedDealView />} />
@@ -41,6 +44,8 @@ function App() {
               <Route path="/portfolio-dashboard" element={<ProtectedRoute><PortfolioDashboard /></ProtectedRoute>} />
               <Route path="/loan-proposal" element={<ProtectedRoute><LoanProposalGenerator /></ProtectedRoute>} />
               <Route path="/deal/action" element={<ProtectedRoute><DealActionHub /></ProtectedRoute>} />
+              <Route path="/project-management" element={<ProtectedRoute><ProjectManagementList /></ProtectedRoute>} />
+              <Route path="/project-management/deal" element={<ProtectedRoute><ProjectManagementDealPage /></ProtectedRoute>} />
             </Routes>
           </main>
           <Footer />

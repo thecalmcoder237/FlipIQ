@@ -3,17 +3,58 @@ import { motion } from 'framer-motion';
 import { calculate70RuleMAO } from '@/utils/advancedDealCalculations';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 
-const SeventyPercentRule = ({ deal, metrics }) => {
+const SeventyPercentRule = ({ deal, metrics, compact = false }) => {
   const [conservative, setConservative] = useState(false);
   
   const mao = calculate70RuleMAO(metrics.arv, metrics.rehabCosts, conservative);
   const difference = mao - deal.purchase_price;
   const isGoodDeal = difference >= 0;
 
+  if (compact) {
+    return (
+      <div className="bg-card rounded-2xl p-4 border border-border shadow-sm overflow-hidden">
+        {/* Title row */}
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="min-w-0">
+            <h3 className="text-base font-bold text-foreground leading-tight">MAO</h3>
+            <p className="text-xs text-muted-foreground truncate">Maximum Allowable Offer</p>
+          </div>
+          {/* Toggle: stacks cleanly on narrow columns */}
+          <div className="flex items-center bg-muted rounded-md p-0.5 shrink-0">
+            <button
+              onClick={() => setConservative(false)}
+              className={`px-2 py-0.5 rounded text-xs transition-all ${!conservative ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              70%
+            </button>
+            <button
+              onClick={() => setConservative(true)}
+              className={`px-2 py-0.5 rounded text-xs transition-all ${conservative ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              65%
+            </button>
+          </div>
+        </div>
+
+        {/* MAO value */}
+        <div className="flex justify-between items-baseline mb-3">
+          <span className="text-sm text-muted-foreground">Target MAO</span>
+          <span className="font-bold text-accentBrand text-xl">${mao.toLocaleString()}</span>
+        </div>
+
+        {/* Status badge */}
+        <div className={`flex items-center gap-2 p-2 rounded-lg text-xs font-semibold ${isGoodDeal ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+          {isGoodDeal ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+          <span className="truncate">{isGoodDeal ? 'Under MAO' : 'Over MAO'} by ${Math.abs(difference).toLocaleString()}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-card rounded-2xl p-6 border border-border shadow-sm">
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-bold text-foreground">The 70% Rule Analysis</h3>
+        <h3 className="text-xl font-bold text-foreground">MAO <span className="text-sm font-normal text-muted-foreground ml-1">(Maximum Allowable Offer)</span></h3>
         <div className="flex items-center bg-muted rounded-lg p-1">
           <button
             onClick={() => setConservative(false)}

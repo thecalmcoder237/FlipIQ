@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Hammer, CheckCircle2, Loader2, RefreshCw, AlertTriangle, Lock, Sparkles, Camera, Building2, MessageSquarePlus, Send, Pencil } from 'lucide-react';
+import { Hammer, CheckCircle2, Loader2, RefreshCw, AlertTriangle, Lock, Sparkles, Camera, Building2, MessageSquarePlus, Send, Pencil, ClipboardList } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -91,7 +91,13 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
     const requestPayload = {
         userAddress: userAddress,
         rehabBudget: Number(inputs?.rehabCosts) || 0,
-        propertyDescription: typeof propertyData === 'string' ? propertyData : JSON.stringify(propertyData || {}),
+        propertyDescription: (() => {
+          if (typeof propertyData === 'string') return propertyData;
+          if (!propertyData) return '{}';
+          // Strip nested comps arrays to keep propertyDescription concise — comps are passed separately via recentComps
+          const { recentComps: _rc, avmComps: _ac, comparables: _cb, ...coreData } = propertyData;
+          return JSON.stringify(coreData);
+        })(),
         images: imageUrls,
         options: {
           deal: {
@@ -208,14 +214,19 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
 
           {/* SOW Context Chat - guide Claude with property-specific notes */}
           {!readOnly && onSowContextUpdated && (
-            <Card className="bg-card border-border shadow-sm">
+            <Card className="bg-card border-l-4 border-primary shadow-md">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
-                  <MessageSquarePlus className="w-4 h-4 text-primary" />
-                  SOW Context
-                </CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Add property-specific notes to guide Claude. Examples: &quot;Basement is crawl space, not full basement&quot;, &quot;Roof needs repair, not full replacement&quot;.
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <CardTitle className="text-xl font-bold text-foreground flex items-center gap-2">
+                    <ClipboardList className="w-5 h-5 text-primary" />
+                    Rehab Analysis Notes
+                  </CardTitle>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/30 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                    Required for Best Results
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Note down your rehab analysis for this project. These notes guide the AI-generated scope of work.
                 </p>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -351,7 +362,7 @@ const RehabSOWSection = ({ inputs, deal, calculations, propertyData, savedSow, o
               <CardHeader className="bg-muted border-b border-border flex flex-row items-center justify-between">
                 <CardTitle className="text-2xl font-bold text-foreground flex items-center gap-2">
                   <Hammer className="text-primary" /> 
-                  AI-Generated Scope of Work
+                  SOW &amp; Estimates
                 </CardTitle>
                 {!readOnly && (
                 <div className="flex gap-2">

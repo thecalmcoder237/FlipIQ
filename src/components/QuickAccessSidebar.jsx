@@ -9,6 +9,7 @@ import {
   History, 
   Layers, 
   PieChart, 
+  Hammer,
   ChevronRight, 
   ChevronLeft 
 } from 'lucide-react';
@@ -21,6 +22,7 @@ const menuItems = [
   { path: '/deal-history', label: 'Deal History', icon: History },
   { path: '/deal-comparison', label: 'Comparison', icon: Layers },
   { path: '/portfolio-dashboard', label: 'Portfolio', icon: PieChart },
+  { path: '/project-management', label: 'Projects', icon: Hammer },
 ];
 
 const QuickAccessSidebar = ({ isOpen, toggle }) => {
