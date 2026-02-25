@@ -269,17 +269,16 @@ async function fetchRealieComparables(
   params.set("timeFrame", String(opts?.timeFrame ?? 12));
   params.set("maxResults", String(Math.min(opts?.maxResults ?? 50, 50)));
 
-  // Optional filters from subjectSpecs
-  if (opts?.subjectSpecs?.bedrooms != null) {
+  // Optional filters from subjectSpecs — use wide ranges to avoid over-filtering and zero results
+  if (opts?.subjectSpecs?.bedrooms != null && opts.subjectSpecs.bedrooms >= 1) {
     const beds = Math.floor(opts.subjectSpecs.bedrooms);
-    // Allow ±1 bed for broader matches
-    params.set("bedsMin", String(Math.max(1, beds - 1)));
-    params.set("bedsMax", String(beds + 1));
+    params.set("bedsMin", String(Math.max(0, beds - 2)));
+    params.set("bedsMax", String(Math.min(10, beds + 2)));
   }
-  if (opts?.subjectSpecs?.bathrooms != null) {
+  if (opts?.subjectSpecs?.bathrooms != null && opts.subjectSpecs.bathrooms >= 0.5) {
     const baths = opts.subjectSpecs.bathrooms;
-    params.set("bathsMin", String(Math.max(1, Math.floor(baths - 1))));
-    params.set("bathsMax", String(Math.ceil(baths + 1)));
+    params.set("bathsMin", String(Math.max(0, Math.floor(baths - 1.5))));
+    params.set("bathsMax", String(Math.min(10, Math.ceil(baths + 1.5))));
   }
 
   const url = `${REALIE_BASE}/public/premium/comparables/?${params.toString()}`;
@@ -355,11 +354,10 @@ function parsePropertiesList(data: unknown): Array<Record<string, unknown>> {
 /** Returns true if the RentCast item appears to be an active listing rather than a closed sale. */
 function isActiveListing(item: Record<string, unknown>): boolean {
   const status = String(item.status ?? item.listingStatus ?? item.mls_status ?? "").toLowerCase();
+  // Only filter when status explicitly indicates active. RentCast AVM comparables use listedDate (no soldDate);
+  // we must not filter those out based on "no sold date + has listed date" or all AVM comps would be removed.
   if (status && (status.includes("active") || status.includes("for sale") || status.includes("listed") || status.includes("new"))) return true;
-  // If it has no sold/close date and has a listed price but no sale price, it's likely still active
-  const hasSoldDate = !!(item.soldDate ?? item.saleDate ?? item.sale_date ?? item.lastSaleDate ?? item.closeDate);
-  const hasListedDate = !!item.listedDate;
-  if (!hasSoldDate && hasListedDate) return true;
+  if (status && (status.includes("sold") || status.includes("closed") || status.includes("pending"))) return false;
   return false;
 }
 
@@ -370,9 +368,11 @@ function mapRentCastToComp(item: Record<string, unknown>): Record<string, unknow
   const a = (address || String(item.address ?? item.formattedAddress ?? item.addressLine1 ?? "")).trim();
   if (!a) return null;
   const salePrice = Number(item.price ?? item.salePrice ?? item.sale_price ?? item.lastSalePrice ?? 0);
-  // Only use actual closed/sold dates — never fall back to listedDate (active listings have no sold date)
-  const saleDateRaw = item.soldDate ?? item.saleDate ?? item.sale_date ?? item.lastSaleDate ?? item.closeDate ?? "";
+  // Prefer actual closed/sold dates; include closedDate for APIs that use it
+  const saleDateRaw = item.soldDate ?? item.saleDate ?? item.sale_date ?? item.lastSaleDate ?? item.closeDate ?? item.closedDate ?? "";
   const saleDate = saleDateRaw ? String(saleDateRaw).trim().slice(0, 10) : "";
+  // RentCast AVM comparables have listedDate/price but no soldDate; allow listedDate only when we didn't filter as active
+  const dateForDisplay = saleDate || (item.listedDate ? String(item.listedDate).trim().slice(0, 10) : "");
   const basement = item.basement ?? item.basementType ?? item.basement_type;
   const basementType = item.basementType ?? item.basement_type;
   const basementCondition = item.basementCondition ?? item.basement_condition;
@@ -387,7 +387,7 @@ function mapRentCastToComp(item: Record<string, unknown>): Record<string, unknow
   return {
     address: a,
     salePrice: Number.isFinite(salePrice) ? salePrice : undefined,
-    saleDate: saleDate || undefined,
+    saleDate: (saleDate || dateForDisplay) || undefined,
     dom: domVal,
     sqft: item.squareFootage ?? item.sqft ?? item.square_footage,
     beds: item.bedrooms ?? item.beds,
@@ -552,7 +552,7 @@ async function fetchRentCastCompsFromAvmValue(address: string, zipCode: string):
 
 type CompsFetchResult = {
   comps: Array<Record<string, unknown>>;
-  source: "realie" | "avm" | "properties";
+  source: "realie" | "avm" | "listings" | "properties";
   avmValue?: number;
   avmSubject?: Record<string, unknown>;
   avmResponseKeys?: string[];
@@ -564,13 +564,15 @@ async function fetchRentCastComps(
   limit: number,
   opts?: { fullAddress?: string; city?: string; state?: string; subjectSpecs?: SubjectSpecs }
 ): Promise<CompsFetchResult> {
-  // Try AVM first — returns sold comparables used for RentCast's valuation model (1 API call)
+  // Try AVM first — RentCast valuation comparables (1 API call). isActiveListing only filters explicit status=Active.
   const avm = await fetchRentCastCompsFromAvmValue(address, zipCode);
   if (avm.comparables.length > 0) {
     return { comps: avm.comparables.slice(0, limit), source: "avm", avmValue: avm.avmValue, avmSubject: avm.avmSubject };
   }
-  // Skip /listings/sale — that endpoint returns active for-sale listings, not closed sales.
-  // Fall back directly to /properties with saleDateRange=365 which returns recently sold records.
+  // Listings/sale: include only records that have sold/close date (isActiveListing filters by status).
+  const listings = await fetchRentCastCompsFromListings(address, zipCode, limit, { fullAddress: opts?.fullAddress });
+  if (listings.length > 0) return { comps: listings, source: "listings", avmValue: avm.avmValue, avmSubject: avm.avmSubject, avmResponseKeys: avm.avmResponseKeys };
+  // Properties with saleDateRange=365 = recently sold records.
   const props = await fetchRentCastCompsFromProperties(zipCode, limit, opts);
   return { comps: props, source: "properties", avmValue: avm.avmValue, avmSubject: avm.avmSubject, avmResponseKeys: avm.avmResponseKeys };
 }
@@ -624,70 +626,11 @@ Deno.serve(async (req) => {
     let debugComps: { fetchSource?: string; compsRawCount: number; notSubjectCount: number; recentCompsCount: number; avmResponseKeys?: string[] } | null = null;
 
     const fullAddress = buildFullAddress({ address, zipCode, city, state });
+    const county = (body?.county != null && body?.county !== "") ? String(body.county).trim() : undefined;
+    const hasCountyAndCity = !!(county && city && county.trim() && city.trim());
 
-    // ── Realie Premium Comparables (primary source) ──────────────────────────
-    // Requires lat/lng. If not provided, skip to RentCast fallback.
-    if (getRealieKey() && realieAllowed && subjectLat != null && subjectLng != null) {
-      try {
-        const rawComps = await fetchRealieComparables(subjectLat, subjectLng, {
-          radius: 1,
-          timeFrame: 12,
-          maxResults: COMPS_RESPONSE_LIMIT,
-          subjectSpecs,
-        });
-
-        if (rawComps.length > 0) {
-          if (userId) await incrementUsage(supabase, userId, ym, "realie");
-
-          // Filter out subject property
-          const notSubject = rawComps.filter((c) => !isSubjectComp(c, subjectAddress, propertyId));
-
-          // Compute distances using subject lat/lng
-          for (const c of notSubject) {
-            if (c.distance != null && Number.isFinite(Number(c.distance))) continue;
-            const clat = c.latitude != null && Number.isFinite(Number(c.latitude)) ? Number(c.latitude) : undefined;
-            const clng = c.longitude != null && Number.isFinite(Number(c.longitude)) ? Number(c.longitude) : undefined;
-            if (clat != null && clng != null) {
-              const miles = computeDistanceFromCoords(subjectLat, subjectLng, clat, clng);
-              if (Number.isFinite(miles)) c.distance = Math.round(miles * 100) / 100;
-            }
-          }
-
-          // Filter to recent (within 12 months) and non-future
-          const oneYearAgoMs = Date.now() - 365 * 24 * 60 * 60 * 1000;
-          const nowMs = Date.now();
-          const recentOnly = notSubject.filter((c) => {
-            const saleMs = parseSaleDate(c.saleDate ?? c.soldDate);
-            if (saleMs === 0) return true;
-            if (saleMs > nowMs) return false;
-            return saleMs >= oneYearAgoMs;
-          });
-          recentComps = recentOnly.length > 0
-            ? recentOnly.slice(0, COMPS_RESPONSE_LIMIT)
-            : notSubject.filter((c) => !isSaleDateInFuture(c)).slice(0, COMPS_RESPONSE_LIMIT);
-          compsSource = "Realie";
-
-          if (debugRequested || recentComps.length === 0) {
-            debugComps = {
-              fetchSource: "realie",
-              compsRawCount: rawComps.length,
-              notSubjectCount: notSubject.length,
-              recentCompsCount: recentComps.length,
-            };
-          }
-        }
-      } catch (e) {
-        console.error("Realie comps fetch error:", e);
-        errors.push("Realie comps: " + (e as Error).message);
-      }
-    } else if (getRealieKey() && realieAllowed && (subjectLat == null || subjectLng == null)) {
-      errors.push("Realie comps require lat/lng coordinates (fetch property details first to obtain them).");
-    } else if (getRealieKey() && userId && !realieAllowed) {
-      errors.push(`Realie monthly limit (${REALIE_LIMIT}) reached.`);
-    }
-
-    // ── RentCast fallback ────────────────────────────────────────────────────
-    if (recentComps.length === 0 && getRentCastKey() && rentcastAllowed) {
+    // ── RentCast first (primary source) ──────────────────────────────────────
+    if (getRentCastKey() && rentcastAllowed) {
       try {
         const fetchResult = await fetchRentCastComps(address, zipCode, COMPS_RESPONSE_LIMIT, {
           fullAddress,
@@ -743,8 +686,62 @@ Deno.serve(async (req) => {
         console.error("RentCast comps fetch error:", e);
         errors.push("RentCast comps: " + (e as Error).message);
       }
-    } else if (recentComps.length === 0 && userId && !rentcastAllowed && !getRealieKey()) {
+    } else if (userId && !rentcastAllowed) {
       errors.push(`RentCast monthly limit (${RENTCAST_LIMIT}) reached.`);
+    }
+
+    // ── Realie fallback (only when county AND city are available, and lat/lng present) ─
+    if (recentComps.length === 0 && getRealieKey() && realieAllowed && hasCountyAndCity && subjectLat != null && subjectLng != null) {
+      try {
+        const rawComps = await fetchRealieComparables(subjectLat, subjectLng, {
+          radius: 1,
+          timeFrame: 12,
+          maxResults: COMPS_RESPONSE_LIMIT,
+          subjectSpecs,
+        });
+
+        if (rawComps.length > 0) {
+          if (userId) await incrementUsage(supabase, userId, ym, "realie");
+
+          const notSubject = rawComps.filter((c) => !isSubjectComp(c, subjectAddress, propertyId));
+
+          for (const c of notSubject) {
+            if (c.distance != null && Number.isFinite(Number(c.distance))) continue;
+            const clat = c.latitude != null && Number.isFinite(Number(c.latitude)) ? Number(c.latitude) : undefined;
+            const clng = c.longitude != null && Number.isFinite(Number(c.longitude)) ? Number(c.longitude) : undefined;
+            if (clat != null && clng != null) {
+              const miles = computeDistanceFromCoords(subjectLat, subjectLng, clat, clng);
+              if (Number.isFinite(miles)) c.distance = Math.round(miles * 100) / 100;
+            }
+          }
+
+          const oneYearAgoMs = Date.now() - 365 * 24 * 60 * 60 * 1000;
+          const nowMs = Date.now();
+          const recentOnly = notSubject.filter((c) => {
+            const saleMs = parseSaleDate(c.saleDate ?? c.soldDate);
+            if (saleMs === 0) return true;
+            if (saleMs > nowMs) return false;
+            return saleMs >= oneYearAgoMs;
+          });
+          recentComps = recentOnly.length > 0
+            ? recentOnly.slice(0, COMPS_RESPONSE_LIMIT)
+            : notSubject.filter((c) => !isSaleDateInFuture(c)).slice(0, COMPS_RESPONSE_LIMIT);
+          compsSource = "Realie";
+
+          if (debugRequested || recentComps.length === 0) {
+            debugComps = { fetchSource: "realie", compsRawCount: rawComps.length, notSubjectCount: notSubject.length, recentCompsCount: recentComps.length };
+          }
+        }
+      } catch (e) {
+        console.error("Realie comps fetch error:", e);
+        errors.push("Realie comps: " + (e as Error).message);
+      }
+    } else if (recentComps.length === 0 && getRealieKey() && hasCountyAndCity && (subjectLat == null || subjectLng == null)) {
+      errors.push("Realie comps fallback requires lat/lng (fetch property details first).");
+    } else if (recentComps.length === 0 && getRealieKey() && !hasCountyAndCity) {
+      errors.push("Realie comps fallback requires county and city.");
+    } else if (getRealieKey() && userId && !realieAllowed) {
+      errors.push(`Realie monthly limit (${REALIE_LIMIT}) reached.`);
     }
 
     if (recentComps.length === 0 && !errors.some((e) => e.includes("comps"))) {
@@ -763,7 +760,7 @@ Deno.serve(async (req) => {
     if (avmValue != null) result.avmValue = avmValue;
     if (avmSubject != null) result.avmSubject = avmSubject;
     if (debugRequested) {
-      result._debug = { address, zipCode, city: city ?? null, state: state ?? null, propertyId: propertyId ?? null, subjectAddress: subjectAddress ?? null, fullAddress, subjectLat: subjectLat ?? null, subjectLng: subjectLng ?? null, realieKeyPresent: !!getRealieKey(), rentcastKeyPresent: !!getRentCastKey() };
+      result._debug = { address, zipCode, city: city ?? null, county: county ?? null, state: state ?? null, propertyId: propertyId ?? null, subjectAddress: subjectAddress ?? null, fullAddress, subjectLat: subjectLat ?? null, subjectLng: subjectLng ?? null, hasCountyAndCity, realieKeyPresent: !!getRealieKey(), rentcastKeyPresent: !!getRentCastKey() };
     }
     if (debugComps) result._debugComps = debugComps;
     if (userId) {

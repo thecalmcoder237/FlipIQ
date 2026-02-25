@@ -22,6 +22,7 @@ import DealActionHub from '@/pages/DealActionHub';
 import SharedDealView from '@/pages/SharedDealView';
 import ProjectManagementList from '@/pages/ProjectManagementList';
 import ProjectManagementDealPage from '@/pages/ProjectManagementDealPage';
+import AdminDashboard from '@/pages/AdminDashboard';
 
 function App() {
   return (
@@ -46,6 +47,7 @@ function App() {
               <Route path="/deal/action" element={<ProtectedRoute><DealActionHub /></ProtectedRoute>} />
               <Route path="/project-management" element={<ProtectedRoute><ProjectManagementList /></ProtectedRoute>} />
               <Route path="/project-management/deal" element={<ProtectedRoute><ProjectManagementDealPage /></ProtectedRoute>} />
+              <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
             </Routes>
           </main>
           <Footer />

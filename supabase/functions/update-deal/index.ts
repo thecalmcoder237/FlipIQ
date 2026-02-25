@@ -53,21 +53,33 @@ Deno.serve(async (req) => {
 
     const existingOwnerId: string | null = existing.user_id;
 
-    // Determine if the caller is allowed to update:
-    //  1. They own the deal (user_id matches).
-    //  2. The deal is orphaned (user_id is null).
-    //  3. The deal's recorded owner no longer exists in auth.users
-    //     (e.g., the account was deleted or the user re-registered with a new UID).
-    let canUpdate = false;
+    // Check if caller is admin: profiles.role = 'admin' or app_metadata.role = 'admin'.
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+    const profileRole = profile?.role != null ? String(profile.role).toLowerCase() : "";
+    const metaRole = user.app_metadata?.role != null ? String(user.app_metadata.role).toLowerCase() : "";
+    const isAdmin = profileRole === "admin" || metaRole === "admin";
 
-    if (!existingOwnerId || existingOwnerId === user.id) {
+    // Determine if the caller is allowed to update:
+    //  1. They are an admin (can update any deal; do not change ownership).
+    //  2. They own the deal (user_id matches).
+    //  3. The deal is orphaned (user_id is null).
+    //  4. The deal's recorded owner no longer exists in auth.users (claim the deal).
+    let canUpdate = false;
+    let preserveOwnership = false; // true when admin editing another's deal
+
+    if (isAdmin) {
+      canUpdate = true;
+      preserveOwnership = !!existingOwnerId && existingOwnerId !== user.id;
+    } else if (!existingOwnerId || existingOwnerId === user.id) {
       canUpdate = true;
     } else {
-      // Check whether the existing owner's auth account still exists.
       const { data: ownerData, error: ownerErr } = await admin.auth.admin.getUserById(existingOwnerId);
       const ownerExists = !ownerErr && ownerData?.user?.id === existingOwnerId;
       if (!ownerExists) {
-        // The original owner's account is gone — allow the current user to claim the deal.
         canUpdate = true;
       }
     }
@@ -87,8 +99,8 @@ Deno.serve(async (req) => {
       updatePayload[key] = value;
     }
 
-    // Claim ownership when the deal was orphaned or the original owner is gone.
-    if (!existingOwnerId || existingOwnerId !== user.id) {
+    // Claim ownership only when not preserving (admin editing) and deal was orphaned or owner gone.
+    if (!preserveOwnership && (!existingOwnerId || existingOwnerId !== user.id)) {
       updatePayload.user_id = user.id;
     }
 

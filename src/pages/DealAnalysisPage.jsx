@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { calculateDealMetrics } from '@/utils/dealCalculations';
 import { applyScenarioAdjustments } from '@/utils/advancedDealCalculations';
 import { dealService } from '@/services/dealService';
-import { updateDealSowContext, updateDealRehabSow } from '@/services/edgeFunctionService';
+import { updateDealSowContext, updateDealRehabSow, fetchCompsWebSearch } from '@/services/edgeFunctionService';
 import { logDataFlow, validateCalculations } from '@/utils/dataFlowDebug';
 
 // Components
@@ -31,6 +31,7 @@ import ExportAnalysisButton from '@/components/ExportAnalysisButton';
 import RehabInsightsExportButton from '@/components/RehabInsightsExportButton';
 import PrintTabButton from '@/components/PrintTabButton';
 import { printIntelligenceReport, printRehabInsightsReport, printCompsReport } from '@/utils/printReportUtils';
+import { normalizePropertyIntelligenceResponse, normalizeComp, isCompWithinLast6Months } from '@/utils/propertyIntelligenceSchema';
 import SOWBudgetComparison from '@/components/SOWBudgetComparison';
 import PhotoUploadSection from '@/components/PhotoUploadSection';
 import ScenarioRiskModel from '@/components/ScenarioRiskModel';
@@ -47,7 +48,7 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
   const dealId = searchParams.get('id');
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { currentUser } = useAuth();
+  const { currentUser, isAdmin } = useAuth();
 
   // State
   const [deal, setDeal] = useState(readOnly ? initialDeal : null);
@@ -68,6 +69,7 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
   // Loading States
   const [loading, setLoading] = useState(!readOnly);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [compsSearching, setCompsSearching] = useState(false);
   const pageContainerRef = useRef(null);
   // Track the user id that last triggered a fetch so re-rendering with
   // the same logged-in user (e.g. after a background token refresh) does
@@ -167,11 +169,14 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deal, metrics, scenarioMode, inputs]);
 
+  const isOwner = (deal?.userId ?? deal?.user_id) === currentUser?.id;
+  const canEdit = isOwner || isAdmin;
+
   const handlePropertyDataFetch = async (data) => {
       const updatedInputs = { ...inputs, propertyIntelligence: data };
       setInputs(updatedInputs);
       setDeal(updatedInputs);
-      
+      if (!canEdit) return;
       try {
          await dealService.saveDeal(updatedInputs, currentUser.id);
       } catch (error) {
@@ -179,11 +184,57 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
       }
   };
 
+  const handleAddComp = (newComp) => {
+    const existing = inputs?.propertyIntelligence ?? {};
+    const merged = {
+      ...existing,
+      recentComps: [...(Array.isArray(existing.recentComps) ? existing.recentComps : []), newComp],
+    };
+    const normalized = normalizePropertyIntelligenceResponse(merged);
+    handlePropertyDataFetch(normalized);
+  };
+
+  const handleSearchCompsWithAI = async () => {
+    const address = (inputs?.address ?? deal?.address ?? '').trim();
+    if (!address || address.length < 5) {
+      toast({ variant: 'destructive', title: 'Address required', description: 'Enter a property address to search for comps with AI.' });
+      return;
+    }
+    const zipToSend = (inputs?.zipCode ?? deal?.zipCode ?? '').trim().replace(/\D/g, '').slice(0, 5);
+    const pi = inputs?.propertyIntelligence;
+    const subjectLat = pi?.latitude != null && Number.isFinite(Number(pi.latitude)) ? Number(pi.latitude) : (pi?.avmSubject?.latitude != null && Number.isFinite(Number(pi.avmSubject.latitude)) ? Number(pi.avmSubject.latitude) : undefined);
+    const subjectLng = pi?.longitude != null && Number.isFinite(Number(pi.longitude)) ? Number(pi.longitude) : (pi?.avmSubject?.longitude != null && Number.isFinite(Number(pi.avmSubject.longitude)) ? Number(pi.avmSubject.longitude) : undefined);
+    setCompsSearching(true);
+    try {
+      const result = await fetchCompsWebSearch(address, zipToSend, { lat: subjectLat, lng: subjectLng });
+      const rawComps = Array.isArray(result?.recentComps) ? result.recentComps : (Array.isArray(result?.comps) ? result.comps : []);
+      const normalizedComps = rawComps
+        .map((c) => normalizeComp(c))
+        .filter(Boolean)
+        .filter(isCompWithinLast6Months);
+      const existing = inputs?.propertyIntelligence ?? {};
+      const merged = {
+        ...existing,
+        recentComps: [...(Array.isArray(existing.recentComps) ? existing.recentComps : []), ...normalizedComps],
+        source: result?.source ?? existing?.source,
+      };
+      const normalized = normalizePropertyIntelligenceResponse(merged);
+      handlePropertyDataFetch(normalized);
+      const count = normalizedComps.length;
+      toast({ title: 'AI comps added', description: count ? `${count} comparable(s) from ChatGPT added.` : 'No comps extracted. Try refining the address.' });
+    } catch (err) {
+      console.error('Search comps with AI failed:', err);
+      toast({ variant: 'destructive', title: 'AI comps failed', description: err?.message || 'Could not fetch comps with AI. Try again.' });
+    } finally {
+      setCompsSearching(false);
+    }
+  };
+
   const handleNeighborhoodDataFetch = async (data) => {
       const updatedInputs = { ...inputs, neighborhoodIntelligence: data };
       setInputs(updatedInputs);
       setDeal(updatedInputs);
-
+      if (!canEdit) return;
       try {
          await dealService.saveDeal(updatedInputs, currentUser.id);
       } catch (error) {
@@ -220,10 +271,9 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
     const next = typeof updater === 'function' ? updater(deal) : updater;
     setDeal(next);
     setInputs(next);
+    if (!canEdit) return;
     dealService.saveDeal(next, currentUser.id).catch((err) => console.error('Failed to save rehab updates', err));
   };
-
-  const isOwner = (deal?.userId ?? deal?.user_id) === currentUser?.id;
 
   const handleSowContextUpdated = async (sowContextMessages) => {
     const updated = { ...deal, sowContextMessages };
@@ -231,7 +281,7 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
     setInputs(updated);
 
     try {
-      if (isOwner) {
+      if (canEdit) {
         await dealService.saveDeal(updated, currentUser.id);
       } else {
         await updateDealSowContext(deal.id, sowContextMessages);
@@ -248,6 +298,7 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
     setDeal(updated);
     setInputs(updated);
     setMetrics(calculateDealMetrics(updated));
+    if (!canEdit) return;
     dealService.saveDeal(updated, currentUser.id).catch((err) => {
       console.error('Failed to save rehab cost', err);
       toast({ variant: "destructive", title: "Save failed", description: err.message });
@@ -293,7 +344,7 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 md:mb-6 gap-3">
         <h1 className="text-2xl md:text-3xl font-bold text-foreground">Deal Analysis</h1>
         <div className="flex flex-wrap gap-2">
-            {!readOnly && (
+            {!readOnly && canEdit && (
               <Button 
                 variant="outline" 
                 className="text-foreground border-primary hover:bg-primary/10"
@@ -303,7 +354,7 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
                 Action Hub
               </Button>
             )}
-            {!readOnly && (
+            {!readOnly && canEdit && (
               <Button variant="ghost" size="icon" className="text-foreground hover:bg-accent" onClick={handleShare} title="Copy share link">
                 <Share2/>
               </Button>
@@ -318,11 +369,17 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
         </div>
       </div>
 
+      {isAdmin && !isOwner && (
+        <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
+          <Shield className="w-4 h-4 shrink-0" />
+          You are editing this deal as an administrator. Changes will be saved to the owner&apos;s deal.
+        </div>
+      )}
       <DealSummaryCard
         deal={deal}
         metrics={displayMetrics}
-        onEdit={readOnly ? undefined : () => setIsEditModalOpen(true)}
-        onDealUpdate={readOnly ? undefined : (updated) => { setDeal(updated); setInputs(updated); }}
+        onEdit={readOnly || !canEdit ? undefined : () => setIsEditModalOpen(true)}
+        onDealUpdate={readOnly || !canEdit ? undefined : (updated) => { setDeal(updated); setInputs(updated); setMetrics(calculateDealMetrics(updated)); }}
         readOnly={readOnly}
       />
 
@@ -364,7 +421,7 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
                     <PropertyIntelligenceSection 
                         inputs={inputs}
                         calculations={metrics}
-                        onPropertyDataFetch={readOnly ? undefined : handlePropertyDataFetch}
+                        onPropertyDataFetch={readOnly || !canEdit ? undefined : handlePropertyDataFetch}
                         propertyData={inputs.propertyIntelligence}
                         readOnly={readOnly}
                     />
@@ -393,7 +450,7 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
                inputs={inputs}
                propertyData={inputs.propertyIntelligence}
                initialData={inputs.neighborhoodIntelligence}
-               onDataFetch={readOnly ? undefined : handleNeighborhoodDataFetch}
+               onDataFetch={readOnly || !canEdit ? undefined : handleNeighborhoodDataFetch}
                readOnly={readOnly}
              />
 
@@ -467,14 +524,14 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
              </div>
              <RehabPlanTab 
                 deal={deal} 
-                setDeal={readOnly ? () => {} : handleRehabDealUpdate} 
+                setDeal={readOnly || !canEdit ? () => {} : handleRehabDealUpdate} 
                 isHighPotential={(metrics?.score ?? 0) >= 60}
                 inputs={inputs}
                 calculations={metrics}
                 propertyData={inputs?.propertyIntelligence}
-                onSowGenerated={readOnly ? undefined : handleSowGenerated}
-                onApplyRehabCost={readOnly ? undefined : handleApplyRehabCost}
-                onSowContextUpdated={readOnly ? undefined : handleSowContextUpdated}
+                onSowGenerated={readOnly || !canEdit ? undefined : handleSowGenerated}
+                onApplyRehabCost={readOnly || !canEdit ? undefined : handleApplyRehabCost}
+                onSowContextUpdated={readOnly || !canEdit ? undefined : handleSowContextUpdated}
                 readOnly={readOnly}
              />
          </TabsContent>
@@ -506,10 +563,14 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
                comps={inputs.propertyIntelligence?.recentComps || deal.comps} 
                loading={false}
                onRefresh={() => { /* Trigger refresh in child */ }}
+               onAddComp={canEdit ? handleAddComp : undefined}
+               onSearchCompsWithAI={canEdit ? handleSearchCompsWithAI : undefined}
+               compsSearching={compsSearching}
                source={inputs.propertyIntelligence?.recentComps?.length ? (inputs.propertyIntelligence?.source ?? "Realie/RentCast") : "Manual/Legacy"}
                subjectAddress={deal?.address ?? inputs?.address ?? ''}
                subjectLat={inputs.propertyIntelligence?.latitude ?? inputs.propertyIntelligence?.avmSubject?.latitude}
                subjectLng={inputs.propertyIntelligence?.longitude ?? inputs.propertyIntelligence?.avmSubject?.longitude}
+               isMapVisible={activeTab === 'comps'}
                subjectSpecs={(() => {
                  const pi = inputs?.propertyIntelligence;
                  const avm = pi?.avmSubject;
@@ -569,7 +630,6 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
       {!readOnly && (
         <EditDealModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} deal={deal} onSave={handleDealUpdate} />
       )}
-      
       {!readOnly && (
         <DebugDashboard 
             formInputs={inputs}

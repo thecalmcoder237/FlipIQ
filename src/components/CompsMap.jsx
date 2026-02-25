@@ -99,7 +99,24 @@ const CompsMap = ({ subjectLat, subjectLng, subjectAddress, comps }) => {
     );
   }
 
-  if (!subjectPos || mappableComps.length === 0) return null;
+  if (!subjectPos) return null;
+
+  if (mappableComps.length === 0) {
+    return (
+      <Card className="bg-card border-border shadow-sm mb-4">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-primary" /> Comps Map
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-xl border border-border bg-muted/50 p-6 text-center text-sm text-muted-foreground">
+            No comp locations available for mapping. Comparable sales in the table above do not include coordinates.
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="bg-card border-border shadow-sm mb-4">

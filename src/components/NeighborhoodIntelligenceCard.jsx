@@ -4,20 +4,13 @@ import {
   MapPin, Users, DollarSign, School, ShoppingBag,
   TreePine, Navigation, RefreshCw, Sparkles, AlertTriangle,
   TrendingUp, ChevronDown, ChevronUp, Car,
-  XCircle, Info, Map, Globe, Maximize2, X
+  XCircle, Info, Globe
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { fetchNeighborhoodIntelligence } from "@/services/edgeFunctionService";
 import PropertyLocationMap from "./PropertyLocationMap";
-
-/** Swap the static image size to a larger resolution for the lightbox. */
-function toLargeUrl(url) {
-  if (!url) return url;
-  return url.replace(/size=\d+x\d+/, "size=1280x720");
-}
 
 const TrafficBadge = ({ risk, color }) => {
   const cls = {
@@ -104,18 +97,8 @@ const NeighborhoodIntelligenceCard = ({ inputs, propertyData, initialData, onDat
   const [data, setData] = useState(initialData ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [showStreetView, setShowStreetView] = useState(true);
   const [schoolsExpanded, setSchoolsExpanded] = useState(false);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxSrc, setLightboxSrc] = useState(null);
-  const [lightboxLabel, setLightboxLabel] = useState("");
   const { toast } = useToast();
-
-  const openLightbox = useCallback((src, label) => {
-    setLightboxSrc(toLargeUrl(src));
-    setLightboxLabel(label);
-    setLightboxOpen(true);
-  }, []);
 
   // Sync if parent loads saved data after initial render (e.g. deal loaded async)
   React.useEffect(() => {
@@ -243,52 +226,6 @@ const NeighborhoodIntelligenceCard = ({ inputs, propertyData, initialData, onDat
 
           {!loading && data && (
             <motion.div key="data" initial={{ opacity:0, y:6 }} animate={{ opacity:1, y:0 }} className="space-y-5">
-
-              {/* Street View */}
-              {(loc.streetViewUrl || loc.staticMapUrl) && (
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <SectionHeader icon={Map} title="Street View" />
-                    <div className="flex gap-1 mb-3">
-                      <button onClick={() => setShowStreetView(true)}
-                        className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${showStreetView ? "bg-primary/10 border-primary/30 text-primary" : "border-border text-muted-foreground hover:bg-muted/60"}`}>
-                        Street
-                      </button>
-                      {loc.staticMapUrl && (
-                        <button onClick={() => setShowStreetView(false)}
-                          className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${!showStreetView ? "bg-primary/10 border-primary/30 text-primary" : "border-border text-muted-foreground hover:bg-muted/60"}`}>
-                          Map
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div
-                    className="relative rounded-xl overflow-hidden border border-border bg-muted h-48 cursor-pointer group"
-                    onClick={() => {
-                      const src = showStreetView ? loc.streetViewUrl : loc.staticMapUrl;
-                      const label = showStreetView ? "Street View" : "Map View";
-                      openLightbox(src, label);
-                    }}
-                  >
-                    <img
-                      src={showStreetView ? loc.streetViewUrl : loc.staticMapUrl}
-                      alt={showStreetView ? "Street View" : "Map View"}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                      onError={(e) => { e.currentTarget.parentElement.style.display = "none"; }}
-                    />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200" />
-                    <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-md backdrop-blur-sm">
-                      {inputs?.address}
-                    </div>
-                    <div className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-md backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <Maximize2 className="w-4 h-4" />
-                    </div>
-                    <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-md backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      Click to enlarge
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Road & Location */}
               <div className="rounded-xl border border-border bg-muted/30 p-4">
@@ -477,37 +414,6 @@ const NeighborhoodIntelligenceCard = ({ inputs, propertyData, initialData, onDat
       </CardContent>
 
       {/* Lightbox */}
-      <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
-        <DialogContent className="max-w-4xl w-full p-0 overflow-hidden bg-black border-border">
-          <div className="relative">
-            <button
-              onClick={() => setLightboxOpen(false)}
-              className="absolute top-3 right-3 z-10 bg-black/70 hover:bg-black/90 text-white rounded-full p-1.5 transition-colors backdrop-blur-sm"
-              aria-label="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            {lightboxLabel && (
-              <div className="absolute top-3 left-3 z-10 bg-black/70 text-white text-xs px-2.5 py-1 rounded-md backdrop-blur-sm font-medium">
-                {lightboxLabel}
-              </div>
-            )}
-            {lightboxSrc && (
-              <img
-                src={lightboxSrc}
-                alt={lightboxLabel}
-                className="w-full h-auto max-h-[80vh] object-contain"
-                onError={(e) => { e.currentTarget.style.display = "none"; }}
-              />
-            )}
-            {inputs?.address && (
-              <div className="absolute bottom-3 left-3 bg-black/70 text-white text-xs px-2.5 py-1 rounded-md backdrop-blur-sm">
-                {inputs.address}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 };

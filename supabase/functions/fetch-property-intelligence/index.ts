@@ -411,6 +411,7 @@ Deno.serve(async (req) => {
     const county = (body?.county != null && body?.county !== "") ? String(body.county).trim() : undefined;
     const propertyId = String(body?.propertyId ?? body?.property_id ?? "").trim() || undefined;
     const debugRequested = body?.debug === true;
+    const streetOnly = extractStreetAddress(address);
 
     const ym = yearMonth();
     const supabase = createSupabaseAdminClient();
@@ -425,36 +426,8 @@ Deno.serve(async (req) => {
     let dataSource = "unknown";
     let rawRentCastRecord: Record<string, unknown> | null = null;
 
-    // ── Realie first (primary source) ────────────────────────────────────────
-    // Realie address lookup requires state (2-letter) + street-only address.
-    const streetOnly = extractStreetAddress(address);
-    if (getRealieKey() && stateFromBody && realieAllowed) {
-      try {
-        const { property: prop, callsUsed } = await fetchRealieProperty(streetOnly, stateFromBody, {
-          county,
-          city,
-        });
-        if (prop && Object.keys(prop).length > 0) {
-          property = prop;
-          dataSource = "Realie";
-          if (userId && callsUsed > 0) {
-            for (let i = 0; i < callsUsed; i++) {
-              await incrementUsage(supabase, userId, ym, "realie");
-            }
-          }
-        }
-      } catch (e) {
-        console.error("Realie property fetch error:", e);
-        errors.push("Realie property: " + (e as Error).message);
-      }
-    } else if (getRealieKey() && !stateFromBody) {
-      errors.push("Realie: state is required for property lookup (not provided).");
-    } else if (getRealieKey() && userId && !realieAllowed) {
-      errors.push(`Realie monthly limit (${REALIE_LIMIT}) reached.`);
-    }
-
-    // ── RentCast fallback ────────────────────────────────────────────────────
-    if (Object.keys(property).length === 0 && getRentCastKey() && rentcastAllowed) {
+    // ── RentCast first (primary source) ──────────────────────────────────────
+    if (getRentCastKey() && rentcastAllowed) {
       try {
         const rentCastOpts = {
           fullAddress: buildRentCastAddress({
@@ -481,8 +454,32 @@ Deno.serve(async (req) => {
         console.error("RentCast property fetch error:", e);
         errors.push("RentCast property: " + (e as Error).message);
       }
-    } else if (Object.keys(property).length === 0 && userId && !rentcastAllowed && !getRealieKey()) {
+    } else if (userId && !rentcastAllowed) {
       errors.push(`RentCast monthly limit (${RENTCAST_LIMIT}) reached.`);
+    }
+
+    // ── Realie fallback (only when county AND city are available) ────────────
+    const hasCountyAndCity = !!(county && city && county.trim() && city.trim());
+    if (Object.keys(property).length === 0 && getRealieKey() && stateFromBody && realieAllowed && hasCountyAndCity) {
+      try {
+        const { property: prop, callsUsed } = await fetchRealieProperty(streetOnly, stateFromBody, { county, city });
+        if (prop && Object.keys(prop).length > 0) {
+          property = prop;
+          dataSource = "Realie";
+          if (userId && callsUsed > 0) {
+            for (let i = 0; i < callsUsed; i++) {
+              await incrementUsage(supabase, userId, ym, "realie");
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Realie property fetch error:", e);
+        errors.push("Realie property: " + (e as Error).message);
+      }
+    } else if (Object.keys(property).length === 0 && getRealieKey() && !hasCountyAndCity) {
+      errors.push("Realie fallback requires county and city (add them for broader property search).");
+    } else if (getRealieKey() && userId && !realieAllowed) {
+      errors.push(`Realie monthly limit (${REALIE_LIMIT}) reached.`);
     }
 
     if (Object.keys(property).length === 0 && !errors.some((e) => e.includes("property fetch"))) {

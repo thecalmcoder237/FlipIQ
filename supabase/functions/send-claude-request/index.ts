@@ -133,6 +133,163 @@ function mapRentCastToComp(item: Record<string, unknown>): Record<string, unknow
   };
 }
 
+// ── Comps web search (OpenAI GPT) ───────────────────────────────────────────
+
+const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+const GPT_MODEL = "gpt-4o-mini";
+const SERPER_BASE = "https://google.serper.dev/search";
+
+function getOpenAIKey(): string | null {
+  return Deno.env.get("OPENAI_API_KEY")?.trim() || null;
+}
+
+function getSerperKey(): string | null {
+  return Deno.env.get("SERPER_API_KEY")?.trim() || null;
+}
+
+/** Call Serper for web search; returns combined snippet text or empty string. */
+async function runSerperSearch(query: string): Promise<string> {
+  const apiKey = getSerperKey();
+  if (!apiKey) return "";
+  try {
+    const res = await fetch(SERPER_BASE, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
+      body: JSON.stringify({ q: query }),
+    });
+    if (!res.ok) return "";
+    const data = (await res.json()) as { organic?: Array<{ title?: string; snippet?: string; link?: string }> };
+    const organic = Array.isArray(data?.organic) ? data.organic : [];
+    return organic
+      .slice(0, 15)
+      .map((o) => [o.title, o.snippet].filter(Boolean).join(": "))
+      .join("\n\n");
+  } catch {
+    return "";
+  }
+}
+
+/** Normalize AI-returned comp to our schema (address required). */
+function normalizeAiComp(raw: Record<string, unknown>): Record<string, unknown> | null {
+  if (!raw || typeof raw !== "object") return null;
+  const address = String(raw.address ?? raw.formattedAddress ?? raw.streetAddress ?? "").trim()
+    || [raw.city, raw.state, raw.zipCode ?? raw.zip].filter(Boolean).join(", ").trim();
+  if (!address) return null;
+  const salePrice = raw.salePrice ?? raw.sale_price ?? raw.price ?? raw.lastSalePrice;
+  const numPrice = salePrice != null && salePrice !== "" ? Number(salePrice) : undefined;
+  const saleDate = raw.saleDate ?? raw.sale_date ?? raw.soldDate ?? raw.sold_date ?? raw.closeDate;
+  const dateStr = saleDate != null ? String(saleDate).trim().slice(0, 10) : undefined;
+  return {
+    address,
+    salePrice: Number.isFinite(numPrice) ? numPrice : undefined,
+    saleDate: dateStr,
+    sqft: raw.sqft ?? raw.squareFootage ?? raw.square_footage,
+    beds: raw.beds ?? raw.bedrooms,
+    baths: raw.baths ?? raw.bathrooms,
+    dom: raw.dom ?? raw.daysOnMarket ?? raw.days_on_market,
+  };
+}
+
+/** True if date string (YYYY-MM-DD or partial) is within the last 6 months. */
+function isWithinLast6Months(dateStr: string | undefined): boolean {
+  if (!dateStr || dateStr.length < 4) return false;
+  const d = new Date(dateStr.slice(0, 10));
+  if (!Number.isFinite(d.getTime())) return false;
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - 6);
+  return d >= cutoff;
+}
+
+/** Request comps via OpenAI (GPT); optionally use Serper web search for context. Only comps within 1 mile of subject. */
+async function runCompsWebSearch(
+  address: string,
+  zipCode: string,
+  subjectLat?: number,
+  subjectLng?: number
+): Promise<{ comps: Array<Record<string, unknown>>; source: string }> {
+  const apiKey = getOpenAIKey();
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not set for the send-claude-request function. Add it in Supabase Dashboard → Edge Functions → send-claude-request → Secrets.");
+  }
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const sixMonthsAgo = new Date(now);
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const cutoffDateStr = sixMonthsAgo.toISOString().slice(0, 10);
+
+  const oneMilePhrase = "within 1 mile radius";
+  const searchQuery = zipCode
+    ? `homes sold last 6 months ${currentYear} within 1 mile ${address} ${zipCode} recent sales`
+    : `homes sold last 6 months ${currentYear} within 1 mile ${address} recent sales`;
+  const searchContext = await runSerperSearch(searchQuery);
+  const hasSearch = searchContext.length > 0;
+
+  const locationHint =
+    subjectLat != null && subjectLng != null && Number.isFinite(subjectLat) && Number.isFinite(subjectLng)
+      ? ` Subject property coordinates: ${subjectLat}, ${subjectLng}. Only include comps within 1 mile of this location.`
+      : ` Only include comparable sales within a 1 mile radius of the subject property.`;
+
+  const systemPrompt = `You are a real estate analyst. Return a JSON array of comparable home sales (comps) for the given property. CRITICAL RULES: (1) Only include sales that closed in the LAST 6 MONTHS (saleDate must be ${cutoffDateStr} or later). (2) Only include sales ${oneMilePhrase} of the subject property—exclude anything farther. Do not include any sale from 2023 or earlier. Each comp must be an object with these keys (use null or omit if unknown): address (string), salePrice (number), saleDate (string, YYYY-MM-DD), sqft (number or string), beds (number or string), baths (number or string), dom (number or string). Return only the JSON array, no markdown. Include 3 to 8 comps. Only real sales with sale price and address.`;
+
+  const userContent = hasSearch
+    ? `Subject property: ${address}${zipCode ? `, ZIP ${zipCode}` : ""}.${locationHint}\n\nWeb search results (use only sales from within 1 mile of the subject; prioritize most recent):\n${searchContext}\n\nExtract ONLY comparable sales that (1) closed in the last 6 months (saleDate ${cutoffDateStr} or later) and (2) are within 1 mile of the subject. Return a JSON array of comp objects (address, salePrice, saleDate, sqft, beds, baths, dom). Exclude any sale from 2023 or before or outside 1 mile. Return only the array.`
+    : `Subject property: ${address}${zipCode ? `, ZIP ${zipCode}` : ""}.${locationHint}\n\nYou do not have live data. Return a JSON array of comp objects with keys: address, salePrice, saleDate (last 6 months only, e.g. ${currentYear}), sqft, beds, baths, dom. Use plausible addresses and prices for properties within 1 mile. saleDate MUST be within the last 6 months. Return only the JSON array.`;
+
+  const response = await fetch(OPENAI_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: GPT_MODEL,
+      max_tokens: 2048,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`OpenAI API error: ${response.status} ${errText}`);
+  }
+
+  const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  const text = (data.choices?.[0]?.message?.content ?? "").trim();
+  let arr: unknown[] = [];
+  try {
+    const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
+    const parsed = JSON.parse(cleaned);
+    arr = Array.isArray(parsed) ? parsed : (parsed?.comps && Array.isArray(parsed.comps) ? parsed.comps : []);
+  } catch {
+    // try to extract array from text
+    const match = text.match(/\[[\s\S]*\]/);
+    if (match) {
+      try {
+        arr = JSON.parse(match[0]);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  const normalized = (arr as Record<string, unknown>[])
+    .map((c) => normalizeAiComp(c))
+    .filter((c): c is Record<string, unknown> => c != null && (c.address as string)?.trim().length > 0);
+
+  // Only allow comps with saleDate within last 6 months; do not return or display anything older
+  const comps = normalized.filter((c) => {
+    const dateStr = (c.saleDate as string) ?? (c.sale_date as string);
+    if (!dateStr || dateStr.length < 4) return false; // no date = exclude (cannot verify recency)
+    return isWithinLast6Months(dateStr);
+  });
+
+  return { comps, source: hasSearch ? "ChatGPT (Web Search)" : "ChatGPT" };
+}
+
 Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
@@ -174,6 +331,33 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (requestType === "compsWebSearch") {
+      // Return 200 with error in body so the client can always read the message (Supabase invoke hides body on 4xx/5xx).
+      if (!address || address.length < 5) {
+        return json({
+          comps: [],
+          recentComps: [],
+          source: "ChatGPT",
+          error: "Address is required (at least 5 characters) for comps web search.",
+        });
+      }
+      const subjectLat = additionalParams.lat != null && Number.isFinite(Number(additionalParams.lat)) ? Number(additionalParams.lat) : undefined;
+      const subjectLng = additionalParams.lng != null && Number.isFinite(Number(additionalParams.lng)) ? Number(additionalParams.lng) : undefined;
+      try {
+        const { comps, source } = await runCompsWebSearch(address, zipCode, subjectLat, subjectLng);
+        return json({ comps, source, recentComps: comps });
+      } catch (e) {
+        console.error("compsWebSearch error:", e);
+        const message = (e as Error).message || "Comps web search failed.";
+        return json({
+          comps: [],
+          recentComps: [],
+          source: "ChatGPT",
+          error: message,
+        });
+      }
+    }
+
     if (requestType === "market_shock_analysis") {
       // Default market shock scenarios (no Claude call yet). Client expects this shape.
       return json({
@@ -210,7 +394,7 @@ Deno.serve(async (req) => {
     }
 
     return json(
-      { error: `Invalid or unsupported requestType. Use analyzePropertyComps or market_shock_analysis.` },
+      { error: `Invalid or unsupported requestType. Use analyzePropertyComps, compsWebSearch, or market_shock_analysis.` },
       { status: 400 }
     );
   } catch (e) {

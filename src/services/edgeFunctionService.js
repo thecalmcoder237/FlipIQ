@@ -95,7 +95,7 @@ export const fetchPropertyIntelligence = async (address, zipCode, propertyType, 
  * Fetch comps only (Realie Premium Comparables with RentCast fallback). Use with fetch-property-intelligence; UI merges property + comps.
  * @param {string} address - Property address
  * @param {string} zipCode - 5-digit ZIP
- * @param {{ city?: string, state?: string, propertyId?: string, subjectAddress?: string, subjectSpecs?: { bedrooms?: number, bathrooms?: number }, lat?: number, lng?: number, userId?: string, debug?: boolean }} [options] - Optional: city, state, propertyId, subjectAddress (for excluding subject from comps), subjectSpecs (for bed/bath filtering), lat/lng (required for Realie comps - pass from property response), userId, debug
+ * @param {{ city?: string, county?: string, state?: string, propertyId?: string, subjectAddress?: string, subjectSpecs?: { bedrooms?: number, bathrooms?: number }, lat?: number, lng?: number, userId?: string, debug?: boolean }} [options] - Optional: city, county (required for Realie fallback), state, propertyId, subjectAddress, subjectSpecs, lat/lng (required for Realie comps), userId, debug
  */
 export const fetchComps = async (address, zipCode, options = {}) => {
     const body = {
@@ -103,6 +103,7 @@ export const fetchComps = async (address, zipCode, options = {}) => {
         zipCode: String(zipCode ?? '').trim().replace(/\D/g, '').slice(0, 5) || '',
     };
     if (options.city) body.city = options.city;
+    if (options.county) body.county = options.county;
     if (options.state && String(options.state).trim().length >= 2) body.state = String(options.state).trim().slice(0, 2).toUpperCase();
     if (options.propertyId) body.propertyId = options.propertyId;
     if (options.subjectAddress) body.subjectAddress = options.subjectAddress;
@@ -117,6 +118,25 @@ export const fetchComps = async (address, zipCode, options = {}) => {
     if (options.userId) body.userId = options.userId;
     if (options.debug === true || (typeof localStorage !== 'undefined' && localStorage.getItem('propertyIntelDebug') === '1')) body.debug = true;
     return invokeEdgeFunction('fetch-comps', body);
+};
+
+/**
+ * Fetch comps using OpenAI ChatGPT (optional web search via Serper). Comps are limited to within 1 mile of subject.
+ * @param {string} address - Property address
+ * @param {string} [zipCode] - 5-digit ZIP (optional but recommended)
+ * @param {{ lat?: number, lng?: number }} [options] - Subject property lat/lng (optional; improves 1-mile radius targeting)
+ * @returns {{ comps: Array, recentComps: Array, source: string, error?: string }}
+ */
+export const fetchCompsWebSearch = async (address, zipCode = '', options = {}) => {
+    const additionalParams = { zipCode: String(zipCode ?? '').trim().replace(/\D/g, '').slice(0, 5) };
+    if (options.lat != null && Number.isFinite(Number(options.lat))) additionalParams.lat = Number(options.lat);
+    if (options.lng != null && Number.isFinite(Number(options.lng))) additionalParams.lng = Number(options.lng);
+    const body = {
+        requestType: 'compsWebSearch',
+        address: (address || '').trim(),
+        additionalParams,
+    };
+    return invokeEdgeFunction('send-claude-request', body);
 };
 
 /**

@@ -31,7 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/use-toast';
 
-const STATUS_OPTIONS = ['All', 'Analyzing', 'Under Contract', 'In Progress', 'Funded', 'Closed', 'Completed', 'Abandoned'];
+const STATUS_OPTIONS = ['All', 'Analyzing', 'Under Contract', 'Offer Sent', 'In Progress', 'Funded', 'Closed', 'Completed', 'Abandoned'];
 
 function formatCompactCurrency(n) {
   const abs = Math.abs(n);

@@ -96,6 +96,28 @@ const EditDealModal = ({ isOpen, onClose, deal, onSave }) => {
                 />
               </div>
               <div>
+                <label className="text-sm text-muted-foreground block mb-1">City (optional)</label>
+                <input
+                  type="text"
+                  name="city"
+                  value={formData.city || ''}
+                  onChange={handleChange}
+                  placeholder="City"
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">County (optional)</label>
+                <input
+                  type="text"
+                  name="county"
+                  value={formData.county || ''}
+                  onChange={handleChange}
+                  placeholder="County"
+                  className="w-full bg-background border border-input rounded-lg p-3 text-foreground focus:ring-2 focus:ring-ring outline-none"
+                />
+              </div>
+              <div>
                 <label className="text-sm text-muted-foreground block mb-1">Status</label>
                 <select
                   name="status"
@@ -105,6 +127,7 @@ const EditDealModal = ({ isOpen, onClose, deal, onSave }) => {
                 >
                   <option value="Analyzing">Analyzing</option>
                   <option value="Under Contract">Under Contract</option>
+                  <option value="Offer Sent">Offer Sent</option>
                   <option value="In Progress">In Progress</option>
                   <option value="Funded">Funded</option>
                   <option value="Closed">Closed</option>

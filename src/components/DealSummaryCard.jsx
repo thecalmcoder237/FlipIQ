@@ -64,7 +64,7 @@ const DealSummaryCard = ({ deal, metrics, onEdit, onDealUpdate, readOnly }) => {
             <h1 className="text-2xl font-bold text-primary-foreground">{deal.address || "Untitled Deal"}</h1>
             {deal.status && (
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
-                deal.status === 'Under Contract' ? 'bg-accentBrand/20 text-white border-accentBrand/30' : 'bg-white/20 text-primary-foreground border-white/30'
+                deal.status === 'Under Contract' || deal.status === 'Offer Sent' ? 'bg-accentBrand/20 text-white border-accentBrand/30' : 'bg-white/20 text-primary-foreground border-white/30'
               }`}>
                 {deal.status}
               </span>
@@ -111,6 +111,7 @@ const DealSummaryCard = ({ deal, metrics, onEdit, onDealUpdate, readOnly }) => {
                <SelectContent align="end" className="bg-card border-border text-foreground">
                  <SelectItem value="Analyzing">Analyzing</SelectItem>
                  <SelectItem value="Under Contract">Under Contract</SelectItem>
+                 <SelectItem value="Offer Sent">Offer Sent</SelectItem>
                  <SelectItem value="Funded">Funded</SelectItem>
                  <SelectItem value="Closed">Closed</SelectItem>
                  <SelectItem value="Completed">Completed</SelectItem>

@@ -1,14 +1,18 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Home, Bed, Bath, Maximize, Calendar, RefreshCw, AlertCircle, Car, Layers, Warehouse, BarChart3 } from 'lucide-react';
+import { Home, Bed, Bath, Maximize, Calendar, RefreshCw, AlertCircle, Car, Layers, Warehouse, BarChart3, Plus, Search } from 'lucide-react';
 import { formatDateUS } from '@/utils/dateUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import CompsMap from './CompsMap';
+import ErrorBoundary from './ErrorBoundary';
+import AddCompModal from './AddCompModal';
 
-const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress, subjectSpecs, avmValue, tableOnly = false, subjectLat, subjectLng }) => {
+const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress, subjectSpecs, avmValue, tableOnly = false, subjectLat, subjectLng, isMapVisible = true, onAddComp, onSearchCompsWithAI, compsSearching = false }) => {
+  const [addCompModalOpen, setAddCompModalOpen] = useState(false);
+
   if (loading && !comps) {
     return (
       <div className="bg-card backdrop-blur-xl rounded-xl shadow-sm p-12 border border-border text-center">
@@ -24,9 +28,25 @@ const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress
           <AlertCircle className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-xl font-bold text-foreground mb-2">No Comparables Found</h3>
           <p className="text-muted-foreground mb-6">Could not find sufficient recent sales data.</p>
-          <Button onClick={onRefresh} variant="outline" className="border-primary text-primary hover:bg-primary/10">
-             Try Again
-          </Button>
+          <div className="flex flex-wrap justify-center gap-2">
+            {onAddComp && (
+              <Button onClick={() => setAddCompModalOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Plus className="w-4 h-4 mr-2" /> Add comp manually
+              </Button>
+            )}
+            {onSearchCompsWithAI && (
+              <Button onClick={onSearchCompsWithAI} disabled={compsSearching} variant="outline" className="border-primary text-primary hover:bg-primary/10">
+                {compsSearching ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
+                Search comps with AI
+              </Button>
+            )}
+            <Button onClick={onRefresh} variant="outline" className="border-primary text-primary hover:bg-primary/10">
+               Try Again
+            </Button>
+          </div>
+          {onAddComp && (
+            <AddCompModal open={addCompModalOpen} onOpenChange={setAddCompModalOpen} onSubmit={(comp) => { onAddComp(comp); setAddCompModalOpen(false); }} />
+          )}
        </div>
     );
   }
@@ -180,6 +200,17 @@ const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress
           </h2>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded border border-border">Source: {source}</span>
+            {onAddComp && (
+              <Button size="sm" variant="ghost" onClick={() => setAddCompModalOpen(true)} className="text-muted-foreground hover:text-foreground" title="Add comp manually">
+                <Plus className="w-4 h-4 mr-2" /> Add comp
+              </Button>
+            )}
+            {onSearchCompsWithAI && (
+              <Button size="sm" variant="ghost" onClick={onSearchCompsWithAI} disabled={compsSearching} className="text-muted-foreground hover:text-foreground" title="Search comps with ChatGPT">
+                {compsSearching ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
+                Search with AI
+              </Button>
+            )}
             <Button
               size="sm"
               variant="ghost"
@@ -193,14 +224,23 @@ const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress
           </div>
         </div>
         <ComparisonTable />
-        {subjectLat && subjectLng && comps?.length > 0 && (
-          <CompsMap
-            subjectLat={subjectLat}
-            subjectLng={subjectLng}
-            subjectAddress={subjectAddress}
-            comps={comps}
-          />
+        {isMapVisible && subjectLat && subjectLng && comps?.length > 0 && (
+          <ErrorBoundary
+            fallback={
+              <div className="rounded-xl border border-border bg-muted/50 p-4 text-center text-sm text-muted-foreground">
+                Map could not be loaded. The table above shows all comparable sales.
+              </div>
+            }
+          >
+            <CompsMap
+              subjectLat={subjectLat}
+              subjectLng={subjectLng}
+              subjectAddress={subjectAddress}
+              comps={comps}
+            />
+          </ErrorBoundary>
         )}
+        {onAddComp && <AddCompModal open={addCompModalOpen} onOpenChange={setAddCompModalOpen} onSubmit={(comp) => { onAddComp(comp); setAddCompModalOpen(false); }} />}
       </div>
     );
   }
@@ -213,6 +253,17 @@ const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress
          </h2>
          <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded border border-border">Source: {source}</span>
+            {onAddComp && (
+              <Button size="sm" variant="ghost" onClick={() => setAddCompModalOpen(true)} className="text-muted-foreground hover:text-foreground" title="Add comp manually">
+                <Plus className="w-4 h-4 mr-2" /> Add comp
+              </Button>
+            )}
+            {onSearchCompsWithAI && (
+              <Button size="sm" variant="ghost" onClick={onSearchCompsWithAI} disabled={compsSearching} className="text-muted-foreground hover:text-foreground" title="Search comps with ChatGPT">
+                {compsSearching ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
+                Search with AI
+              </Button>
+            )}
             <Button 
                 size="sm" 
                 variant="ghost" 
@@ -300,14 +351,23 @@ const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress
       {comps.length > 0 && hasSubjectData && (
         <ComparisonTable />
       )}
-      {subjectLat && subjectLng && comps?.length > 0 && (
-        <CompsMap
-          subjectLat={subjectLat}
-          subjectLng={subjectLng}
-          subjectAddress={subjectAddress}
-          comps={comps}
-        />
+      {isMapVisible && subjectLat && subjectLng && comps?.length > 0 && (
+        <ErrorBoundary
+          fallback={
+            <div className="rounded-xl border border-border bg-muted/50 p-4 text-center text-sm text-muted-foreground">
+              Map could not be loaded. The table above shows all comparable sales.
+            </div>
+          }
+        >
+          <CompsMap
+            subjectLat={subjectLat}
+            subjectLng={subjectLng}
+            subjectAddress={subjectAddress}
+            comps={comps}
+          />
+        </ErrorBoundary>
       )}
+      {onAddComp && <AddCompModal open={addCompModalOpen} onOpenChange={setAddCompModalOpen} onSubmit={(comp) => { onAddComp(comp); setAddCompModalOpen(false); }} />}
     </div>
   );
 };

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, LogOut, Home, TrendingUp, History, PieChart, Hammer } from 'lucide-react';
+import { Menu, X, LogOut, Home, TrendingUp, History, PieChart, Hammer, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import QuickAccessSidebar from './QuickAccessSidebar';
@@ -13,7 +13,7 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, signOut } = useAuth();
+  const { currentUser, signOut, isAdmin } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -70,7 +70,9 @@ const Navbar = () => {
                 <NavLink to="/deal-history" icon={History} label="History" active={location.pathname === '/deal-history'} />
                 <NavLink to="/portfolio-dashboard" icon={PieChart} label="Portfolio" active={location.pathname === '/portfolio-dashboard'} />
                 <NavLink to="/project-management" icon={Hammer} label="Projects" active={location.pathname.startsWith('/project-management')} />
-                
+                {isAdmin && (
+                  <NavLink to="/admin" icon={Shield} label="Admin" active={location.pathname === '/admin'} />
+                )}
                 <div className="h-6 w-px bg-border mx-2" />
                 
                 <div className="flex items-center gap-3 ml-2">
@@ -121,6 +123,9 @@ const Navbar = () => {
                 <MobileNavLink to="/deal-history" icon={History} label="History" onClick={() => setIsOpen(false)} />
                 <MobileNavLink to="/portfolio-dashboard" icon={PieChart} label="Portfolio" onClick={() => setIsOpen(false)} />
                 <MobileNavLink to="/project-management" icon={Hammer} label="Projects" onClick={() => setIsOpen(false)} />
+                {isAdmin && (
+                  <MobileNavLink to="/admin" icon={Shield} label="Admin" onClick={() => setIsOpen(false)} />
+                )}
                 <hr className="border-border my-2" />
                 <button
                   onClick={() => { handleSignOut(); setIsOpen(false); }}

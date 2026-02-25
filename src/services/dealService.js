@@ -266,32 +266,22 @@ export const dealService = {
    * @param {string} userId 
    * @returns {Promise<boolean>} True if successful.
    */
+  /**
+   * Deletes a deal. Uses delete-deal edge function so both owner and admin can delete.
+   * @param {string} dealId - The deal UUID.
+   * @param {string} [userId] - Optional, kept for backwards compatibility; auth is from session.
+   * @returns {Promise<boolean>} True if successful.
+   */
   async deleteDeal(dealId, userId) {
     if (!dealId) throw new Error("Deal ID is required.");
-    if (!userId) throw new Error("User ID is required for security verification.");
 
     try {
-      // Security: First verify ownership before deleting
-      const { data: deal, error: fetchError } = await supabase
-        .from('deals')
-        .select('user_id')
-        .eq('id', dealId)
-        .single();
+      const { data, error } = await supabase.functions.invoke('delete-deal', {
+        body: { dealId },
+      });
 
-      if (fetchError) throw fetchError;
-      if (!deal) throw new Error("Deal not found.");
-      if (deal.user_id !== userId) {
-        throw new Error("Access denied: You do not have permission to delete this deal.");
-      }
-
-      // Now safe to delete
-      const { error } = await supabase
-        .from('deals')
-        .delete()
-        .eq('id', dealId)
-        .eq('user_id', userId); // Double-check with user_id filter
-
-      if (error) throw error;
+      if (error) throw new Error(error.message || 'Delete failed');
+      if (data?.error) throw new Error(data.error);
       return true;
     } catch (error) {
       console.error("dealService.deleteDeal Error:", error);

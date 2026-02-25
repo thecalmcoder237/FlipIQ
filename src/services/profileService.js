@@ -8,12 +8,13 @@ import { supabase } from '@/lib/customSupabaseClient';
 export async function getProfiles() {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, email, display_name')
+    .select('id, email, display_name, role')
     .order('email', { ascending: true });
   if (error) throw error;
   return (data || []).map((row) => ({
     id: row.id,
     email: row.email || '',
     displayName: row.display_name || row.email || 'Unknown',
+    role: row.role ?? 'user',
   }));
 }

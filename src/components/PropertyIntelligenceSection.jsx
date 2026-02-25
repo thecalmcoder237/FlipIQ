@@ -1,18 +1,19 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, DollarSign, ChevronDown, ChevronUp, RefreshCw, Sparkles, AlertTriangle, History, RotateCcw } from 'lucide-react';
+import { Building2, DollarSign, ChevronDown, ChevronUp, RefreshCw, Sparkles, AlertTriangle, History, RotateCcw, Plus, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { validatePropertyInput } from "@/utils/validationUtils";
 import { formatDateUS } from "@/utils/dateUtils";
-import { normalizePropertyIntelligenceResponse } from "@/utils/propertyIntelligenceSchema";
+import { normalizePropertyIntelligenceResponse, normalizeComp, isCompWithinLast6Months } from "@/utils/propertyIntelligenceSchema";
 import { useToast } from "@/components/ui/use-toast";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { logDataFlow } from "@/utils/dataFlowDebug";
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchPropertyIntelligence, fetchComps, getPropertyApiUsage, resetPropertyApiUsage } from '@/services/edgeFunctionService';
+import { fetchPropertyIntelligence, fetchComps, fetchCompsWebSearch, getPropertyApiUsage, resetPropertyApiUsage } from '@/services/edgeFunctionService';
+import AddCompModal from '@/components/AddCompModal';
 
 /** Renders property detail values: primitives as text, arrays as tags/list, objects as styled key-value blocks. */
 function DetailValueCell({ value }) {
@@ -72,6 +73,8 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
   const [isCompsOpen, setIsCompsOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const [compsRefreshing, setCompsRefreshing] = useState(false);
+  const [addCompModalOpen, setAddCompModalOpen] = useState(false);
+  const [compsSearching, setCompsSearching] = useState(false);
   const [fetchError, setFetchError] = useState(null);
   const [apiUsage, setApiUsage] = useState(null);
   const { toast } = useToast();
@@ -168,6 +171,7 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
       try {
         compsResponse = await fetchComps(address, zipToSend, {
           city: citySend,
+          county: countySend,
           state: stateSend,
           propertyId: propertyIdForComps,
           subjectAddress: propertyResponse?.address ?? propertyResponse?.formattedAddress ?? propertyResponse?.streetAddress ?? address,
@@ -298,8 +302,10 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
       // #endregion
       const refreshLat = inputs.propertyIntelligence?.latitude != null && Number.isFinite(Number(inputs.propertyIntelligence.latitude)) ? Number(inputs.propertyIntelligence.latitude) : undefined;
       const refreshLng = inputs.propertyIntelligence?.longitude != null && Number.isFinite(Number(inputs.propertyIntelligence.longitude)) ? Number(inputs.propertyIntelligence.longitude) : undefined;
+      const countyRefresh = inputs.county || inputs.propertyIntelligence?.county;
       const compsResponse = await fetchComps(address, zipToSend, {
         city: citySend,
+        county: countyRefresh,
         state: stateSend,
         propertyId: propertyIdForComps,
         subjectAddress: inputs.propertyIntelligence?.address ?? inputs.propertyIntelligence?.formattedAddress ?? inputs.propertyIntelligence?.streetAddress ?? address,
@@ -354,7 +360,56 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
         description: err.message || 'Failed to refresh comps. Please try again.',
       });
     } finally {
-      setCompsRefreshing(false);
+setCompsRefreshing(false);
+  }
+};
+
+  const handleAddComp = (newComp) => {
+    if (!onPropertyDataFetch) return;
+    const existing = propertyData ?? {};
+    const merged = {
+      ...existing,
+      recentComps: [...(Array.isArray(existing.recentComps) ? existing.recentComps : []), newComp],
+    };
+    const normalized = normalizePropertyIntelligenceResponse(merged);
+    onPropertyDataFetch(normalized);
+    toast({ title: 'Comp added', description: 'Comparable sale added to the list.' });
+  };
+
+  const handleSearchCompsWithAI = async (e) => {
+    e?.stopPropagation?.();
+    const address = (inputs?.address ?? '').trim();
+    if (!address || address.length < 5) {
+      toast({ variant: 'destructive', title: 'Address required', description: 'Enter a property address to search for comps with AI.' });
+      return;
+    }
+    const zipToSend = (inputs?.zipCode ?? '').trim().replace(/\D/g, '').slice(0, 5);
+    const subjectLat = propertyData?.latitude != null && Number.isFinite(Number(propertyData.latitude)) ? Number(propertyData.latitude) : undefined;
+    const subjectLng = propertyData?.longitude != null && Number.isFinite(Number(propertyData.longitude)) ? Number(propertyData.longitude) : undefined;
+    if (!onPropertyDataFetch) return;
+    setCompsSearching(true);
+    try {
+      const result = await fetchCompsWebSearch(address, zipToSend, { lat: subjectLat, lng: subjectLng });
+      const rawComps = Array.isArray(result?.recentComps) ? result.recentComps : (Array.isArray(result?.comps) ? result.comps : []);
+      const normalizedComps = rawComps
+        .map((c) => normalizeComp(c))
+        .filter(Boolean)
+        .filter(isCompWithinLast6Months);
+      const existing = propertyData ?? {};
+      const merged = {
+        ...existing,
+        recentComps: [...(Array.isArray(existing.recentComps) ? existing.recentComps : []), ...normalizedComps],
+        source: result?.source ?? existing?.source,
+      };
+      const normalized = normalizePropertyIntelligenceResponse(merged);
+      onPropertyDataFetch(normalized);
+      const count = normalizedComps.length;
+      toast({ title: 'AI comps added', description: count ? `${count} comparable(s) from ChatGPT added.` : 'No comps extracted. Try refining the address or use Refresh comps.' });
+    } catch (err) {
+      console.error('Search comps with AI failed:', err);
+      toast({ variant: 'destructive', title: 'AI comps failed', description: err?.message || 'Could not fetch comps with AI. Try again.' });
+    } finally {
+      setCompsSearching(false);
     }
   };
 
@@ -385,7 +440,7 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
               </div>
               <h3 className="text-xl font-bold text-foreground mb-2">Property Data & Comps</h3>
               <p className="text-muted-foreground max-w-md mb-6">
-                {readOnly ? 'No property data available for this deal.' : 'Property data and comps via Realie (with RentCast fallback).'}
+                {readOnly ? 'No property data available for this deal.' : 'Property data and comps via RentCast (Realie fallback when county & city provided).'}
               </p>
               {!readOnly && apiUsage && (
                 <div className="flex items-center gap-3 mb-2 flex-wrap justify-center">
@@ -455,7 +510,7 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
                 <CardTitle className="text-xl font-bold text-foreground flex items-center gap-2">
                   <Building2 className="text-primary" /> Property Details
                 </CardTitle>
-                <p className="text-xs text-muted-foreground absolute right-4 top-14">Realie + RentCast</p>
+                <p className="text-xs text-muted-foreground absolute right-4 top-14">RentCast + Realie</p>
                 <div className="flex items-center gap-2">
                    {!readOnly && apiUsage && (
                      <>
@@ -622,21 +677,48 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
                 </CardTitle>
                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                   {!readOnly && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="shrink-0 text-muted-foreground hover:text-foreground"
-                      onClick={handleRefreshComps}
-                      disabled={compsRefreshing || !inputs?.address?.trim() || (String(inputs?.zipCode ?? '').replace(/\D/g, '').slice(0, 5).length !== 5)}
-                      title="Refresh comps only"
-                    >
-                      {compsRefreshing ? (
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-4 w-4" />
-                      )}
-                    </Button>
+                    <>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                        onClick={() => setAddCompModalOpen(true)}
+                        title="Add comp manually"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                        onClick={handleSearchCompsWithAI}
+                        disabled={compsSearching || !inputs?.address?.trim()}
+                        title="Search comps with ChatGPT (optional web search)"
+                      >
+                        {compsSearching ? (
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Search className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                        onClick={handleRefreshComps}
+                        disabled={compsRefreshing || !inputs?.address?.trim() || (String(inputs?.zipCode ?? '').replace(/\D/g, '').slice(0, 5).length !== 5)}
+                        title="Refresh comps only"
+                      >
+                        {compsRefreshing ? (
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </>
                   )}
                   {isCompsOpen ? <ChevronUp className="text-muted-foreground" /> : <ChevronDown className="text-muted-foreground" />}
                 </div>
@@ -691,6 +773,11 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
                 )}
               </AnimatePresence>
             </Card>
+            <AddCompModal
+              open={addCompModalOpen}
+              onOpenChange={setAddCompModalOpen}
+              onSubmit={handleAddComp}
+            />
           </>
         )}
       </div>

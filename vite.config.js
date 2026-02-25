@@ -25,10 +25,12 @@ const observer = new MutationObserver((mutations) => {
 	}
 });
 
-observer.observe(document.documentElement, {
-	childList: true,
-	subtree: true
-});
+try {
+	const root = document.documentElement;
+	if (root && root.nodeType === 1) {
+		observer.observe(root, { childList: true, subtree: true });
+	}
+} catch (_) {}
 
 function handleViteOverlay(node) {
 	if (!node.shadowRoot) {

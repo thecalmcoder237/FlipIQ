@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/customSupabaseClient';
 import { useToast } from '@/components/ui/use-toast';
@@ -7,11 +6,11 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setCurrentUser(session?.user ?? null);
       setLoading(false);
@@ -20,8 +19,6 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     });
 
-    // Listen for auth changes — ignore silent token refreshes to avoid
-    // triggering re-fetches across the app for the same signed-in user.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'TOKEN_REFRESHED') return;
       setCurrentUser(session?.user ?? null);
@@ -30,6 +27,32 @@ export const AuthProvider = ({ children }) => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!currentUser?.id) {
+      setProfile(null);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from('profiles')
+      .select('id, email, display_name, role')
+      .eq('id', currentUser.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled || error) {
+          if (!cancelled && error) console.error('Profile fetch failed:', error);
+          return;
+        }
+        setProfile(data ? {
+          id: data.id,
+          email: data.email ?? '',
+          displayName: data.display_name ?? data.email ?? 'Unknown',
+          role: data.role ?? 'user',
+        } : null);
+      });
+    return () => { cancelled = true; };
+  }, [currentUser?.id]);
 
   const signUp = async (email, password) => {
     try {
@@ -102,8 +125,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const isAdmin = profile?.role === 'admin';
+
   const value = {
     currentUser,
+    profile,
+    isAdmin,
     loading,
     signUp,
     signIn,

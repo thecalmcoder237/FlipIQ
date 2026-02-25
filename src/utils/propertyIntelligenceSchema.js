@@ -108,6 +108,21 @@ function normalizeComp(raw) {
   };
 }
 
+/** True if comp's saleDate is within the last 6 months from today; used so search results never display or add older comps. */
+export function isCompWithinLast6Months(comp) {
+  if (!comp || typeof comp !== 'object') return false;
+  const dateStr = comp.saleDate ?? comp.sale_date ?? comp.soldDate;
+  if (!dateStr || String(dateStr).trim().length < 4) return false;
+  const d = new Date(String(dateStr).trim().slice(0, 10));
+  if (!Number.isFinite(d.getTime())) return false;
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - 6);
+  return d >= cutoff;
+}
+
+/** Export for use when merging manual or AI-sourced comps. */
+export { normalizeComp };
+
 /**
  * Validate and normalize property intelligence response from fetch-property-intelligence.
  * Coerces types, clamps ranges, normalizes comps to frontend contract (salePrice, sqft, beds, baths, dom, saleDate).

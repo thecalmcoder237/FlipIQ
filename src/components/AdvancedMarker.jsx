@@ -30,61 +30,67 @@ const AdvancedMarker = ({
     const useAdvanced =
       HAS_MAP_ID && !!window.google?.maps?.marker?.AdvancedMarkerElement;
 
-    if (useAdvanced) {
-      let content;
-      if (pinBackground || pinGlyph != null || pinScale) {
-        const opts = { glyphColor: pinGlyphColor };
-        if (pinBackground) opts.background = pinBackground;
-        if (pinBorderColor) opts.borderColor = pinBorderColor;
-        if (pinScale) opts.scale = pinScale;
-        if (pinGlyph != null) {
-          opts.glyph =
-            typeof pinGlyph === 'string' ? new Text(pinGlyph) : pinGlyph;
+    try {
+      if (useAdvanced) {
+        let content;
+        if (pinBackground || pinGlyph != null || pinScale) {
+          const opts = { glyphColor: pinGlyphColor };
+          if (pinBackground) opts.background = pinBackground;
+          if (pinBorderColor) opts.borderColor = pinBorderColor;
+          if (pinScale) opts.scale = pinScale;
+          // PinElement.glyph accepts: string, Element, or URL (not Text node)
+          if (pinGlyph != null) {
+            opts.glyph = typeof pinGlyph === 'string' ? pinGlyph : pinGlyph;
+          }
+          const pin = new window.google.maps.marker.PinElement(opts);
+          content = pin.element;
         }
-        const pin = new window.google.maps.marker.PinElement(opts);
-        content = pin.element;
-      }
 
-      const marker = new window.google.maps.marker.AdvancedMarkerElement({
-        map,
-        position,
-        title: title || '',
-        zIndex,
-        ...(content ? { content } : {}),
-      });
+        const marker = new window.google.maps.marker.AdvancedMarkerElement({
+          map,
+          position,
+          title: title || '',
+          zIndex,
+          ...(content ? { content } : {}),
+        });
 
-      markerRef.current = marker;
-      if (onClick) {
-        listenerRef.current = marker.addListener('click', onClick);
-      }
-    } else {
-      const opts = { map, position, title: title || '', zIndex };
-      if (label) opts.label = label;
-      if (icon) {
-        opts.icon = icon;
-      } else if (pinBackground) {
-        opts.icon = {
-          path: window.google.maps.SymbolPath.CIRCLE,
-          fillColor: pinBackground,
-          fillOpacity: 1,
-          strokeColor: pinBorderColor || pinBackground,
-          strokeWeight: 2,
-          scale: (pinScale || 1) * 10,
-        };
-        if (pinGlyph) {
-          opts.label = {
-            text: String(pinGlyph),
-            color: pinGlyphColor,
-            fontWeight: 'bold',
-            fontSize: '12px',
+        markerRef.current = marker;
+        if (onClick) {
+          listenerRef.current = marker.addListener('click', onClick);
+        }
+      } else {
+        const opts = { map, position, title: title || '', zIndex };
+        if (label) opts.label = label;
+        if (icon) {
+          opts.icon = icon;
+        } else if (pinBackground) {
+          opts.icon = {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            fillColor: pinBackground,
+            fillOpacity: 1,
+            strokeColor: pinBorderColor || pinBackground,
+            strokeWeight: 2,
+            scale: (pinScale || 1) * 10,
           };
+          if (pinGlyph) {
+            opts.label = {
+              text: String(pinGlyph),
+              color: pinGlyphColor,
+              fontWeight: 'bold',
+              fontSize: '12px',
+            };
+          }
+        }
+
+        const marker = new window.google.maps.Marker(opts);
+        markerRef.current = marker;
+        if (onClick) {
+          listenerRef.current = marker.addListener('click', onClick);
         }
       }
-
-      const marker = new window.google.maps.Marker(opts);
-      markerRef.current = marker;
-      if (onClick) {
-        listenerRef.current = marker.addListener('click', onClick);
+    } catch (err) {
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('[AdvancedMarker] Could not create marker:', err?.message || err);
       }
     }
 

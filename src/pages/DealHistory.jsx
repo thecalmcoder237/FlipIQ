@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import { Search, Eye, Edit, Trash2, Star, Tag } from 'lucide-react';
+import { Search, Eye, Edit, Trash2, Star, Tag, BarChart3, Send, CheckCircle2, CalendarDays, Filter, Calendar, User, ArrowDown, ArrowUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -17,6 +17,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+
+const STATUS_FILTER_OPTIONS = ['All', 'Favorites', 'Analyzing', 'Under Contract', 'Offer Sent', 'Funded', 'Closed', 'Completed', 'Passed'];
+
+function getDealCountsByPeriod(deals) {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const sevenDaysAgo = new Date(now);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  let daily = 0;
+  let weekly = 0;
+  let monthly = 0;
+  deals.forEach((deal) => {
+    const created = deal.createdAt ? new Date(deal.createdAt) : null;
+    if (!created) return;
+    if (created >= startOfToday) daily++;
+    if (created >= sevenDaysAgo) weekly++;
+    if (created >= startOfMonth) monthly++;
+  });
+  return { daily, weekly, monthly };
+}
 
 const DealHistory = () => {
   const [deals, setDeals] = useState([]);
@@ -26,7 +53,9 @@ const DealHistory = () => {
   const [selectedUserFilter, setSelectedUserFilter] = useState('all');
   const [profiles, setProfiles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const { currentUser } = useAuth();
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const { currentUser, isAdmin } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -36,9 +65,18 @@ const DealHistory = () => {
     return map;
   }, [profiles]);
 
+  const dashboardCounts = useMemo(() => {
+    const period = getDealCountsByPeriod(deals);
+    const offersSent = deals.filter((d) => d.status === 'Offer Sent').length;
+    const closed = deals.filter((d) => d.status === 'Closed' || d.status === 'Completed' || d.isClosed === true).length;
+    return { ...period, offersSent, closed };
+  }, [deals]);
+
   useEffect(() => {
     if (viewFilter === 'All') {
       getProfiles().then(setProfiles).catch(() => setProfiles([]));
+    } else {
+      setSortBy('date');
     }
   }, [viewFilter]);
 
@@ -78,7 +116,11 @@ const DealHistory = () => {
     }
   };
   
+  const isDealOwner = (deal) => (deal?.userId ?? deal?.user_id) === currentUser?.id;
+  const canManageDeal = (deal) => isDealOwner(deal) || isAdmin;
+
   const toggleFavorite = async (deal) => {
+    if (!canManageDeal(deal)) return;
     try {
       const updatedDeal = { ...deal, isFavorite: !deal.isFavorite };
       await dealService.saveDeal(updatedDeal, currentUser.id);
@@ -90,6 +132,7 @@ const DealHistory = () => {
   };
 
   const handleStatusChange = async (deal, newStatus) => {
+    if (!canManageDeal(deal)) return;
     try {
       const saved = await dealService.updateDealFields(deal.id, { status: newStatus }, currentUser.id);
       setDeals(deals.map(d => d.id === deal.id ? saved : d));
@@ -99,12 +142,31 @@ const DealHistory = () => {
     }
   };
 
-  const filteredDeals = deals.filter((deal) => {
+  const filteredDeals = useMemo(() => deals.filter((deal) => {
     const matchesSearch = (deal.address || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus =
       filter === 'All' ? true : filter === 'Favorites' ? deal.isFavorite : deal.status === filter;
     return matchesSearch && matchesStatus;
-  });
+  }), [deals, searchTerm, filter]);
+
+  const sortedDeals = useMemo(() => {
+    const list = [...filteredDeals];
+    if (sortBy === 'date') {
+      list.sort((a, b) => {
+        const ta = new Date(a.updatedAt || a.createdAt).getTime();
+        const tb = new Date(b.updatedAt || b.createdAt).getTime();
+        return sortOrder === 'desc' ? tb - ta : ta - tb;
+      });
+    } else {
+      list.sort((a, b) => {
+        const nameA = (profileByUserId[a.userId]?.displayName || profileByUserId[a.userId]?.email || '').toLowerCase();
+        const nameB = (profileByUserId[b.userId]?.displayName || profileByUserId[b.userId]?.email || '').toLowerCase();
+        const cmp = nameA.localeCompare(nameB);
+        return sortOrder === 'desc' ? -cmp : cmp;
+      });
+    }
+    return list;
+  }, [filteredDeals, sortBy, sortOrder, profileByUserId]);
 
   return (
     <div className="min-h-screen bg-muted px-4 py-8 sm:px-8">
@@ -121,6 +183,65 @@ const DealHistory = () => {
             + New Deal
           </Button>
         </div>
+
+        {!loading && deals.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="grid grid-cols-1 min-[500px]:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 mb-6"
+          >
+            <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow overflow-hidden relative group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-bl-full -translate-y-2 translate-x-2 group-hover:bg-primary/10 transition-colors" aria-hidden />
+              <div className="relative flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <BarChart3 className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">Deals analyzed</p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-lg sm:text-xl font-bold tabular-nums text-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                      Daily <span className="text-primary">{dashboardCounts.daily}</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                      Weekly <span className="text-primary">{dashboardCounts.weekly}</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                      Monthly <span className="text-primary">{dashboardCounts.monthly}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow overflow-hidden relative group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-accentBrand/5 rounded-bl-full -translate-y-2 translate-x-2 group-hover:bg-accentBrand/10 transition-colors" aria-hidden />
+              <div className="relative flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accentBrand/10 text-accentBrand">
+                  <Send className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">Offers sent</p>
+                  <p className="text-2xl sm:text-3xl font-bold tabular-nums text-foreground">{dashboardCounts.offersSent}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow overflow-hidden relative group min-[500px]:col-span-2 xl:col-span-1">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-bl-full -translate-y-2 translate-x-2 group-hover:bg-green-500/10 transition-colors" aria-hidden />
+              <div className="relative flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-500/10 text-green-600 dark:text-green-400">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">Closed</p>
+                  <p className="text-2xl sm:text-3xl font-bold tabular-nums text-foreground">{dashboardCounts.closed}</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         <div className="flex flex-col gap-4 mb-6">
             <div className="flex flex-wrap items-center gap-3">
@@ -155,9 +276,9 @@ const DealHistory = () => {
               )}
             </div>
 
-            <div className="bg-card p-4 rounded-xl border border-border shadow-sm flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5" />
+            <div className="bg-card p-4 rounded-xl border border-border shadow-sm flex flex-col md:flex-row gap-4 items-stretch md:items-center">
+            <div className="relative flex-1 min-w-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5 shrink-0" />
                 <input
                 type="text"
                 placeholder="Search by address..."
@@ -166,21 +287,73 @@ const DealHistory = () => {
                 className="w-full bg-background border border-input rounded-lg pl-10 pr-4 py-2 text-foreground focus:ring-2 focus:ring-ring outline-none"
                 />
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
-                {['All', 'Favorites', 'Analyzing', 'Under Contract', 'Funded', 'Closed', 'Completed', 'Passed'].map(f => (
-                <button
-                    key={f}
-                    onClick={() => setFilter(f)}
-                    className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                    filter === f 
-                        ? 'bg-primary text-primary-foreground font-bold' 
-                        : 'bg-card text-muted-foreground hover:text-foreground border border-border'
-                    }`}
-                >
+            <Select value={filter} onValueChange={setFilter}>
+              <SelectTrigger className="w-full md:w-[200px] h-10 bg-card border-border shrink-0 gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_FILTER_OPTIONS.map((f) => (
+                  <SelectItem key={f} value={f}>
                     {f}
-                </button>
+                  </SelectItem>
                 ))}
-            </div>
+              </SelectContent>
+            </Select>
+            <TooltipProvider>
+              <div className="flex items-center gap-1 border border-border rounded-lg p-1 bg-background/50 shrink-0">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={sortBy === 'date' ? 'secondary' : 'ghost'}
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => setSortBy('date')}
+                      aria-label="Sort by date"
+                    >
+                      <Calendar className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Sort by date</TooltipContent>
+                </Tooltip>
+                {viewFilter === 'All' && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={sortBy === 'user' ? 'secondary' : 'ghost'}
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        onClick={() => setSortBy('user')}
+                        aria-label="Sort by user"
+                      >
+                        <User className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Sort by user</TooltipContent>
+                  </Tooltip>
+                )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
+                      aria-label={sortOrder === 'desc' ? 'Newest first' : 'Oldest first'}
+                    >
+                      {sortOrder === 'desc' ? (
+                        <ArrowDown className="h-4 w-4" />
+                      ) : (
+                        <ArrowUp className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {sortOrder === 'desc' ? (sortBy === 'date' ? 'Newest first' : 'Z–A') : (sortBy === 'date' ? 'Oldest first' : 'A–Z')}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
             </div>
         </div>
 
@@ -189,7 +362,7 @@ const DealHistory = () => {
             <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
             <p className="text-muted-foreground">Loading deals...</p>
           </div>
-        ) : filteredDeals.length === 0 ? (
+        ) : sortedDeals.length === 0 ? (
           <div className="text-center py-20 bg-muted rounded-2xl border border-border">
             <p className="text-muted-foreground mb-4">No deals found matching your criteria.</p>
             <Button onClick={() => navigate('/deal-input')} variant="outline" className="text-primary border-primary hover:bg-primary/10">
@@ -198,7 +371,7 @@ const DealHistory = () => {
           </div>
         ) : (
           <div className="grid gap-4">
-            {filteredDeals.map((deal, idx) => {
+            {sortedDeals.map((deal, idx) => {
               const metrics = calculateDealMetrics(deal);
               return (
                 <motion.div
@@ -216,7 +389,7 @@ const DealHistory = () => {
                         <h3 className="text-xl font-bold text-foreground">{deal.address}</h3>
                         <span className={`text-xs px-2 py-0.5 rounded-full border ${
                           deal.status === 'Completed' || deal.status === 'Closed' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 
-                          deal.status === 'Under Contract' || deal.status === 'Funded' ? 'bg-accentBrand/20 text-accentBrand border-accentBrand/30' :
+                          deal.status === 'Under Contract' || deal.status === 'Funded' || deal.status === 'Offer Sent' ? 'bg-accentBrand/20 text-accentBrand border-accentBrand/30' :
                           deal.status === 'Passed' ? 'bg-muted text-muted-foreground border-border' :
                           'bg-primary/20 text-primary border-primary/30'
                         }`}>
@@ -236,7 +409,7 @@ const DealHistory = () => {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {deal.userId === currentUser?.id && (
+                      {canManageDeal(deal) && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -252,7 +425,7 @@ const DealHistory = () => {
                       >
                         <Eye className="w-4 h-4 mr-2" /> View
                       </Button>
-                      {deal.userId === currentUser?.id && (
+                      {canManageDeal(deal) && (
                         <>
                           <Button
                             variant="ghost"
@@ -277,6 +450,7 @@ const DealHistory = () => {
                             <SelectContent align="end" className="bg-card border-border text-foreground">
                               <SelectItem value="Analyzing">Analyzing</SelectItem>
                               <SelectItem value="Under Contract">Under Contract</SelectItem>
+                              <SelectItem value="Offer Sent">Offer Sent</SelectItem>
                               <SelectItem value="Funded">Funded</SelectItem>
                               <SelectItem value="Closed">Closed</SelectItem>
                               <SelectItem value="Completed">Completed</SelectItem>
