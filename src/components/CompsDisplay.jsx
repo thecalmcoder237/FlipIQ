@@ -34,8 +34,10 @@ const CompsDisplay = ({ comps: rawComps, loading, onRefresh, source = "AI", subj
       const result = await geocodeComps(comps, (progress) => {
         setGeocodeProgress(progress);
       });
+      // Always set the result — geocodeComps never throws and returns partial results
       setGeocodedComps(result);
     } catch (err) {
+      // Defensive: geocodeComps should never throw, but just in case
       setGeocodeError(err.message || 'Geocoding failed');
     } finally {
       setGeocoding(false);

@@ -2,14 +2,12 @@
  * Geocode comp addresses that are missing latitude/longitude.
  *
  * Strategy:
- *   1. Try the `geocode-comps` Supabase Edge Function (GPT-powered, batch)
- *      with a 10 s timeout so the UI never hangs.
- *   2. Fall back to the Google Maps Places API (findPlaceFromQuery) which is
- *      already loaded via @react-google-maps/api with the 'places' library.
- *   3. If Places also fails, try the Geocoder service.
+ *   1. Try the `geocode-comps` Supabase Edge Function (GPT-powered, batch).
+ *   2. Fall back to Google Maps Places API (findPlaceFromQuery).
+ *   3. Fall back to Google Maps Geocoder.
  *
- * Returns a new array of comps with `latitude` and `longitude` filled in where
- * possible.  Comps that already have coordinates are returned as-is.
+ * Always returns partial results — never throws. If 4/5 addresses succeed,
+ * those 4 will have coordinates and the map can render with them.
  */
 
 import { invokeEdgeFunction } from '@/services/edgeFunctionService';
@@ -34,10 +32,6 @@ function withTimeout(promise, ms) {
   ]);
 }
 
-/**
- * Geocode via Google Maps Places API findPlaceFromQuery.
- * Uses the already-loaded 'places' library.
- */
 function geocodeViaPlacesAPI(address) {
   return withTimeout(
     new Promise((resolve) => {
@@ -49,35 +43,28 @@ function geocodeViaPlacesAPI(address) {
         const div = document.createElement('div');
         const service = new window.google.maps.places.PlacesService(div);
         service.findPlaceFromQuery(
-          {
-            query: address,
-            fields: ['geometry'],
-          },
+          { query: address, fields: ['geometry'] },
           (results, status) => {
-            if (
-              status === window.google.maps.places.PlacesServiceStatus.OK &&
-              results &&
-              results.length > 0 &&
-              results[0].geometry?.location
-            ) {
-              const loc = results[0].geometry.location;
-              resolve({ latitude: loc.lat(), longitude: loc.lng() });
-            } else {
-              resolve(null);
-            }
+            try {
+              if (
+                status === window.google.maps.places.PlacesServiceStatus.OK &&
+                results?.length > 0 &&
+                results[0].geometry?.location
+              ) {
+                const loc = results[0].geometry.location;
+                resolve({ latitude: loc.lat(), longitude: loc.lng() });
+              } else {
+                resolve(null);
+              }
+            } catch { resolve(null); }
           }
         );
-      } catch {
-        resolve(null);
-      }
+      } catch { resolve(null); }
     }),
     8000
   );
 }
 
-/**
- * Geocode via Google Maps Geocoder (fallback if Places fails).
- */
 function geocodeViaGeocoder(address) {
   return withTimeout(
     new Promise((resolve) => {
@@ -88,16 +75,16 @@ function geocodeViaGeocoder(address) {
         }
         const geocoder = new window.google.maps.Geocoder();
         geocoder.geocode({ address }, (results, status) => {
-          if (status === 'OK' && results && results.length > 0) {
-            const loc = results[0].geometry.location;
-            resolve({ latitude: loc.lat(), longitude: loc.lng() });
-          } else {
-            resolve(null);
-          }
+          try {
+            if (status === 'OK' && results?.length > 0) {
+              const loc = results[0].geometry.location;
+              resolve({ latitude: loc.lat(), longitude: loc.lng() });
+            } else {
+              resolve(null);
+            }
+          } catch { resolve(null); }
         });
-      } catch {
-        resolve(null);
-      }
+      } catch { resolve(null); }
     }),
     5000
   );
@@ -109,35 +96,35 @@ async function geocodeViaEdgeFunction(addresses) {
       invokeEdgeFunction('geocode-comps', { addresses }),
       10000
     );
-    if (data?.results && Array.isArray(data.results)) {
-      return data.results;
-    }
+    if (data?.results && Array.isArray(data.results)) return data.results;
     return null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-/**
- * Geocode a single address using available strategies.
- */
 async function geocodeSingleAddress(address) {
-  const placesResult = await geocodeViaPlacesAPI(address);
-  if (placesResult) return placesResult;
+  try {
+    const placesResult = await geocodeViaPlacesAPI(address);
+    if (placesResult) return placesResult;
+  } catch { /* continue to next strategy */ }
 
-  const geocoderResult = await geocodeViaGeocoder(address);
-  if (geocoderResult) return geocoderResult;
+  try {
+    const geocoderResult = await geocodeViaGeocoder(address);
+    if (geocoderResult) return geocoderResult;
+  } catch { /* give up on this address */ }
 
   return null;
 }
 
 /**
- * @param {Array} comps – array of comp objects
+ * @param {Array} comps
  * @param {(progress: {done: number, total: number}) => void} [onProgress]
- * @returns {Promise<Array>} – new array with coordinates filled in
+ * @returns {Promise<Array>} – NEVER throws; always returns comps (some may
+ *   now have latitude/longitude filled in)
  */
 export async function geocodeComps(comps, onProgress) {
   if (!Array.isArray(comps) || comps.length === 0) return comps;
+
+  const geocoded = {};
 
   const needsGeocode = [];
   comps.forEach((comp, i) => {
@@ -148,22 +135,24 @@ export async function geocodeComps(comps, onProgress) {
 
   if (needsGeocode.length === 0) return comps;
 
-  const geocoded = {};
+  const buildResult = () =>
+    comps.map((comp, i) => (geocoded[i] ? { ...comp, ...geocoded[i] } : comp));
 
-  // Try edge function first (batch GPT geocoding) with timeout
-  const edgeResults = await geocodeViaEdgeFunction(
-    needsGeocode.map((n) => ({ index: n.index, address: n.address }))
-  );
-
-  if (edgeResults) {
-    for (const r of edgeResults) {
-      if (r.latitude != null && r.longitude != null) {
-        geocoded[r.index] = { latitude: r.latitude, longitude: r.longitude };
+  // 1. Edge function (batch GPT)
+  try {
+    const edgeResults = await geocodeViaEdgeFunction(
+      needsGeocode.map((n) => ({ index: n.index, address: n.address }))
+    );
+    if (edgeResults) {
+      for (const r of edgeResults) {
+        if (r.latitude != null && r.longitude != null) {
+          geocoded[r.index] = { latitude: r.latitude, longitude: r.longitude };
+        }
       }
     }
-  }
+  } catch { /* edge function failed, continue to client-side fallback */ }
 
-  // Client-side fallback for any addresses not resolved
+  // 2. Client-side fallback for anything not yet resolved
   const stillNeed = needsGeocode.filter((n) => !geocoded[n.index]);
 
   if (stillNeed.length > 0) {
@@ -171,28 +160,22 @@ export async function geocodeComps(comps, onProgress) {
     const total = needsGeocode.length;
 
     for (let i = 0; i < stillNeed.length; i++) {
-      const { index, address } = stillNeed[i];
       try {
+        const { index, address } = stillNeed[i];
         const result = await geocodeSingleAddress(address);
-        if (result) {
-          geocoded[index] = result;
-        }
-      } catch {
-        // Skip addresses that error out; partial results are still useful
-      }
+        if (result) geocoded[index] = result;
+      } catch { /* skip this address */ }
+
       done++;
-      if (onProgress) onProgress({ done, total });
-      if (i < stillNeed.length - 1) await sleep(400);
+      try { if (onProgress) onProgress({ done, total }); } catch { /* */ }
+
+      if (i < stillNeed.length - 1) {
+        try { await sleep(400); } catch { /* */ }
+      }
     }
   }
 
-  // Return comps with whatever coordinates we resolved (partial is OK)
-  return comps.map((comp, i) => {
-    if (geocoded[i]) {
-      return { ...comp, ...geocoded[i] };
-    }
-    return comp;
-  });
+  return buildResult();
 }
 
 export default geocodeComps;
