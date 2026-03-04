@@ -1,14 +1,47 @@
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Home, Bed, Bath, Maximize, Calendar, RefreshCw, AlertCircle, Car, Layers, Warehouse, BarChart3 } from 'lucide-react';
+import { Home, Bed, Bath, Maximize, Calendar, RefreshCw, AlertCircle, Car, Layers, Warehouse, BarChart3, MapPin, Loader2 } from 'lucide-react';
 import { formatDateUS } from '@/utils/dateUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import CompsMap from './CompsMap';
+import { geocodeComps } from '@/utils/geocodeComps';
 
-const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress, subjectSpecs, avmValue, tableOnly = false, subjectLat, subjectLng }) => {
+const CompsDisplay = ({ comps: rawComps, loading, onRefresh, source = "AI", subjectAddress, subjectSpecs, avmValue, tableOnly = false, subjectLat, subjectLng }) => {
+  const [geocodedComps, setGeocodedComps] = useState(null);
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeProgress, setGeocodeProgress] = useState(null);
+  const [geocodeError, setGeocodeError] = useState(null);
+
+  const comps = geocodedComps || rawComps;
+
+  const compsWithCoords = (comps || []).filter(
+    (c) => c.latitude != null && c.longitude != null && Number.isFinite(Number(c.latitude)) && Number.isFinite(Number(c.longitude))
+  );
+  const compsNeedingGeocode = (comps || []).filter(
+    (c) => c.address && (c.latitude == null || c.longitude == null || !Number.isFinite(Number(c.latitude)) || !Number.isFinite(Number(c.longitude)))
+  );
+  const canShowMap = subjectLat && subjectLng && compsWithCoords.length > 0;
+  const showGeocodeButton = subjectLat && subjectLng && compsNeedingGeocode.length > 0 && !geocoding;
+
+  const handleGeocode = useCallback(async () => {
+    setGeocoding(true);
+    setGeocodeError(null);
+    setGeocodeProgress({ done: 0, total: compsNeedingGeocode.length });
+    try {
+      const result = await geocodeComps(comps, (progress) => {
+        setGeocodeProgress(progress);
+      });
+      setGeocodedComps(result);
+    } catch (err) {
+      setGeocodeError(err.message || 'Geocoding failed');
+    } finally {
+      setGeocoding(false);
+      setGeocodeProgress(null);
+    }
+  }, [comps, compsNeedingGeocode.length]);
   if (loading && !comps) {
     return (
       <div className="bg-card backdrop-blur-xl rounded-xl shadow-sm p-12 border border-border text-center">
@@ -193,13 +226,41 @@ const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress
           </div>
         </div>
         <ComparisonTable />
-        {subjectLat && subjectLng && comps?.length > 0 && (
+        {canShowMap && (
           <CompsMap
             subjectLat={subjectLat}
             subjectLng={subjectLng}
             subjectAddress={subjectAddress}
             comps={comps}
           />
+        )}
+        {showGeocodeButton && (
+          <Card className="bg-card border-border shadow-sm">
+            <CardContent className="flex flex-col items-center justify-center py-8 gap-3">
+              <MapPin className="w-10 h-10 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground text-center max-w-md">
+                {compsWithCoords.length > 0
+                  ? `${compsNeedingGeocode.length} comp${compsNeedingGeocode.length !== 1 ? 's' : ''} missing map coordinates.`
+                  : `${compsNeedingGeocode.length} comp${compsNeedingGeocode.length !== 1 ? 's are' : ' is'} missing map coordinates — geocode to view the Comps Map.`}
+              </p>
+              <Button onClick={handleGeocode} className="gap-2" size="sm">
+                <MapPin className="w-4 h-4" /> Geocode & Show Map
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+        {geocoding && (
+          <Card className="bg-card border-border shadow-sm">
+            <CardContent className="flex flex-col items-center justify-center py-8 gap-3">
+              <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              <p className="text-sm text-muted-foreground">
+                Geocoding addresses{geocodeProgress ? ` (${geocodeProgress.done}/${geocodeProgress.total})` : ''}…
+              </p>
+            </CardContent>
+          </Card>
+        )}
+        {geocodeError && (
+          <p className="text-xs text-destructive text-center">{geocodeError}</p>
         )}
       </div>
     );
@@ -300,13 +361,41 @@ const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress
       {comps.length > 0 && hasSubjectData && (
         <ComparisonTable />
       )}
-      {subjectLat && subjectLng && comps?.length > 0 && (
+      {canShowMap && (
         <CompsMap
           subjectLat={subjectLat}
           subjectLng={subjectLng}
           subjectAddress={subjectAddress}
           comps={comps}
         />
+      )}
+      {showGeocodeButton && (
+        <Card className="bg-card border-border shadow-sm">
+          <CardContent className="flex flex-col items-center justify-center py-8 gap-3">
+            <MapPin className="w-10 h-10 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground text-center max-w-md">
+              {compsWithCoords.length > 0
+                ? `${compsNeedingGeocode.length} comp${compsNeedingGeocode.length !== 1 ? 's' : ''} missing map coordinates.`
+                : `${compsNeedingGeocode.length} comp${compsNeedingGeocode.length !== 1 ? 's are' : ' is'} missing map coordinates — geocode to view the Comps Map.`}
+            </p>
+            <Button onClick={handleGeocode} className="gap-2" size="sm">
+              <MapPin className="w-4 h-4" /> Geocode & Show Map
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+      {geocoding && (
+        <Card className="bg-card border-border shadow-sm">
+          <CardContent className="flex flex-col items-center justify-center py-8 gap-3">
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+            <p className="text-sm text-muted-foreground">
+              Geocoding addresses{geocodeProgress ? ` (${geocodeProgress.done}/${geocodeProgress.total})` : ''}…
+            </p>
+          </CardContent>
+        </Card>
+      )}
+      {geocodeError && (
+        <p className="text-xs text-destructive text-center">{geocodeError}</p>
       )}
     </div>
   );
