@@ -71,7 +71,7 @@ function geocodeViaPlacesAPI(address) {
         resolve(null);
       }
     }),
-    6000
+    8000
   );
 }
 
@@ -172,16 +172,21 @@ export async function geocodeComps(comps, onProgress) {
 
     for (let i = 0; i < stillNeed.length; i++) {
       const { index, address } = stillNeed[i];
-      const result = await geocodeSingleAddress(address);
-      if (result) {
-        geocoded[index] = result;
+      try {
+        const result = await geocodeSingleAddress(address);
+        if (result) {
+          geocoded[index] = result;
+        }
+      } catch {
+        // Skip addresses that error out; partial results are still useful
       }
       done++;
       if (onProgress) onProgress({ done, total });
-      if (i < stillNeed.length - 1) await sleep(350);
+      if (i < stillNeed.length - 1) await sleep(400);
     }
   }
 
+  // Return comps with whatever coordinates we resolved (partial is OK)
   return comps.map((comp, i) => {
     if (geocoded[i]) {
       return { ...comp, ...geocoded[i] };
