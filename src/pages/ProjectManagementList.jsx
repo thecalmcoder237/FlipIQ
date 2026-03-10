@@ -170,15 +170,25 @@ const ProjectManagementList = () => {
                 Active rehab deals — track tasks, budget, materials, and progress.
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('/deal-history')}
-              className="hidden sm:flex items-center gap-2"
-            >
-              <ClipboardList className="w-4 h-4" />
-              All Deals
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/project-management/vendors')}
+                className="hidden sm:flex items-center gap-2 text-muted-foreground hover:text-foreground"
+              >
+                Vendors &amp; payment methods
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/deal-history')}
+                className="hidden sm:flex items-center gap-2"
+              >
+                <ClipboardList className="w-4 h-4" />
+                All Deals
+              </Button>
+            </div>
           </div>
 
           {/* Stats row */}

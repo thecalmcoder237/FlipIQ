@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, DollarSign, ChevronDown, ChevronUp, RefreshCw, Sparkles, AlertTriangle, History, RotateCcw, Plus, Search } from 'lucide-react';
+import { Building2, DollarSign, ChevronDown, ChevronUp, RefreshCw, Sparkles, AlertTriangle, History, RotateCcw, Plus, Search, Trash2, Pencil } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -74,6 +74,7 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
   const [loading, setLoading] = useState(false);
   const [compsRefreshing, setCompsRefreshing] = useState(false);
   const [addCompModalOpen, setAddCompModalOpen] = useState(false);
+  const [editCompIndex, setEditCompIndex] = useState(null);
   const [compsSearching, setCompsSearching] = useState(false);
   const [fetchError, setFetchError] = useState(null);
   const [apiUsage, setApiUsage] = useState(null);
@@ -165,19 +166,13 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
         console.debug('[PropertyIntel] calling fetchComps', { address, zipToSend, subjectSpecs: subjectSpecsForComps });
       }
       // #endregion
-      // Extract lat/lng from property response to enable Realie coordinate-based comps
-      const propLat = propertyResponse?.latitude != null && Number.isFinite(Number(propertyResponse.latitude)) ? Number(propertyResponse.latitude) : undefined;
-      const propLng = propertyResponse?.longitude != null && Number.isFinite(Number(propertyResponse.longitude)) ? Number(propertyResponse.longitude) : undefined;
       try {
         compsResponse = await fetchComps(address, zipToSend, {
           city: citySend,
-          county: countySend,
           state: stateSend,
           propertyId: propertyIdForComps,
           subjectAddress: propertyResponse?.address ?? propertyResponse?.formattedAddress ?? propertyResponse?.streetAddress ?? address,
           subjectSpecs: subjectSpecsForComps,
-          lat: propLat,
-          lng: propLng,
           userId: currentUser?.id,
         });
         // #region agent log
@@ -300,18 +295,12 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
         console.debug('[PropertyIntel] refreshComps request', { address, zipToSend, subjectSpecs: subjectSpecsRefresh });
       }
       // #endregion
-      const refreshLat = inputs.propertyIntelligence?.latitude != null && Number.isFinite(Number(inputs.propertyIntelligence.latitude)) ? Number(inputs.propertyIntelligence.latitude) : undefined;
-      const refreshLng = inputs.propertyIntelligence?.longitude != null && Number.isFinite(Number(inputs.propertyIntelligence.longitude)) ? Number(inputs.propertyIntelligence.longitude) : undefined;
-      const countyRefresh = inputs.county || inputs.propertyIntelligence?.county;
       const compsResponse = await fetchComps(address, zipToSend, {
         city: citySend,
-        county: countyRefresh,
         state: stateSend,
         propertyId: propertyIdForComps,
         subjectAddress: inputs.propertyIntelligence?.address ?? inputs.propertyIntelligence?.formattedAddress ?? inputs.propertyIntelligence?.streetAddress ?? address,
         subjectSpecs: subjectSpecsRefresh,
-        lat: refreshLat,
-        lng: refreshLng,
         userId: currentUser?.id,
       });
       // #region agent log
@@ -374,6 +363,30 @@ setCompsRefreshing(false);
     const normalized = normalizePropertyIntelligenceResponse(merged);
     onPropertyDataFetch(normalized);
     toast({ title: 'Comp added', description: 'Comparable sale added to the list.' });
+  };
+
+  const handleRemoveComp = (index) => {
+    if (!onPropertyDataFetch) return;
+    const existing = propertyData ?? {};
+    const current = Array.isArray(existing.recentComps) ? existing.recentComps : [];
+    if (index < 0 || index >= current.length) return;
+    const nextComps = current.filter((_, i) => i !== index);
+    const merged = { ...existing, recentComps: nextComps };
+    const normalized = normalizePropertyIntelligenceResponse(merged);
+    onPropertyDataFetch(normalized);
+    toast({ title: 'Comp removed', description: 'Comparable sale removed from the list.' });
+  };
+
+  const handleUpdateComp = (index, updatedComp) => {
+    if (!onPropertyDataFetch) return;
+    const existing = propertyData ?? {};
+    const current = Array.isArray(existing.recentComps) ? existing.recentComps : [];
+    if (index < 0 || index >= current.length) return;
+    const nextComps = current.map((c, i) => (i === index ? updatedComp : c));
+    const merged = { ...existing, recentComps: nextComps };
+    const normalized = normalizePropertyIntelligenceResponse(merged);
+    onPropertyDataFetch(normalized);
+    toast({ title: 'Comp updated', description: 'Comparable sale updated.' });
   };
 
   const handleSearchCompsWithAI = async (e) => {
@@ -683,7 +696,7 @@ setCompsRefreshing(false);
                         variant="ghost"
                         size="sm"
                         className="shrink-0 text-muted-foreground hover:text-foreground"
-                        onClick={() => setAddCompModalOpen(true)}
+                        onClick={() => { setEditCompIndex(null); setAddCompModalOpen(true); }}
                         title="Add comp manually"
                       >
                         <Plus className="h-4 w-4" />
@@ -741,6 +754,7 @@ setCompsRefreshing(false);
                               <TableHead className="text-muted-foreground font-medium">Beds/Baths</TableHead>
                               <TableHead className="text-muted-foreground font-medium">DOM</TableHead>
                               <TableHead className="text-muted-foreground font-medium">Sale Date</TableHead>
+                              {!readOnly && <TableHead className="text-muted-foreground font-medium w-[52px]"> </TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -753,11 +767,23 @@ setCompsRefreshing(false);
                                   <TableCell className="text-muted-foreground">{comp.beds} / {comp.baths}</TableCell>
                                   <TableCell className="text-muted-foreground">{comp.dom}</TableCell>
                                   <TableCell className="text-muted-foreground">{formatDateUS(comp.saleDate)}</TableCell>
+                                  {!readOnly && (
+                                    <TableCell className="p-1">
+                                      <div className="flex items-center gap-0.5">
+                                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => setEditCompIndex(i)} title="Edit comp (e.g. add lat/lng for map)">
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => handleRemoveComp(i)} title="Remove comp">
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  )}
                                 </TableRow>
                               ))
                             ) : (
                               <TableRow className="hover:bg-transparent">
-                                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                                <TableCell colSpan={readOnly ? 6 : 7} className="text-center text-muted-foreground py-8">
                                   {propertyData?.warnings?.length
                                     ? propertyData.warnings.find((w) => typeof w === 'string' && w.toLowerCase().includes('comparable'))
                                       || propertyData.warnings[0]
@@ -774,9 +800,14 @@ setCompsRefreshing(false);
               </AnimatePresence>
             </Card>
             <AddCompModal
-              open={addCompModalOpen}
-              onOpenChange={setAddCompModalOpen}
-              onSubmit={handleAddComp}
+              open={addCompModalOpen || editCompIndex !== null}
+              onOpenChange={(open) => { if (!open) { setAddCompModalOpen(false); setEditCompIndex(null); } }}
+              onSubmit={(comp, index) => {
+                if (index != null) { handleUpdateComp(index, comp); setEditCompIndex(null); }
+                else { handleAddComp(comp); setAddCompModalOpen(false); }
+              }}
+              initialComp={editCompIndex !== null && Array.isArray(recentComps) && recentComps[editCompIndex] ? recentComps[editCompIndex] : null}
+              compIndex={editCompIndex ?? undefined}
             />
           </>
         )}

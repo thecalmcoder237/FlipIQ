@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -20,16 +20,44 @@ const defaultForm = {
   beds: '',
   baths: '',
   dom: '',
+  latitude: '',
+  longitude: '',
 };
 
+function compToForm(comp) {
+  if (!comp || typeof comp !== 'object') return defaultForm;
+  return {
+    address: comp.address ?? '',
+    salePrice: comp.salePrice != null ? String(comp.salePrice) : (comp.price != null ? String(comp.price) : ''),
+    saleDate: comp.saleDate ? String(comp.saleDate).slice(0, 10) : '',
+    sqft: comp.sqft != null ? String(comp.sqft) : '',
+    yearBuilt: comp.yearBuilt != null ? String(comp.yearBuilt) : '',
+    beds: comp.beds != null ? String(comp.beds) : (comp.bedrooms != null ? String(comp.bedrooms) : ''),
+    baths: comp.baths != null ? String(comp.baths) : (comp.bathrooms != null ? String(comp.bathrooms) : ''),
+    dom: comp.dom != null ? String(comp.dom) : (comp.daysOnMarket != null ? String(comp.daysOnMarket) : ''),
+    latitude: comp.latitude != null ? String(comp.latitude) : '',
+    longitude: comp.longitude != null ? String(comp.longitude) : '',
+  };
+}
+
 /**
- * Modal to add a single comparable (manual entry).
- * Builds a comp object in canonical shape; parent should run through normalizeComp if needed and merge into recentComps.
- * @param {{ open: boolean, onOpenChange: (open: boolean) => void, onSubmit: (comp: Record<string, unknown>) => void }} props
+ * Modal to add or edit a comparable. In edit mode pass initialComp and compIndex; onSubmit(comp, compIndex) will be called.
+ * @param {{ open: boolean, onOpenChange: (open: boolean) => void, onSubmit: (comp: Record<string, unknown>, compIndex?: number) => void, initialComp?: Record<string, unknown> | null, compIndex?: number }} props
  */
-export default function AddCompModal({ open, onOpenChange, onSubmit }) {
+export default function AddCompModal({ open, onOpenChange, onSubmit, initialComp = null, compIndex }) {
   const [form, setForm] = useState(defaultForm);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      if (initialComp) {
+        setForm(compToForm(initialComp));
+      } else {
+        setForm(defaultForm);
+      }
+      setError('');
+    }
+  }, [open, initialComp]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -50,6 +78,8 @@ export default function AddCompModal({ open, onOpenChange, onSubmit }) {
       setError('Sale price is required.');
       return;
     }
+    const latNum = form.latitude?.trim() ? Number(form.latitude) : undefined;
+    const lngNum = form.longitude?.trim() ? Number(form.longitude) : undefined;
     const comp = {
       address,
       salePrice: Number(salePrice),
@@ -59,8 +89,10 @@ export default function AddCompModal({ open, onOpenChange, onSubmit }) {
       beds: form.beds?.trim() ? (Number(form.beds) || form.beds) : undefined,
       baths: form.baths?.trim() ? (Number(form.baths) || form.baths) : undefined,
       dom: form.dom?.trim() ? (Number(form.dom) || form.dom) : undefined,
+      latitude: latNum != null && Number.isFinite(latNum) ? latNum : undefined,
+      longitude: lngNum != null && Number.isFinite(lngNum) ? lngNum : undefined,
     };
-    onSubmit(comp);
+    onSubmit(comp, compIndex);
     setForm(defaultForm);
     setError('');
     onOpenChange(false);
@@ -78,7 +110,7 @@ export default function AddCompModal({ open, onOpenChange, onSubmit }) {
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Comparable Sale</DialogTitle>
+          <DialogTitle>{initialComp ? 'Edit Comparable Sale' : 'Add Comparable Sale'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -185,6 +217,34 @@ export default function AddCompModal({ open, onOpenChange, onSubmit }) {
               />
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label htmlFor="comp-latitude" className={labelClass}>Latitude (for map)</label>
+              <Input
+                id="comp-latitude"
+                name="latitude"
+                type="text"
+                inputMode="decimal"
+                value={form.latitude}
+                onChange={handleChange}
+                placeholder="33.7490"
+                className="bg-background border-input text-foreground"
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="comp-longitude" className={labelClass}>Longitude (for map)</label>
+              <Input
+                id="comp-longitude"
+                name="longitude"
+                type="text"
+                inputMode="decimal"
+                value={form.longitude}
+                onChange={handleChange}
+                placeholder="-84.3880"
+                className="bg-background border-input text-foreground"
+              />
+            </div>
+          </div>
           {error && (
             <p className="text-sm text-destructive">{error}</p>
           )}
@@ -193,7 +253,7 @@ export default function AddCompModal({ open, onOpenChange, onSubmit }) {
               Cancel
             </Button>
             <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              Add Comp
+              {initialComp ? 'Save changes' : 'Add Comp'}
             </Button>
           </DialogFooter>
         </form>

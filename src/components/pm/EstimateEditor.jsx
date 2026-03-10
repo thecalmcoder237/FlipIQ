@@ -71,14 +71,13 @@ const EstimateEditor = ({ sow, estimate, open, onClose, onSaved }) => {
     try {
       const payload = {
         labor_estimate: parseFloat(form.labor_estimate) || 0,
-        labor_actual: parseFloat(form.labor_actual) || 0,
         labor_paid: form.labor_paid,
         materials_estimate: parseFloat(form.materials_estimate) || 0,
         permits_estimate: parseFloat(form.permits_estimate) || 0,
-        permits_actual: parseFloat(form.permits_actual) || 0,
         permits_paid: form.permits_paid,
         notes: form.notes || null,
       };
+      // labor_actual and permits_actual are synced from project_transactions (trigger)
       const saved = await estimatesService.upsertForSow(sow.id, payload);
       onSaved?.(saved);
       toast({ title: 'Estimates saved' });
@@ -102,7 +101,13 @@ const EstimateEditor = ({ sow, estimate, open, onClose, onSaved }) => {
             <p className="text-sm font-semibold text-foreground mb-3">Labor</p>
             <div className="grid grid-cols-2 gap-3">
               <NumInput label="Labor Estimate" value={form.labor_estimate} onChange={(v) => set('labor_estimate', v)} />
-              <NumInput label="Labor Actual" value={form.labor_actual} onChange={(v) => set('labor_actual', v)} />
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Labor Actual</label>
+                <p className="text-sm font-semibold text-foreground py-2 px-3 bg-muted rounded-lg">
+                  ${Number(form.labor_actual || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">From Transactions tab</p>
+              </div>
             </div>
             <div className="mt-2">
               <CheckRow label="Labor Paid" checked={form.labor_paid} onChange={(v) => set('labor_paid', v)} />
@@ -123,7 +128,13 @@ const EstimateEditor = ({ sow, estimate, open, onClose, onSaved }) => {
             <p className="text-sm font-semibold text-foreground mb-3">Permits</p>
             <div className="grid grid-cols-2 gap-3">
               <NumInput label="Permits Estimate" value={form.permits_estimate} onChange={(v) => set('permits_estimate', v)} />
-              <NumInput label="Permits Actual" value={form.permits_actual} onChange={(v) => set('permits_actual', v)} />
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Permits Actual</label>
+                <p className="text-sm font-semibold text-foreground py-2 px-3 bg-muted rounded-lg">
+                  ${Number(form.permits_actual || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">From Transactions tab</p>
+              </div>
             </div>
             <div className="mt-2">
               <CheckRow label="Permits Paid" checked={form.permits_paid} onChange={(v) => set('permits_paid', v)} />

@@ -132,6 +132,8 @@ const EditDealModal = ({ isOpen, onClose, deal, onSave }) => {
                   <option value="Funded">Funded</option>
                   <option value="Closed">Closed</option>
                   <option value="Completed">Completed</option>
+                  <option value="Passed">Passed</option>
+                  <option value="Lost">Lost</option>
                   <option value="Abandoned">Abandoned</option>
                 </select>
               </div>

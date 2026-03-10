@@ -194,6 +194,26 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
     handlePropertyDataFetch(normalized);
   };
 
+  const handleRemoveComp = (index) => {
+    const existing = inputs?.propertyIntelligence ?? {};
+    const current = Array.isArray(existing.recentComps) ? existing.recentComps : [];
+    if (index < 0 || index >= current.length) return;
+    const nextComps = current.filter((_, i) => i !== index);
+    const merged = { ...existing, recentComps: nextComps };
+    const normalized = normalizePropertyIntelligenceResponse(merged);
+    handlePropertyDataFetch(normalized);
+  };
+
+  const handleUpdateComp = (index, updatedComp) => {
+    const existing = inputs?.propertyIntelligence ?? {};
+    const current = Array.isArray(existing.recentComps) ? existing.recentComps : [];
+    if (index < 0 || index >= current.length) return;
+    const nextComps = current.map((c, i) => (i === index ? updatedComp : c));
+    const merged = { ...existing, recentComps: nextComps };
+    const normalized = normalizePropertyIntelligenceResponse(merged);
+    handlePropertyDataFetch(normalized);
+  };
+
   const handleSearchCompsWithAI = async () => {
     const address = (inputs?.address ?? deal?.address ?? '').trim();
     if (!address || address.length < 5) {
@@ -564,6 +584,8 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
                loading={false}
                onRefresh={() => { /* Trigger refresh in child */ }}
                onAddComp={canEdit ? handleAddComp : undefined}
+               onRemoveComp={canEdit ? handleRemoveComp : undefined}
+               onEditComp={canEdit ? handleUpdateComp : undefined}
                onSearchCompsWithAI={canEdit ? handleSearchCompsWithAI : undefined}
                compsSearching={compsSearching}
                source={inputs.propertyIntelligence?.recentComps?.length ? (inputs.propertyIntelligence?.source ?? "Realie/RentCast") : "Manual/Legacy"}

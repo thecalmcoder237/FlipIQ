@@ -393,3 +393,260 @@ export const issuesService = {
     if (error) throw error;
   },
 };
+
+// ============================================================
+// payment_methods
+// ============================================================
+export const paymentMethodsService = {
+  async getForUser(userId) {
+    const { data, error } = await supabase
+      .from('payment_methods')
+      .select('*')
+      .eq('user_id', userId)
+      .order('name');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(userId, fields) {
+    const { data, error } = await supabase
+      .from('payment_methods')
+      .insert({ user_id: userId, ...fields })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id, fields) {
+    const { data, error } = await supabase
+      .from('payment_methods')
+      .update(fields)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id) {
+    const { error } = await supabase.from('payment_methods').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
+
+// ============================================================
+// project_vendors
+// ============================================================
+export const vendorsService = {
+  async getForUser(userId) {
+    const { data, error } = await supabase
+      .from('project_vendors')
+      .select('*')
+      .eq('user_id', userId)
+      .order('name');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(userId, fields) {
+    const { data, error } = await supabase
+      .from('project_vendors')
+      .insert({ user_id: userId, ...fields })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id, fields) {
+    const { data, error } = await supabase
+      .from('project_vendors')
+      .update({ ...fields, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id) {
+    const { error } = await supabase.from('project_vendors').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  async uploadW9(userId, vendorId, file) {
+    const ext = file.name.split('.').pop();
+    const path = `${userId}/vendors/${vendorId}_w9.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from('materials-receipts')
+      .upload(path, file, { upsert: true });
+    if (uploadError) throw uploadError;
+    const { data: urlData } = supabase.storage.from('materials-receipts').getPublicUrl(path);
+    return urlData?.publicUrl || null;
+  },
+};
+
+// ============================================================
+// project_transactions
+// ============================================================
+export const transactionsService = {
+  async getForDeal(dealId) {
+    const { data, error } = await supabase
+      .from('project_transactions')
+      .select('*, rehab_sow(name), project_vendors(name), payment_methods(name)')
+      .eq('deal_id', dealId)
+      .order('transaction_date', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getForSow(sowId) {
+    const { data, error } = await supabase
+      .from('project_transactions')
+      .select('*, project_vendors(name), payment_methods(name)')
+      .eq('sow_id', sowId)
+      .order('transaction_date', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(fields) {
+    const { data, error } = await supabase
+      .from('project_transactions')
+      .insert(fields)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id, fields) {
+    const { data, error } = await supabase
+      .from('project_transactions')
+      .update({ ...fields, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id) {
+    const { error } = await supabase.from('project_transactions').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  async uploadInvoice(dealId, transactionId, file) {
+    const ext = file.name.split('.').pop();
+    const path = `${dealId}/invoices/${transactionId}_${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from('materials-receipts')
+      .upload(path, file, { upsert: false });
+    if (uploadError) throw uploadError;
+    const { data: urlData } = supabase.storage.from('materials-receipts').getPublicUrl(path);
+    return urlData?.publicUrl || null;
+  },
+};
+
+// ============================================================
+// rehab_bids
+// ============================================================
+export const bidsService = {
+  async getForSow(sowId) {
+    const { data, error } = await supabase
+      .from('rehab_bids')
+      .select('*')
+      .eq('sow_id', sowId)
+      .order('sort_order');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getForDeal(dealId) {
+    const { data, error } = await supabase
+      .from('rehab_bids')
+      .select('*, rehab_sow!inner(deal_id, name, sort_order)')
+      .eq('rehab_sow.deal_id', dealId)
+      .order('rehab_sow(sort_order)', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(sowId, fields) {
+    const { data, error } = await supabase
+      .from('rehab_bids')
+      .insert({ sow_id: sowId, ...fields })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id, fields) {
+    const { data, error } = await supabase
+      .from('rehab_bids')
+      .update(fields)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id) {
+    const { error } = await supabase.from('rehab_bids').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
+
+// ============================================================
+// rehab_budget_templates
+// ============================================================
+export const budgetTemplatesService = {
+  async getForUser(userId) {
+    const { data, error } = await supabase
+      .from('rehab_budget_templates')
+      .select('*')
+      .or(`user_id.eq.${userId},is_public.eq.true`)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getPublic() {
+    const { data, error } = await supabase
+      .from('rehab_budget_templates')
+      .select('*')
+      .eq('is_public', true)
+      .order('name');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(userId, fields) {
+    const { data, error } = await supabase
+      .from('rehab_budget_templates')
+      .insert({ user_id: userId, ...fields })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async update(id, fields) {
+    const { data, error } = await supabase
+      .from('rehab_budget_templates')
+      .update(fields)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async delete(id) {
+    const { error } = await supabase.from('rehab_budget_templates').delete().eq('id', id);
+    if (error) throw error;
+  },
+};

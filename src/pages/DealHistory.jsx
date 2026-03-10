@@ -24,7 +24,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-const STATUS_FILTER_OPTIONS = ['All', 'Favorites', 'Analyzing', 'Under Contract', 'Offer Sent', 'Funded', 'Closed', 'Completed', 'Passed'];
+const STATUS_FILTER_OPTIONS = ['All', 'Favorites', 'Analyzing', 'Under Contract', 'Offer Sent', 'Funded', 'Closed', 'Completed', 'Passed', 'Lost'];
 
 function getDealCountsByPeriod(deals) {
   const now = new Date();
@@ -390,7 +390,7 @@ const DealHistory = () => {
                         <span className={`text-xs px-2 py-0.5 rounded-full border ${
                           deal.status === 'Completed' || deal.status === 'Closed' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 
                           deal.status === 'Under Contract' || deal.status === 'Funded' || deal.status === 'Offer Sent' ? 'bg-accentBrand/20 text-accentBrand border-accentBrand/30' :
-                          deal.status === 'Passed' ? 'bg-muted text-muted-foreground border-border' :
+                          deal.status === 'Passed' || deal.status === 'Lost' ? 'bg-muted text-muted-foreground border-border' :
                           'bg-primary/20 text-primary border-primary/30'
                         }`}>
                           {deal.status || 'Analyzing'}
@@ -455,6 +455,7 @@ const DealHistory = () => {
                               <SelectItem value="Closed">Closed</SelectItem>
                               <SelectItem value="Completed">Completed</SelectItem>
                               <SelectItem value="Passed">Passed</SelectItem>
+                              <SelectItem value="Lost">Lost</SelectItem>
                             </SelectContent>
                           </Select>
                           <Button

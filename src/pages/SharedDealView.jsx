@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { dealService } from '@/services/dealService';
 import { calculateDealMetrics } from '@/utils/dealCalculations';
 import DealAnalysisPage from '@/pages/DealAnalysisPage';
+import SharedDealPreview from '@/components/SharedDealPreview';
 
 const SharedDealView = () => {
   const { token } = useParams();
@@ -48,12 +49,17 @@ const SharedDealView = () => {
 
   const metrics = calculateDealMetrics(deal);
   return (
-    <DealAnalysisPage
-      readOnly
-      initialDeal={deal}
-      initialInputs={deal}
-      initialMetrics={metrics}
-    />
+    <div className="min-h-screen bg-muted">
+      <div className="max-w-7xl mx-auto px-2 md:px-4 py-4 md:py-6">
+        <SharedDealPreview deal={deal} metrics={metrics} />
+      </div>
+      <DealAnalysisPage
+        readOnly
+        initialDeal={deal}
+        initialInputs={deal}
+        initialMetrics={metrics}
+      />
+    </div>
   );
 };
 

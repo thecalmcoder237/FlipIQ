@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Home, Bed, Bath, Maximize, Calendar, RefreshCw, AlertCircle, Car, Layers, Warehouse, BarChart3, Plus, Search } from 'lucide-react';
+import { Home, Bed, Bath, Maximize, Calendar, RefreshCw, AlertCircle, Car, Layers, Warehouse, BarChart3, Plus, Search, Trash2, Pencil } from 'lucide-react';
 import { formatDateUS } from '@/utils/dateUtils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,8 +10,9 @@ import CompsMap from './CompsMap';
 import ErrorBoundary from './ErrorBoundary';
 import AddCompModal from './AddCompModal';
 
-const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress, subjectSpecs, avmValue, tableOnly = false, subjectLat, subjectLng, isMapVisible = true, onAddComp, onSearchCompsWithAI, compsSearching = false }) => {
+const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress, subjectSpecs, avmValue, tableOnly = false, subjectLat, subjectLng, isMapVisible = true, onAddComp, onRemoveComp, onEditComp, onSearchCompsWithAI, compsSearching = false }) => {
   const [addCompModalOpen, setAddCompModalOpen] = useState(false);
+  const [editCompIndex, setEditCompIndex] = useState(null);
 
   if (loading && !comps) {
     return (
@@ -30,7 +31,7 @@ const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress
           <p className="text-muted-foreground mb-6">Could not find sufficient recent sales data.</p>
           <div className="flex flex-wrap justify-center gap-2">
             {onAddComp && (
-              <Button onClick={() => setAddCompModalOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Button onClick={() => { setEditCompIndex(null); setAddCompModalOpen(true); }} className="bg-primary hover:bg-primary/90 text-primary-foreground">
                 <Plus className="w-4 h-4 mr-2" /> Add comp manually
               </Button>
             )}
@@ -45,7 +46,16 @@ const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress
             </Button>
           </div>
           {onAddComp && (
-            <AddCompModal open={addCompModalOpen} onOpenChange={setAddCompModalOpen} onSubmit={(comp) => { onAddComp(comp); setAddCompModalOpen(false); }} />
+            <AddCompModal
+              open={addCompModalOpen || (onEditComp && editCompIndex !== null)}
+              onOpenChange={(open) => { if (!open) { setAddCompModalOpen(false); setEditCompIndex(null); } }}
+              onSubmit={(comp, index) => {
+                if (index != null && onEditComp) { onEditComp(index, comp); setEditCompIndex(null); }
+                else { onAddComp(comp); setAddCompModalOpen(false); }
+              }}
+              initialComp={onEditComp && editCompIndex !== null && comps[editCompIndex] ? comps[editCompIndex] : null}
+              compIndex={editCompIndex ?? undefined}
+            />
           )}
        </div>
     );
@@ -183,6 +193,28 @@ const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress
                   );
                 })}
               </TableRow>
+              {(onRemoveComp || onEditComp) && (
+                <TableRow className="border-border hover:bg-accent/50">
+                  <TableCell className="font-medium text-muted-foreground sticky left-0 bg-card">Actions</TableCell>
+                  {hasSubjectData && <TableCell />}
+                  {comps.map((_, i) => (
+                    <TableCell key={i}>
+                      <div className="flex items-center gap-0.5">
+                        {onEditComp && (
+                          <Button type="button" variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground" onClick={() => setEditCompIndex(i)} title="Edit comp (e.g. add lat/lng for map)">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {onRemoveComp && (
+                          <Button type="button" variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-destructive" onClick={() => onRemoveComp(i)} title="Remove comp">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  ))}
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </div>
@@ -201,7 +233,7 @@ const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded border border-border">Source: {source}</span>
             {onAddComp && (
-              <Button size="sm" variant="ghost" onClick={() => setAddCompModalOpen(true)} className="text-muted-foreground hover:text-foreground" title="Add comp manually">
+              <Button size="sm" variant="ghost" onClick={() => { setEditCompIndex(null); setAddCompModalOpen(true); }} className="text-muted-foreground hover:text-foreground" title="Add comp manually">
                 <Plus className="w-4 h-4 mr-2" /> Add comp
               </Button>
             )}
@@ -240,7 +272,18 @@ const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress
             />
           </ErrorBoundary>
         )}
-        {onAddComp && <AddCompModal open={addCompModalOpen} onOpenChange={setAddCompModalOpen} onSubmit={(comp) => { onAddComp(comp); setAddCompModalOpen(false); }} />}
+        {onAddComp && (
+          <AddCompModal
+            open={addCompModalOpen || (onEditComp && editCompIndex !== null)}
+            onOpenChange={(open) => { if (!open) { setAddCompModalOpen(false); setEditCompIndex(null); } }}
+            onSubmit={(comp, index) => {
+              if (index != null && onEditComp) { onEditComp(index, comp); setEditCompIndex(null); }
+              else { onAddComp(comp); setAddCompModalOpen(false); }
+            }}
+            initialComp={onEditComp && editCompIndex !== null && comps[editCompIndex] ? comps[editCompIndex] : null}
+            compIndex={editCompIndex ?? undefined}
+          />
+        )}
       </div>
     );
   }
@@ -254,7 +297,7 @@ const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress
          <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded border border-border">Source: {source}</span>
             {onAddComp && (
-              <Button size="sm" variant="ghost" onClick={() => setAddCompModalOpen(true)} className="text-muted-foreground hover:text-foreground" title="Add comp manually">
+              <Button size="sm" variant="ghost" onClick={() => { setEditCompIndex(null); setAddCompModalOpen(true); }} className="text-muted-foreground hover:text-foreground" title="Add comp manually">
                 <Plus className="w-4 h-4 mr-2" /> Add comp
               </Button>
             )}
@@ -286,7 +329,21 @@ const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress
             transition={{ delay: idx * 0.05 }}
             className="bg-card rounded-xl overflow-hidden border border-border hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/10 group shadow-sm"
           >
-            <div className="p-5">
+            <div className="p-5 relative">
+               {(onEditComp || onRemoveComp) && (
+                 <div className="absolute top-2 right-2 flex items-center gap-0.5">
+                   {onEditComp && (
+                     <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => setEditCompIndex(idx)} title="Edit comp (e.g. add lat/lng for map)">
+                       <Pencil className="h-4 w-4" />
+                     </Button>
+                   )}
+                   {onRemoveComp && (
+                     <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => onRemoveComp(idx)} title="Remove comp">
+                       <Trash2 className="h-4 w-4" />
+                     </Button>
+                   )}
+                 </div>
+               )}
                <div className="flex justify-between items-start mb-3">
                   <div>
                      <h3 className="font-bold text-foreground text-sm line-clamp-1 group-hover:text-primary transition-colors">
@@ -367,7 +424,18 @@ const CompsDisplay = ({ comps, loading, onRefresh, source = "AI", subjectAddress
           />
         </ErrorBoundary>
       )}
-      {onAddComp && <AddCompModal open={addCompModalOpen} onOpenChange={setAddCompModalOpen} onSubmit={(comp) => { onAddComp(comp); setAddCompModalOpen(false); }} />}
+      {onAddComp && (
+          <AddCompModal
+            open={addCompModalOpen || (onEditComp && editCompIndex !== null)}
+            onOpenChange={(open) => { if (!open) { setAddCompModalOpen(false); setEditCompIndex(null); } }}
+            onSubmit={(comp, index) => {
+              if (index != null && onEditComp) { onEditComp(index, comp); setEditCompIndex(null); }
+              else { onAddComp(comp); setAddCompModalOpen(false); }
+            }}
+            initialComp={onEditComp && editCompIndex !== null && comps[editCompIndex] ? comps[editCompIndex] : null}
+            compIndex={editCompIndex ?? undefined}
+          />
+        )}
     </div>
   );
 };

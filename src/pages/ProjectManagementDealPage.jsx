@@ -25,6 +25,9 @@ import {
   List,
   LayoutList,
   Download,
+  FileText,
+  Receipt,
+  LayoutDashboard,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,6 +45,8 @@ import {
   photosService,
   issuesService,
   materialsService,
+  budgetTemplatesService,
+  transactionsService,
 } from '@/services/projectManagementService';
 import Breadcrumb from '@/components/Breadcrumb';
 import RehabTimelineDashboard from '@/components/pm/RehabTimelineDashboard';
@@ -51,6 +56,10 @@ import PhotoJournal from '@/components/pm/PhotoJournal';
 import RiskIssueLog from '@/components/pm/RiskIssueLog';
 import RehabSOWCard from '@/components/pm/RehabSOWCard';
 import EstimateEditor from '@/components/pm/EstimateEditor';
+import TransactionsLog from '@/components/pm/TransactionsLog';
+import BidsSection from '@/components/pm/BidsSection';
+import ProjectChartsDashboard from '@/components/pm/ProjectChartsDashboard';
+import { BudgetVsActualBarChart, CostMixPieChart } from '@/components/pm/ProjectBudgetCharts';
 import { parseSOWLineItems } from '@/utils/sowParser';
 
 const ACTIVE_REHAB_STATUSES = ['Funded', 'Closed', 'Completed'];
@@ -169,6 +178,61 @@ const TaskForm = ({ initial = EMPTY_TASK, phases = [], onSubmit, onCancel, loadi
   );
 };
 
+// ─── Save Template Form ──────────────────────────────────────────────────────
+const SaveTemplateForm = ({ loading, onSave, onCancel }) => {
+  const [name, setName] = useState('');
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-xs font-medium text-muted-foreground mb-1">Template name *</label>
+        <input
+          className="w-full bg-muted border border-input rounded-lg px-3 py-2 text-sm"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Light rehab 3br"
+        />
+      </div>
+      <DialogFooter className="pt-2">
+        <Button variant="outline" onClick={onCancel} disabled={loading}>Cancel</Button>
+        <Button onClick={() => onSave(name)} disabled={loading || !name.trim()}>
+          {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+          Save template
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+};
+
+// ─── Load Template Form ──────────────────────────────────────────────────────
+const LoadTemplateForm = ({ templates, loading, onLoad, onCancel }) => (
+  <div className="space-y-4">
+    {templates.length === 0 ? (
+      <p className="text-sm text-muted-foreground">No templates yet. Save your current scope as a template from the Budget tab.</p>
+    ) : (
+      <ul className="max-h-60 overflow-y-auto space-y-2">
+        {templates.map((t) => (
+          <li key={t.id} className="flex items-center justify-between gap-2 p-3 rounded-lg border border-border hover:bg-muted/50">
+            <span className="font-medium text-foreground">{t.name}</span>
+            <span className="text-xs text-muted-foreground">
+              {t.template_data?.items?.length ?? 0} items
+            </span>
+            <Button
+              size="sm"
+              onClick={() => onLoad(t.id)}
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Load'}
+            </Button>
+          </li>
+        ))}
+      </ul>
+    )}
+    <DialogFooter className="pt-2">
+      <Button variant="outline" onClick={onCancel}>Close</Button>
+    </DialogFooter>
+  </div>
+);
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const ProjectManagementDealPage = () => {
   const [searchParams] = useSearchParams();
@@ -187,6 +251,7 @@ const ProjectManagementDealPage = () => {
   const [photos, setPhotos] = useState([]);
   const [issues, setIssues] = useState([]);
   const [allMaterials, setAllMaterials] = useState([]);  // materials for deal (for photo previews)
+  const [transactions, setTransactions] = useState([]);
 
   // UI state
   const [activeTab, setActiveTab] = useState('overview');
@@ -205,13 +270,18 @@ const ProjectManagementDealPage = () => {
   const [savingSOW, setSavingSOW] = useState(false);
   const [savingTask, setSavingTask] = useState(false);
   const [importingSOW, setImportingSOW] = useState(false);
+  const [templateModal, setTemplateModal] = useState(false);
+  const [loadTemplateModal, setLoadTemplateModal] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
 
   // ── Load all data ──────────────────────────────────────────────────────────
   const loadAll = useCallback(async () => {
     if (!dealId || !currentUser) return;
     setLoading(true);
     try {
-      const [dealData, phasesData, sowData, tasksData, photosData, issuesData, materialsData] = await Promise.all([
+      const [dealData, phasesData, sowData, tasksData, photosData, issuesData, materialsData, transactionsData] = await Promise.all([
         dealService.loadDeal(dealId, currentUser.id),
         phasesService.getAll(),
         sowService.getForDeal(dealId),
@@ -219,6 +289,7 @@ const ProjectManagementDealPage = () => {
         photosService.getForDeal(dealId),
         issuesService.getForDeal(dealId),
         materialsService.getForDeal(dealId).catch(() => []),
+        transactionsService.getForDeal(dealId).catch(() => []),
       ]);
 
       if (!dealData) { navigate('/project-management'); return; }
@@ -231,6 +302,7 @@ const ProjectManagementDealPage = () => {
       setPhotos(photosData);
       setIssues(issuesData);
       setAllMaterials(Array.isArray(materialsData) ? materialsData : []);
+      setTransactions(Array.isArray(transactionsData) ? transactionsData : []);
 
       // Load estimates for each SOW item
       const estimateMap = {};
@@ -405,6 +477,74 @@ const ProjectManagementDealPage = () => {
     setEstimates((p) => ({ ...p, [est.sow_id]: est }));
   };
 
+  // ── Budget template: save ──────────────────────────────────────────────────
+  const handleSaveAsTemplate = async (templateName) => {
+    if (!currentUser?.id || !templateName?.trim()) return;
+    setSavingTemplate(true);
+    try {
+      const templateData = sowItems.map((s) => {
+        const est = estimates[s.id];
+        return {
+          name: s.name,
+          category: s.category,
+          phase: s.phase,
+          area_of_work: s.area_of_work,
+          notes: s.notes,
+          labor_estimate: est?.labor_estimate ?? 0,
+          materials_estimate: est?.materials_estimate ?? 0,
+          permits_estimate: est?.permits_estimate ?? 0,
+        };
+      });
+      await budgetTemplatesService.create(currentUser.id, {
+        name: templateName.trim(),
+        is_public: false,
+        template_data: { items: templateData },
+      });
+      toast({ title: 'Template saved' });
+      setTemplateModal(false);
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  // ── Budget template: load ───────────────────────────────────────────────────
+  const handleLoadTemplate = async (templateId) => {
+    if (!dealId || !templateId) return;
+    const t = templates.find((x) => x.id === templateId);
+    if (!t?.template_data?.items?.length) {
+      toast({ variant: 'destructive', title: 'Invalid template', description: 'Template has no scope items.' });
+      return;
+    }
+    setLoadingTemplate(true);
+    try {
+      for (let i = 0; i < t.template_data.items.length; i++) {
+        const item = t.template_data.items[i];
+        const created = await sowService.create(dealId, {
+          name: item.name || 'Scope item',
+          category: item.category || null,
+          phase: item.phase || null,
+          area_of_work: item.area_of_work || null,
+          notes: item.notes || null,
+          status: 'Not Started',
+        });
+        await estimatesService.upsertForSow(created.id, {
+          labor_estimate: item.labor_estimate ?? 0,
+          materials_estimate: item.materials_estimate ?? 0,
+          permits_estimate: item.permits_estimate ?? 0,
+        });
+      }
+      toast({ title: 'Template loaded', description: `Added ${t.template_data.items.length} scope item(s).` });
+      setLoadTemplateModal(false);
+      await loadAll();
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Error loading template', description: e.message });
+    } finally {
+      setLoadingTemplate(false);
+    }
+  };
+
   // ── Filtered scopes (search + filter) ──────────────────────────────────────
   const filteredSowItems = useMemo(() => {
     let list = sowItems;
@@ -575,9 +715,12 @@ const ProjectManagementDealPage = () => {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="flex flex-wrap gap-1 h-auto p-2 mb-6 bg-primary rounded-xl">
               {[
+                { value: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
                 { value: 'overview', label: 'Scope & Tasks', icon: ClipboardList },
+                { value: 'bids', label: 'Bids', icon: FileText },
                 { value: 'timeline', label: 'Timeline', icon: Calendar },
                 { value: 'budget', label: 'Budget', icon: DollarSign },
+                { value: 'transactions', label: 'Transactions', icon: Receipt },
                 { value: 'materials', label: 'Materials', icon: Package },
                 { value: 'photos', label: 'Photos', icon: Camera },
                 { value: 'issues', label: 'Issues', icon: AlertTriangle },
@@ -597,6 +740,17 @@ const ProjectManagementDealPage = () => {
                 </TabsTrigger>
               ))}
             </TabsList>
+
+            {/* ── Dashboard Tab ─────────────────────────────────────────────────── */}
+            <TabsContent value="dashboard" className="space-y-4">
+              <ProjectChartsDashboard
+                sowItems={sowItems}
+                estimates={estimates}
+                tasks={tasks}
+                transactions={transactions}
+                materials={allMaterials}
+              />
+            </TabsContent>
 
             {/* ── Scope & Tasks Tab ─────────────────────────────────────────────── */}
             <TabsContent value="overview" className="space-y-4">
@@ -888,9 +1042,103 @@ const ProjectManagementDealPage = () => {
               <RehabTimelineDashboard sowItems={sowItems} />
             </TabsContent>
 
+            {/* ── Bids Tab ─────────────────────────────────────────────────────── */}
+            <TabsContent value="bids">
+              <BidsSection dealId={dealId} sowItems={sowItems} />
+            </TabsContent>
+
             {/* ── Budget Tab ────────────────────────────────────────────────────── */}
             <TabsContent value="budget">
-              <BudgetVsActualTracker sowItems={sowItems} estimates={estimates} />
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1"
+                    onClick={async () => {
+                      setTemplateModal(true);
+                      if (currentUser?.id) {
+                        const list = await budgetTemplatesService.getForUser(currentUser.id);
+                        setTemplates(list || []);
+                      }
+                    }}
+                    disabled={sowItems.length === 0}
+                  >
+                    <Save className="w-3 h-3" />
+                    Save as template
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1"
+                    onClick={async () => {
+                      setLoadTemplateModal(true);
+                      if (currentUser?.id) {
+                        const list = await budgetTemplatesService.getForUser(currentUser.id);
+                        setTemplates(list || []);
+                      }
+                    }}
+                  >
+                    <FileDown className="w-3 h-3" />
+                    Load template
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1"
+                    onClick={() => {
+                      const headers = ['Scope', 'Category', 'Labor Est', 'Labor Act', 'Materials Est', 'Materials Act', 'Permits Est', 'Permits Act', 'Total Est', 'Total Act', 'Variance'];
+                      const rows = sowItems.map((s) => {
+                        const e = estimates[s.id];
+                        const totalEst = e?.total_estimated ?? 0;
+                        const totalAct = e?.total_actual ?? 0;
+                        return [
+                          s.name || '',
+                          s.category || '',
+                          e?.labor_estimate ?? 0,
+                          e?.labor_actual ?? 0,
+                          e?.materials_estimate ?? 0,
+                          e?.materials_actual ?? 0,
+                          e?.permits_estimate ?? 0,
+                          e?.permits_actual ?? 0,
+                          totalEst,
+                          totalAct,
+                          totalEst - totalAct,
+                        ];
+                      });
+                      const csv = [headers.join(','), ...rows.map((r) => r.map((c) => (typeof c === 'number' ? c : `"${String(c).replace(/"/g, '""')}"`)).join(','))].join('\n');
+                      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `budget-vs-actual-${(deal?.address || 'project').replace(/\s+/g, '-')}-${new Date().toISOString().slice(0, 10)}.csv`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      toast({ title: 'Exported', description: 'Budget vs actual CSV downloaded.' });
+                    }}
+                    disabled={sowItems.length === 0}
+                  >
+                    <Download className="w-3 h-3" />
+                    Export to Excel
+                  </Button>
+                </div>
+                {sowItems.length > 0 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                    <BudgetVsActualBarChart sowItems={sowItems} estimates={estimates} />
+                    <CostMixPieChart sowItems={sowItems} estimates={estimates} />
+                  </div>
+                )}
+                <BudgetVsActualTracker sowItems={sowItems} estimates={estimates} />
+              </div>
+            </TabsContent>
+
+            {/* ── Transactions Tab ─────────────────────────────────────────────── */}
+            <TabsContent value="transactions">
+              <TransactionsLog
+                dealId={dealId}
+                sowItems={sowItems}
+                onDataChange={() => loadAll()}
+              />
             </TabsContent>
 
             {/* ── Materials Tab ─────────────────────────────────────────────────── */}
@@ -985,6 +1233,36 @@ const ProjectManagementDealPage = () => {
         onClose={() => { setEstimateModal(false); setEstimateSow(null); }}
         onSaved={handleEstimateSaved}
       />
+
+      {/* Save as Template Modal */}
+      <Dialog open={templateModal} onOpenChange={setTemplateModal}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Save as budget template</DialogTitle>
+          </DialogHeader>
+          <SaveTemplateForm
+            loading={savingTemplate}
+            onSave={handleSaveAsTemplate}
+            onCancel={() => setTemplateModal(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Load Template Modal */}
+      <Dialog open={loadTemplateModal} onOpenChange={setLoadTemplateModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Load budget template</DialogTitle>
+            <p className="text-xs text-muted-foreground">Scope items and estimates will be added to this project.</p>
+          </DialogHeader>
+          <LoadTemplateForm
+            templates={templates}
+            loading={loadingTemplate}
+            onLoad={handleLoadTemplate}
+            onCancel={() => setLoadTemplateModal(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

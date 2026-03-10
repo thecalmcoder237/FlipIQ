@@ -92,10 +92,10 @@ export const fetchPropertyIntelligence = async (address, zipCode, propertyType, 
 };
 
 /**
- * Fetch comps only (Realie Premium Comparables with RentCast fallback). Use with fetch-property-intelligence; UI merges property + comps.
+ * Fetch comps only (RentCast AVM + listings/sale + properties fallback). Use with fetch-property-intelligence; UI merges property + comps.
  * @param {string} address - Property address
  * @param {string} zipCode - 5-digit ZIP
- * @param {{ city?: string, county?: string, state?: string, propertyId?: string, subjectAddress?: string, subjectSpecs?: { bedrooms?: number, bathrooms?: number }, lat?: number, lng?: number, userId?: string, debug?: boolean }} [options] - Optional: city, county (required for Realie fallback), state, propertyId, subjectAddress, subjectSpecs, lat/lng (required for Realie comps), userId, debug
+ * @param {{ city?: string, state?: string, propertyId?: string, subjectAddress?: string, subjectSpecs?: { bedrooms?: number, bathrooms?: number }, userId?: string, debug?: boolean }} [options]
  */
 export const fetchComps = async (address, zipCode, options = {}) => {
     const body = {
@@ -103,17 +103,11 @@ export const fetchComps = async (address, zipCode, options = {}) => {
         zipCode: String(zipCode ?? '').trim().replace(/\D/g, '').slice(0, 5) || '',
     };
     if (options.city) body.city = options.city;
-    if (options.county) body.county = options.county;
     if (options.state && String(options.state).trim().length >= 2) body.state = String(options.state).trim().slice(0, 2).toUpperCase();
     if (options.propertyId) body.propertyId = options.propertyId;
     if (options.subjectAddress) body.subjectAddress = options.subjectAddress;
     if (options.subjectSpecs && typeof options.subjectSpecs === 'object' && (options.subjectSpecs.bedrooms != null || options.subjectSpecs.bathrooms != null)) {
         body.subjectSpecs = options.subjectSpecs;
-    }
-    // lat/lng enables Realie Premium Comparables (coordinate-based search); pass from property response when available
-    if (options.lat != null && options.lng != null && Number.isFinite(Number(options.lat)) && Number.isFinite(Number(options.lng))) {
-        body.lat = Number(options.lat);
-        body.lng = Number(options.lng);
     }
     if (options.userId) body.userId = options.userId;
     if (options.debug === true || (typeof localStorage !== 'undefined' && localStorage.getItem('propertyIntelDebug') === '1')) body.debug = true;

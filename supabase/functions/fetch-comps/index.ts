@@ -257,6 +257,14 @@ function parsePropertiesList(data: unknown): Array<Record<string, unknown>> {
   return list.filter((x): x is Record<string, unknown> => x != null && typeof x === "object");
 }
 
+/** Returns true if a RentCast record is an active/for-sale listing rather than a closed sale. */
+function isActiveListing(item: Record<string, unknown>): boolean {
+  const status = String(item.status ?? item.listingStatus ?? item.mls_status ?? "").toLowerCase();
+  if (status && (status.includes("active") || status.includes("for sale") || status.includes("listed") || status.includes("new"))) return true;
+  if (status && (status.includes("sold") || status.includes("closed") || status.includes("pending"))) return false;
+  return false;
+}
+
 function mapRentCastToComp(item: Record<string, unknown>): Record<string, unknown> | null {
   if (!item || typeof item !== "object") return null;
   // AVM comparables use formattedAddress/addressLine1; listings use formattedAddress/address/streetAddress
@@ -327,8 +335,9 @@ async function fetchRentCastCompsFromListings(
   const res = await fetch(url, { headers: { "X-Api-Key": apiKey, Accept: "application/json" } });
   if (!res.ok) return [];
   const data = await res.json();
-  const list = Array.isArray(data) ? data : data?.listings ?? data?.comps ?? data?.data ?? [];
-  const mapped = list.map(mapRentCastToComp).filter(Boolean) as Array<Record<string, unknown>>;
+  const rawList = Array.isArray(data) ? data : data?.listings ?? data?.comps ?? data?.data ?? [];
+  const soldOnly = (rawList as Record<string, unknown>[]).filter((item) => !isActiveListing(item));
+  const mapped = soldOnly.map(mapRentCastToComp).filter(Boolean) as Array<Record<string, unknown>>;
   const nowMs = Date.now();
   const within12mo = mapped.filter((c) => {
     const ts = parseSaleDate(c.saleDate ?? c.soldDate);
@@ -431,7 +440,9 @@ async function fetchRentCastCompsFromAvmValue(address: string, zipCode: string):
     : Array.isArray((d as Record<string, unknown>).comparable_sales) ? (d as Record<string, unknown>).comparable_sales as unknown[]
     : [];
   const mapped = comparables
-    .map((item: unknown) => mapRentCastToComp(item as Record<string, unknown>))
+    .map((item: unknown) => item as Record<string, unknown>)
+    .filter((item) => !isActiveListing(item))
+    .map((item) => mapRentCastToComp(item))
     .filter(Boolean) as Array<Record<string, unknown>>;
 
   const rawValue = d.value ?? d.price ?? d.avmValue ?? d.estimatedValue;
