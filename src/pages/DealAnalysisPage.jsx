@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { BarChart3, Hammer, Home, FileText, Share2, Sparkles, Building2, Table as TableIcon, Settings2, Shield, RefreshCw } from 'lucide-react';
+import { BarChart3, Hammer, Home, FileText, Share2, Sparkles, Building2, Table as TableIcon, Settings2, Shield, RefreshCw, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -355,6 +355,22 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
   const displayMetrics = metrics || {};
   const effectiveDealId = dealId || deal?.id;
 
+  // Tab order for Next button navigation
+  const TAB_ORDER = ['intelligence', 'rehab-insights', 'comps', 'scenario-risk', 'notes'];
+  const showProjectMgmt = !readOnly && (deal?.status === 'Funded' || deal?.status === 'Closed' || deal?.status === 'Completed' || deal?.isFunded || deal?.isClosed);
+  const visibleTabs = showProjectMgmt ? [...TAB_ORDER, 'project-mgmt'] : TAB_ORDER;
+  const currentIndex = visibleTabs.indexOf(activeTab);
+  const nextTab = currentIndex >= 0 && currentIndex < visibleTabs.length - 1 ? visibleTabs[currentIndex + 1] : null;
+  const TAB_LABELS = {
+    'intelligence': 'Intelligence',
+    'rehab-insights': 'Rehab Insights',
+    'comps': 'Comps',
+    'scenario-risk': 'Scenario Risk Model',
+    'notes': 'Notes',
+    'project-mgmt': 'Project Management',
+  };
+  const nextLabel = nextTab ? TAB_LABELS[nextTab] : null;
+
   return (
     <div ref={pageContainerRef} className="min-h-screen bg-muted px-2 md:px-4 py-4 md:py-8 max-w-7xl mx-auto mb-20 overflow-x-hidden">
       <Helmet><title>Deal Analysis - {deal.address} | FlipIQ</title></Helmet>
@@ -520,6 +536,17 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
                     </CardContent>
                 </Card>
             </div>
+            {nextTab && (
+              <div className="flex justify-end pt-6 border-t border-border mt-8">
+                <Button
+                  onClick={() => setActiveTab(nextTab)}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold gap-2"
+                >
+                  Next: {nextLabel}
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
          </TabsContent>
 
          <TabsContent value="rehab-insights" className="space-y-8">
@@ -554,6 +581,17 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
                 onSowContextUpdated={readOnly || !canEdit ? undefined : handleSowContextUpdated}
                 readOnly={readOnly}
              />
+            {nextTab && (
+              <div className="flex justify-end pt-6 border-t border-border mt-8">
+                <Button
+                  onClick={() => setActiveTab(nextTab)}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold gap-2"
+                >
+                  Next: {nextLabel}
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
          </TabsContent>
 
          <TabsContent value="comps">
@@ -606,6 +644,17 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
                })()}
                avmValue={inputs?.propertyIntelligence?.avmValue}
             />
+            {nextTab && (
+              <div className="flex justify-end pt-6 border-t border-border mt-8">
+                <Button
+                  onClick={() => setActiveTab(nextTab)}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold gap-2"
+                >
+                  Next: {nextLabel}
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
          </TabsContent>
 
          <TabsContent value="scenario-risk" className="space-y-8">
@@ -614,10 +663,32 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
                metrics={displayMetrics}
                propertyIntelligence={inputs.propertyIntelligence}
             />
+            {nextTab && (
+              <div className="flex justify-end pt-6 border-t border-border mt-8">
+                <Button
+                  onClick={() => setActiveTab(nextTab)}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold gap-2"
+                >
+                  Next: {nextLabel}
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
          </TabsContent>
 
          <TabsContent value="notes">
             <NotesPanel dealId={deal.id} initialNotes={deal.notes} readOnly={readOnly} sowContextMessages={deal.sowContextMessages} />
+            {nextTab && (
+              <div className="flex justify-end pt-6 border-t border-border mt-8">
+                <Button
+                  onClick={() => setActiveTab(nextTab)}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold gap-2"
+                >
+                  Next: {nextLabel}
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
          </TabsContent>
 
          {!readOnly && (deal?.status === 'Funded' || deal?.status === 'Closed' || deal?.status === 'Completed' || deal?.isFunded || deal?.isClosed) && (
@@ -638,6 +709,17 @@ const DealAnalysisPage = ({ readOnly = false, initialDeal, initialInputs, initia
                  Open Project Dashboard
                </Button>
              </div>
+             {nextTab && (
+               <div className="flex justify-end pt-6 border-t border-border mt-8">
+                 <Button
+                   onClick={() => setActiveTab(nextTab)}
+                   className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold gap-2"
+                 >
+                   Next: {nextLabel}
+                   <ArrowRight className="w-4 h-4" />
+                 </Button>
+               </div>
+             )}
            </TabsContent>
          )}
       </Tabs>

@@ -2,6 +2,13 @@
   command = "npm run build"
   publish = "dist"
 
+# Shared deal link preview - serve HTML with OG meta tags for link previews
+[[redirects]]
+  from = "/deal/share/:token"
+  to = "/.netlify/functions/deal-share-preview?token=:token"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

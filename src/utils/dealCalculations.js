@@ -14,13 +14,14 @@ import { logDataFlow } from './dataFlowDebug';
  * Calculates all financial metrics for a deal based on inputs.
  * Ensures robust type conversion and validation.
  */
+const DEBUG_CALC = import.meta.env.VITE_DEBUG_CALC === 'true';
+
 export const calculateDealMetrics = (deal) => {
-  console.group('💰 calculateDealMetrics Start');
+  if (DEBUG_CALC) console.group('💰 calculateDealMetrics Start');
   logDataFlow('INPUTS_TO_CALCULATE', deal, new Date());
 
   if (!deal) {
-    console.warn("calculateDealMetrics received null/undefined deal input");
-    console.groupEnd();
+    if (DEBUG_CALC) console.groupEnd();
     return null;
   }
 
@@ -32,8 +33,8 @@ export const calculateDealMetrics = (deal) => {
     ...deal 
   };
   
-  if (inputs.purchasePrice <= 0) console.warn("⚠️ Warning: Purchase Price is 0 or invalid");
-  if (inputs.arv <= 0) console.warn("⚠️ Warning: ARV is 0 or invalid");
+  if (DEBUG_CALC && inputs.purchasePrice <= 0) console.warn("⚠️ Warning: Purchase Price is 0 or invalid");
+  if (DEBUG_CALC && inputs.arv <= 0) console.warn("⚠️ Warning: ARV is 0 or invalid");
 
   // 2. Calculate Categories
   const acq = calculateAcquisitionCosts(inputs);
@@ -52,7 +53,7 @@ export const calculateDealMetrics = (deal) => {
   const grossProfit = inputs.arv - totalProjectCost;
   const netProfit = grossProfit - selling.total;
 
-  console.log('🧮 Profit Calc:', {
+  if (DEBUG_CALC) console.log('🧮 Profit Calc:', {
       arv: inputs.arv,
       totalProjectCost,
       sellingCosts: selling.total,
@@ -136,7 +137,9 @@ export const calculateDealMetrics = (deal) => {
     }
   };
 
-  console.log('✅ Final Metrics with Score & Scenarios:', results);
-  console.groupEnd();
+  if (DEBUG_CALC) {
+    console.log('✅ Final Metrics with Score & Scenarios:', results);
+    console.groupEnd();
+  }
   return results;
 };

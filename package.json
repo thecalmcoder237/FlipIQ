@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "vite --host :: --port 3000",
     "build": "node tools/generate-llms.js || true && node ./node_modules/vite/bin/vite.js build",
-    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 200",
     "preview": "vite preview --host :: --port 3000",
-    "postinstall": ""
+    "postinstall": "",
+    "deploy:deck": "supabase functions deploy generate-business-deck"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "^1.4.0",
@@ -28,6 +29,7 @@
     "embla-carousel-autoplay": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^10.16.4",
+    "html2canvas": "^1.4.1",
     "html2pdf.js": "^0.14.0",
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",

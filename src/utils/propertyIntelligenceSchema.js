@@ -57,6 +57,17 @@ function safeStr(value) {
   return s.length ? s : undefined;
 }
 
+/** Remove duplicate ", City, State, Zip" suffix when the rest of the address already contains a comma (full address). */
+function dedupeAddressSuffix(addr) {
+  if (!addr || typeof addr !== 'string') return addr;
+  const s = addr.trim();
+  const trailing = s.match(/,\s*[^,]+,\s*[^,]+,\s*\d{5}(?:-\d{4})?\s*$/);
+  if (!trailing) return s;
+  const beforeSuffix = s.slice(0, -trailing[0].length).trim();
+  if (!beforeSuffix || !beforeSuffix.includes(',')) return s;
+  return beforeSuffix;
+}
+
 /**
  * Normalize a single comp from edge response to frontend shape.
  * Maps common API field names (sale_price, price, bedrooms, daysOnMarket, sale_date) to expected names.
@@ -65,16 +76,22 @@ function safeStr(value) {
  */
 function normalizeComp(raw) {
   if (!raw || typeof raw !== 'object') return null;
-  const address = safeStr(raw.address ?? raw.formattedAddress ?? raw.streetAddress)
+  let address = safeStr(raw.address ?? raw.formattedAddress ?? raw.streetAddress)
     || [raw.city, raw.state, raw.zipCode ?? raw.zip_code ?? raw.zip].filter(Boolean).join(', ').trim() || null;
   if (!address) return null;
+  address = dedupeAddressSuffix(address);
 
   const salePrice = safeNum(raw.salePrice ?? raw.sale_price ?? raw.price ?? raw.last_sale_price ?? raw.lastSalePrice);
   const sqft = raw.sqft != null ? (Number(raw.sqft) || raw.sqft) : (raw.squareFootage ?? raw.square_footage);
   const beds = raw.beds ?? raw.bedrooms ?? raw.beds;
   const baths = raw.baths ?? raw.bathrooms ?? raw.baths;
   const dom = raw.dom ?? raw.daysOnMarket ?? raw.days_on_market ?? raw.listingAge;
-  const saleDate = safeStr(raw.saleDate ?? raw.sale_date ?? raw.sold_date ?? raw.soldDate ?? raw.close_date ?? raw.closeDate);
+  let saleDate = safeStr(raw.saleDate ?? raw.sale_date ?? raw.sold_date ?? raw.soldDate ?? raw.close_date ?? raw.closeDate);
+  // Reject future sale dates (invalid data)
+  if (saleDate) {
+    const d = new Date(String(saleDate).trim().slice(0, 10));
+    if (Number.isFinite(d.getTime()) && d > new Date()) saleDate = undefined;
+  }
   const basement = safeStr(raw.basement ?? raw.basement_type);
   const basementType = safeStr(raw.basementType ?? raw.basement_type);
   const basementCondition = safeStr(raw.basementCondition ?? raw.basement_condition);
@@ -86,6 +103,9 @@ function normalizeComp(raw) {
   const longitude = raw.longitude != null ? safeNum(raw.longitude, -180, 180) : (raw.lng != null ? safeNum(raw.lng, -180, 180) : (raw.lon != null ? safeNum(raw.lon, -180, 180) : undefined));
   const distVal = raw.distance ?? raw.distance_in_miles ?? raw.distanceMiles ?? raw.milesFromSubject ?? raw.distanceFromSubject;
   const distance = distVal != null ? safeNum(distVal, 0, 1e6) : undefined;
+  const sourceUrl = safeStr(raw.sourceUrl ?? raw.source_url ?? raw.url ?? raw.link);
+  const sourceTitle = safeStr(raw.sourceTitle ?? raw.source_title ?? raw.title);
+  const sourceSnippet = safeStr(raw.sourceSnippet ?? raw.source_snippet ?? raw.snippet);
 
   return {
     address,
@@ -105,16 +125,22 @@ function normalizeComp(raw) {
     latitude: latitude ?? undefined,
     longitude: longitude ?? undefined,
     distance: distance ?? undefined,
+    ...(sourceUrl ? { sourceUrl } : {}),
+    ...(sourceTitle ? { sourceTitle } : {}),
+    ...(sourceSnippet ? { sourceSnippet } : {}),
   };
 }
 
-/** True if comp's saleDate is within the last 6 months from today; used so search results never display or add older comps. */
+/** True if comp's saleDate is within the last 6 months from today and not in the future. */
 export function isCompWithinLast6Months(comp) {
   if (!comp || typeof comp !== 'object') return false;
   const dateStr = comp.saleDate ?? comp.sale_date ?? comp.soldDate;
   if (!dateStr || String(dateStr).trim().length < 4) return false;
   const d = new Date(String(dateStr).trim().slice(0, 10));
   if (!Number.isFinite(d.getTime())) return false;
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  if (d > today) return false; // reject future dates
   const cutoff = new Date();
   cutoff.setMonth(cutoff.getMonth() - 6);
   return d >= cutoff;

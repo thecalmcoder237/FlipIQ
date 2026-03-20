@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatCurrency } from "@/utils/proposalTemplate";
 import { calculate70RuleMAO } from "@/utils/advancedDealCalculations";
+import { parseSOWLineItems, extractSOWRemarks } from "@/utils/sowParser";
 
 function safeNum(n) {
   const x = Number(n);
@@ -88,12 +89,13 @@ export function generateFullAnalysisReportPDF({
   rehabSow,
   scenarios,
   notes,
+  shareUrl,
 }) {
   const doc = new jsPDF();
   const colors = {
-    primary: [41, 128, 185], // blue
+    primary: [234, 88, 12], // FlipIQ orange #EA580C
     slate: [30, 41, 59],
-    muted: [243, 244, 246],
+    muted: [254, 243, 237], // orange-50 tint
     gray: [107, 114, 128],
   };
 
@@ -115,6 +117,24 @@ export function generateFullAnalysisReportPDF({
   doc.text(safeStr(deal?.address), 196, 28, { align: "right" });
 
   let y = 46;
+
+  // Share link (optional)
+  if (shareUrl) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...colors.gray);
+    doc.text("Shared deal link:", 14, y);
+    doc.setTextColor(...colors.primary);
+    const urlText = String(shareUrl).slice(0, 120);
+    // Render as clickable link when supported by jsPDF
+    if (typeof doc.textWithLink === "function") {
+      doc.textWithLink(urlText, 46, y, { url: shareUrl });
+    } else {
+      doc.text(urlText, 46, y);
+    }
+    y += 10;
+    doc.setTextColor(...colors.slate);
+  }
 
   // Executive Summary
   y = sectionTitle(doc, "Executive Summary", y, colors);
@@ -155,25 +175,48 @@ export function generateFullAnalysisReportPDF({
   y += 6;
   y = drawCostBars(doc, y, metrics, colors);
 
-  // Property & Deal Details
-  y = ensureSpace(doc, y, 60);
+  // Property Details (merged from deal + propertyIntelligence)
+  y = ensureSpace(doc, y, 80);
   y = sectionTitle(doc, "Property Details", y, colors);
-  autoTable(doc, {
-    startY: y,
-    head: [["Field", "Value"]],
-    body: [
-      ["Beds / Baths", `${safeStr(deal?.bedrooms)} / ${safeStr(deal?.bathrooms)}`],
-      ["Sqft", safeStr(deal?.sqft)],
-      ["Year Built", safeStr(deal?.year_built)],
-      ["ZIP", safeStr(deal?.zipCode ?? deal?.zip_code)],
-      ["Exit Strategy", safeStr(deal?.exit_strategy)],
-    ],
-    theme: "grid",
-    headStyles: { fillColor: colors.primary },
-    styles: { fontSize: 10, cellPadding: 4 },
-    margin: { left: 14, right: 14 },
-  });
-  y = doc.lastAutoTable.finalY + 10;
+  const propRows = [];
+  const addProp = (label, val) => {
+    const v = safeStr(val);
+    if (v !== "N/A" && v?.trim()) propRows.push([label, v]);
+  };
+  const beds = deal?.bedrooms ?? propertyIntelligence?.bedrooms ?? "";
+  const baths = deal?.bathrooms ?? propertyIntelligence?.bathrooms ?? "";
+  addProp("Beds / Baths", [beds, baths].filter(Boolean).join(" / ") || null);
+  addProp("Sqft", deal?.sqft ?? propertyIntelligence?.squareFootage ?? propertyIntelligence?.sqft);
+  addProp("Year Built", deal?.year_built ?? propertyIntelligence?.yearBuilt);
+  addProp("ZIP", deal?.zipCode ?? deal?.zip_code);
+  addProp("Property Type", propertyIntelligence?.propertyType);
+  addProp("County", propertyIntelligence?.county);
+  addProp("School District", propertyIntelligence?.schoolDistrict);
+  addProp("Zoning", propertyIntelligence?.zoning);
+  addProp("Garage", propertyIntelligence?.hasGarage ? (propertyIntelligence?.garageSize || "Yes") : null);
+  addProp("HVAC", propertyIntelligence?.hvacType);
+  addProp("Roof", propertyIntelligence?.roofType);
+  addProp("Annual Taxes", propertyIntelligence?.annualPropertyTaxes != null ? formatCurrency(propertyIntelligence.annualPropertyTaxes) : null);
+  addProp("Assessed Value", propertyIntelligence?.assessedValue != null ? formatCurrency(propertyIntelligence.assessedValue) : null);
+  addProp("Exit Strategy", deal?.exit_strategy);
+  if (propRows.length) {
+    autoTable(doc, {
+      startY: y,
+      head: [["Field", "Value"]],
+      body: propRows,
+      theme: "grid",
+      headStyles: { fillColor: colors.primary },
+      styles: { fontSize: 10, cellPadding: 4 },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 10;
+  } else {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(...colors.gray);
+    doc.text("No property details available.", 14, y);
+    y += 12;
+  }
 
   // Financial Breakdown
   y = ensureSpace(doc, y, 80);
@@ -196,76 +239,103 @@ export function generateFullAnalysisReportPDF({
   });
   y = doc.lastAutoTable.finalY + 10;
 
-  // Property Intelligence (optional)
-  if (propertyIntelligence) {
+  // Recent Comps (from propertyIntelligence)
+  const comps = propertyIntelligence?.recentComps;
+  if (Array.isArray(comps) && comps.length) {
     y = ensureSpace(doc, y, 70);
-    y = sectionTitle(doc, "Property Intelligence (if available)", y, colors);
-    const rows = [];
-    Object.entries(propertyIntelligence).forEach(([k, v]) => {
-      if (k === "recentComps") return;
-      if (v && typeof v === "object") return;
-      rows.push([k.replace(/([A-Z])/g, " $1").trim(), safeStr(v)]);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(...colors.slate);
+    doc.text("Recent Comps", 14, y);
+    y += 6;
+    autoTable(doc, {
+      startY: y,
+      head: [["Address", "Price", "Beds/Baths", "Sqft", "DOM"]],
+      body: comps.slice(0, 12).map((c) => [
+        safeStr(c?.address),
+        (c?.price ?? c?.salePrice) != null && Number.isFinite(Number(c?.price ?? c?.salePrice))
+          ? formatCurrency(c?.price ?? c?.salePrice)
+          : safeStr(c?.salePrice ?? c?.price),
+        `${safeStr(c?.beds ?? c?.bedrooms)} / ${safeStr(c?.baths ?? c?.bathrooms)}`,
+        safeStr(c?.sqft),
+        safeStr(c?.daysOnMarket ?? c?.dom),
+      ]),
+      theme: "grid",
+      headStyles: { fillColor: colors.primary },
+      styles: { fontSize: 8, cellPadding: 3 },
+      margin: { left: 14, right: 14 },
     });
-    if (rows.length) {
+    y = doc.lastAutoTable.finalY + 10;
+  }
+
+  // Rehab SOW (optional summary)
+  if (rehabSow) {
+    const sowText = String(rehabSow);
+    const { lineItems, tiers, timeline } = parseSOWLineItems(sowText);
+
+    if (lineItems.length > 0) {
+      y = ensureSpace(doc, y, 80);
+      y = sectionTitle(doc, "Rehab Scope of Work", y, colors);
+      const body = lineItems.map((r) => [
+        r.category ? `${r.category}: ${r.item}` : r.item,
+        formatCurrency(r.cost ?? 0),
+      ]);
       autoTable(doc, {
         startY: y,
-        head: [["Item", "Value"]],
-        body: rows.slice(0, 25),
+        head: [["Item", "Est. Cost"]],
+        body,
         theme: "grid",
         headStyles: { fillColor: colors.primary },
         styles: { fontSize: 9, cellPadding: 3 },
         margin: { left: 14, right: 14 },
       });
-      y = doc.lastAutoTable.finalY + 10;
-    } else {
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      doc.setTextColor(...colors.gray);
-      doc.text("No property intelligence fields found.", 14, y);
-      y += 10;
+      y = doc.lastAutoTable.finalY + 6;
+
+      if (tiers?.budget != null || tiers?.midGrade != null || tiers?.highEnd != null) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(...colors.gray);
+        const tierParts = [];
+        if (tiers.budget != null) tierParts.push(`Budget: ${formatCurrency(tiers.budget)}`);
+        if (tiers.midGrade != null) tierParts.push(`Mid-Grade: ${formatCurrency(tiers.midGrade)}`);
+        if (tiers.highEnd != null) tierParts.push(`High-End: ${formatCurrency(tiers.highEnd)}`);
+        doc.text(tierParts.join("  •  "), 14, y);
+        y += 8;
+      }
+      if (timeline) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(...colors.gray);
+        doc.text(`Estimated timeline: ${timeline.value} ${timeline.unit}`, 14, y);
+        y += 8;
+      }
     }
 
-    const comps = propertyIntelligence?.recentComps;
-    if (Array.isArray(comps) && comps.length) {
-      y = ensureSpace(doc, y, 70);
+    const remarks = extractSOWRemarks(sowText);
+    if (remarks && remarks.trim().length > 0) {
+      y = ensureSpace(doc, y, 40);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
+      doc.setFontSize(10);
       doc.setTextColor(...colors.slate);
-      doc.text("Recent Comps", 14, y);
+      doc.text("SOW Remarks", 14, y);
       y += 6;
-      autoTable(doc, {
-        startY: y,
-        head: [["Address", "Price", "Beds/Baths", "Sqft", "DOM"]],
-        body: comps.slice(0, 12).map((c) => [
-          safeStr(c?.address),
-          c?.price ? formatCurrency(c.price) : safeStr(c?.salePrice),
-          `${safeStr(c?.bedrooms)} / ${safeStr(c?.bathrooms)}`,
-          safeStr(c?.sqft),
-          safeStr(c?.daysOnMarket ?? c?.dom),
-        ]),
-        theme: "grid",
-        headStyles: { fillColor: colors.primary },
-        styles: { fontSize: 8, cellPadding: 3 },
-        margin: { left: 14, right: 14 },
-      });
-      y = doc.lastAutoTable.finalY + 10;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(...colors.slate);
+      const lines = doc.splitTextToSize(remarks.slice(0, 800), 182);
+      doc.text(lines.slice(0, 15), 14, y);
+      y += Math.min(15, lines.length) * 5 + 6;
     }
-  }
 
-  // Rehab SOW (optional summary)
-  if (rehabSow) {
-    y = ensureSpace(doc, y, 70);
-    y = sectionTitle(doc, "Rehab Scope Summary (if available)", y, colors);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(...colors.slate);
-    const lines = doc.splitTextToSize(String(rehabSow).slice(0, 2200), 182);
-    doc.text(lines.slice(0, 40), 14, y);
-    y += Math.min(40, lines.length) * 5 + 6;
-    if (lines.length > 40) {
-      doc.setTextColor(...colors.gray);
-      doc.text("... (truncated — see full version in app)", 14, y);
-      y += 8;
+    if (lineItems.length === 0 && !remarks) {
+      y = ensureSpace(doc, y, 50);
+      y = sectionTitle(doc, "Rehab Scope of Work", y, colors);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(...colors.slate);
+      const lines = doc.splitTextToSize(sowText.slice(0, 1200), 182);
+      doc.text(lines.slice(0, 20), 14, y);
+      y += Math.min(20, lines.length) * 5 + 6;
     }
   }
 

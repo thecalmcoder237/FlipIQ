@@ -1,5 +1,6 @@
 import { handleCors, json } from "../_shared/cors.ts";
 import { createSupabaseAdminClient } from "../_shared/supabaseAdmin.ts";
+import { callQwenJson } from "../_shared/llmClients.ts";
 
 const RENTCAST_BASE = "https://api.rentcast.io/v1";
 const RENTCAST_LIMIT = 45;
@@ -138,17 +139,72 @@ function mapRentCastToComp(item: Record<string, unknown>): Record<string, unknow
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const GPT_MODEL = "gpt-4o-mini";
 const SERPER_BASE = "https://google.serper.dev/search";
+const SERPAPI_BASE = "https://serpapi.com/search.json";
 
 function getOpenAIKey(): string | null {
   return Deno.env.get("OPENAI_API_KEY")?.trim() || null;
+}
+
+function getQwenKey(): string | null {
+  return Deno.env.get("QWEN_API_KEY")?.trim() || null;
 }
 
 function getSerperKey(): string | null {
   return Deno.env.get("SERPER_API_KEY")?.trim() || null;
 }
 
-/** Call Serper for web search; returns combined snippet text or empty string. */
-async function runSerperSearch(query: string): Promise<string> {
+/**
+ * SerpAPI key (preferred if configured).
+ */
+function getSerpApiKey(): string | null {
+  return Deno.env.get("SERPAPI_API_KEY")?.trim() || Deno.env.get("SERP_API_KEY")?.trim() || null;
+}
+
+/**
+ * Call SerpAPI (preferred) or Serper (fallback) for web search.
+ * Returns a compact text corpus INCLUDING URLs so AI can cite evidence.
+ */
+async function runWebSearch(query: string): Promise<string> {
+  const serpApiKey = getSerpApiKey();
+  if (serpApiKey) {
+    try {
+      const params = new URLSearchParams();
+      params.set("engine", "google");
+      params.set("q", query);
+      params.set("gl", "us");
+      params.set("hl", "en");
+      params.set("num", "20");
+      params.set("api_key", serpApiKey);
+      const url = `${SERPAPI_BASE}?${params.toString()}`;
+      const res = await fetch(url, { method: "GET" });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        return `__SERPAPI_ERROR__ status=${res.status} ${res.statusText} body=${errText.slice(0, 400)}`;
+      }
+      const data = (await res.json()) as {
+        organic_results?: Array<{ title?: string; snippet?: string; link?: string }>;
+      };
+      const organic = Array.isArray(data?.organic_results) ? data.organic_results : [];
+      return organic
+        .slice(0, 15)
+        .map((o, idx) => {
+          const title = (o.title ?? "").trim();
+          const snippet = (o.snippet ?? "").trim();
+          const link = (o.link ?? "").trim();
+          const parts = [
+            `Result ${idx + 1}: ${title || "(no title)"}`,
+            link ? `URL: ${link}` : "URL: (missing)",
+            snippet ? `Snippet: ${snippet}` : "Snippet: (missing)",
+          ];
+          return parts.join("\n");
+        })
+        .join("\n\n---\n\n");
+    } catch {
+      return "";
+    }
+  }
+
+  // Fallback to Serper for compatibility if SERPAPI_API_KEY is not set.
   const apiKey = getSerperKey();
   if (!apiKey) return "";
   try {
@@ -157,16 +213,118 @@ async function runSerperSearch(query: string): Promise<string> {
       headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
       body: JSON.stringify({ q: query }),
     });
-    if (!res.ok) return "";
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      return `__SERPER_ERROR__ status=${res.status} ${res.statusText} body=${errText.slice(0, 400)}`;
+    }
     const data = (await res.json()) as { organic?: Array<{ title?: string; snippet?: string; link?: string }> };
     const organic = Array.isArray(data?.organic) ? data.organic : [];
     return organic
       .slice(0, 15)
-      .map((o) => [o.title, o.snippet].filter(Boolean).join(": "))
-      .join("\n\n");
+      .map((o, idx) => {
+        const title = (o.title ?? "").trim();
+        const snippet = (o.snippet ?? "").trim();
+        const link = (o.link ?? "").trim();
+        const parts = [
+          `Result ${idx + 1}: ${title || "(no title)"}`,
+          link ? `URL: ${link}` : "URL: (missing)",
+          snippet ? `Snippet: ${snippet}` : "Snippet: (missing)",
+        ];
+        return parts.join("\n");
+      })
+      .join("\n\n---\n\n");
   } catch {
     return "";
   }
+}
+
+/** URLs that are estimates / records / not verified sold listings — reject as comp evidence. */
+function isBlockedCompSourceUrl(url: string): boolean {
+  const u = url.toLowerCase();
+  const blocked = [
+    "propertyrecord-search",
+    "/propertyrecord",
+    "zestimate",
+    "/home-value",
+    "/home_value",
+    "valuation",
+    "avm",
+    "tax-assessor",
+    "assessor",
+  ];
+  return blocked.some((b) => u.includes(b));
+}
+
+/** True if snippet/title clearly indicates a completed sale (not estimate-only). */
+function textIndicatesSoldSale(title: string, snippet: string): boolean {
+  const t = `${title} ${snippet}`.toLowerCase();
+  const soldSignals = [
+    "sold on",
+    "sold for",
+    "last sold",
+    "recently sold",
+    "sold homes",
+    "sold home",
+    "sale date",
+    "closed on",
+    "sold property",
+    "sold:",
+    "was sold",
+    "sold after",
+    "sold in ",
+    "sold \u2014",
+    "sold —",
+  ];
+  if (soldSignals.some((s) => t.includes(s))) return true;
+  // "sold" as whole word (avoid "unsold", "resold" edge cases: require space/punct before sold)
+  if (/\b(sold|closed)\b/.test(t) && !/\bunsold\b/.test(t)) return true;
+  return false;
+}
+
+/** Estimate / off-market language without a real sale — reject unless we have a valid saleDate. */
+function textLooksLikeEstimateOnly(title: string, snippet: string): boolean {
+  const t = `${title} ${snippet}`.toLowerCase();
+  const bad = [
+    /\$\s*[\d,]+\s*est\.?/i,
+    /est\.\s*\$/i,
+    /\bestimated\b/i,
+    /\bzestimate\b/i,
+    /\boff market\b/i,
+    /\bnot for sale\b/i,
+    /\bassessed value\b/i,
+    /\btax assessment\b/i,
+  ];
+  return bad.some((re) => re.test(t));
+}
+
+function hasValidPastSaleDate(dateStr: string | undefined): boolean {
+  if (!dateStr || dateStr.length < 8) return false;
+  const d = new Date(dateStr.slice(0, 10));
+  if (!Number.isFinite(d.getTime())) return false;
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  return d <= today;
+}
+
+/**
+ * Require external evidence of an actual sale: not blocked URL, and either a past saleDate
+ * or snippet/title that clearly references a sale (not estimate-only pages).
+ */
+function passesVerifiedSaleEvidence(c: Record<string, unknown>): boolean {
+  const url = String(c.sourceUrl ?? c.source_url ?? "").trim();
+  if (!url || isBlockedCompSourceUrl(url)) return false;
+
+  const title = String(c.sourceTitle ?? c.source_title ?? "").trim();
+  const snippet = String(c.sourceSnippet ?? c.source_snippet ?? "").trim();
+  const dateStr = (c.saleDate ?? c.sale_date) as string | undefined;
+  const dateOk = hasValidPastSaleDate(typeof dateStr === "string" ? dateStr.slice(0, 10) : undefined);
+
+  // Estimate/off-market pages need either sold language in evidence text or a real past sale date
+  if (textLooksLikeEstimateOnly(title, snippet) && !textIndicatesSoldSale(title, snippet) && !dateOk) {
+    return false;
+  }
+  if (!dateOk && !textIndicatesSoldSale(title, snippet)) return false;
+  return true;
 }
 
 /** Normalize AI-returned comp to our schema (address required). */
@@ -175,10 +333,18 @@ function normalizeAiComp(raw: Record<string, unknown>): Record<string, unknown> 
   const address = String(raw.address ?? raw.formattedAddress ?? raw.streetAddress ?? "").trim()
     || [raw.city, raw.state, raw.zipCode ?? raw.zip].filter(Boolean).join(", ").trim();
   if (!address) return null;
+  const sourceUrl = String(raw.sourceUrl ?? raw.source_url ?? raw.url ?? raw.link ?? "").trim();
+  const sourceSnippet = String(raw.sourceSnippet ?? raw.source_snippet ?? raw.snippet ?? "").trim();
+  const sourceTitle = String(raw.sourceTitle ?? raw.source_title ?? raw.title ?? "").trim();
+  if (!sourceUrl) return null;
   const salePrice = raw.salePrice ?? raw.sale_price ?? raw.price ?? raw.lastSalePrice;
   const numPrice = salePrice != null && salePrice !== "" ? Number(salePrice) : undefined;
   const saleDate = raw.saleDate ?? raw.sale_date ?? raw.soldDate ?? raw.sold_date ?? raw.closeDate;
-  const dateStr = saleDate != null ? String(saleDate).trim().slice(0, 10) : undefined;
+  let dateStr = saleDate != null ? String(saleDate).trim().slice(0, 10) : undefined;
+  if (dateStr) {
+    const d = new Date(dateStr);
+    if (Number.isFinite(d.getTime()) && d > new Date()) dateStr = undefined; // reject future dates
+  }
   return {
     address,
     salePrice: Number.isFinite(numPrice) ? numPrice : undefined,
@@ -187,30 +353,43 @@ function normalizeAiComp(raw: Record<string, unknown>): Record<string, unknown> 
     beds: raw.beds ?? raw.bedrooms,
     baths: raw.baths ?? raw.bathrooms,
     dom: raw.dom ?? raw.daysOnMarket ?? raw.days_on_market,
+    sourceUrl,
+    ...(sourceTitle ? { sourceTitle } : {}),
+    ...(sourceSnippet ? { sourceSnippet } : {}),
   };
 }
 
-/** True if date string (YYYY-MM-DD or partial) is within the last 6 months. */
+/** True if date string (YYYY-MM-DD or partial) is within the last 6 months and not in the future. */
 function isWithinLast6Months(dateStr: string | undefined): boolean {
   if (!dateStr || dateStr.length < 4) return false;
   const d = new Date(dateStr.slice(0, 10));
   if (!Number.isFinite(d.getTime())) return false;
+  if (d > new Date()) return false;
   const cutoff = new Date();
   cutoff.setMonth(cutoff.getMonth() - 6);
   return d >= cutoff;
 }
 
-/** Request comps via OpenAI (GPT); optionally use Serper web search for context. Only comps within 1 mile of subject. */
+/** Request comps via Qwen (preferred) or OpenAI; optionally use Serper/SerpAPI web search for context. Only comps within 1 mile of subject. */
 async function runCompsWebSearch(
   address: string,
   zipCode: string,
   subjectLat?: number,
   subjectLng?: number
-): Promise<{ comps: Array<Record<string, unknown>>; source: string }> {
-  const apiKey = getOpenAIKey();
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not set for the send-claude-request function. Add it in Supabase Dashboard → Edge Functions → send-claude-request → Secrets.");
+): Promise<{
+  comps: Array<Record<string, unknown>>;
+  source: string;
+  warnings?: string[];
+  _debugSearch?: Record<string, unknown>;
+  _debugAi?: Record<string, unknown>;
+}> {
+  const qwenKey = getQwenKey();
+  const openAiKey = getOpenAIKey();
+  if (!qwenKey && !openAiKey) {
+    throw new Error("Either QWEN_API_KEY or OPENAI_API_KEY must be set for comps web search. Add one in Supabase Dashboard → Edge Functions → send-claude-request → Secrets.");
   }
+  // Prefer OpenAI when both are set (avoids Qwen 401 if key is invalid)
+  const useQwen = !!qwenKey && !openAiKey;
 
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -219,75 +398,194 @@ async function runCompsWebSearch(
   const cutoffDateStr = sixMonthsAgo.toISOString().slice(0, 10);
 
   const oneMilePhrase = "within 1 mile radius";
-  const searchQuery = zipCode
-    ? `homes sold last 6 months ${currentYear} within 1 mile ${address} ${zipCode} recent sales`
-    : `homes sold last 6 months ${currentYear} within 1 mile ${address} recent sales`;
-  const searchContext = await runSerperSearch(searchQuery);
+  const addrParts = address.split(",").map((s) => s.trim()).filter(Boolean);
+  const city = addrParts.length >= 2 ? addrParts[1] : "";
+  const statePart = addrParts.length >= 3 ? addrParts[2] : "";
+  const state = statePart ? statePart.split(/\s+/)[0] : "";
+
+  const searchQueries: string[] = [];
+  if (zipCode) searchQueries.push(`recently sold homes near ${address} ${zipCode}`);
+  searchQueries.push(`recently sold homes near ${address}`);
+  if (zipCode) searchQueries.push(`recently sold homes ${zipCode}`);
+  if (city && state) searchQueries.push(`recently sold homes ${city} ${state}`);
+  if (city && state) searchQueries.push(`site:redfin.com sold ${city} ${state} homes`);
+  const hasSerpApiKey = !!getSerpApiKey();
+  const hasSerperKey = !!getSerperKey();
+  const provider = hasSerpApiKey ? "SerpAPI" : hasSerperKey ? "Serper" : "none";
+  console.log(`[compsWebSearch] provider=${provider} hasSerpApiKey=${hasSerpApiKey} hasSerperKey=${hasSerperKey}`);
+
+  let searchContext = "";
+  let searchQuery = "";
+  for (const q of searchQueries) {
+    searchQuery = q;
+    searchContext = await runWebSearch(q);
+    if (searchContext.startsWith("__SERPAPI_ERROR__")) {
+      throw new Error(`SerpAPI search failed: ${searchContext}`);
+    }
+    if (searchContext.startsWith("__SERPER_ERROR__")) {
+      throw new Error(`Serper search failed (provider=${provider}): ${searchContext}`);
+    }
+    if (searchContext.length > 0) break;
+  }
+
   const hasSearch = searchContext.length > 0;
+  if (!hasSearch) {
+    const hint = hasSerpApiKey
+      ? "SerpAPI returned no results for this query."
+      : hasSerperKey
+        ? "Serper returned no results for this query."
+        : "Neither SERPAPI_API_KEY nor SERPER_API_KEY is configured.";
+    // No-results is not a hard failure; return empty comps so the UI can show a friendly message.
+    return {
+      comps: [],
+      source: "Qwen/ChatGPT (Web Search)",
+      warnings: [
+        `No web search results found for this address. ${hint} (provider=${provider})`,
+        "Try adding a ZIP code, or simplify the address (remove unit #, punctuation).",
+      ],
+      _debugSearch: { hasSearch, searchQuery, searchContextLen: 0 },
+      _debugAi: { rawCount: 0, normalizedCount: 0, filteredCount: 0, rawText: "[]", searchContextPreview: "" },
+    };
+  }
 
   const locationHint =
     subjectLat != null && subjectLng != null && Number.isFinite(subjectLat) && Number.isFinite(subjectLng)
       ? ` Subject property coordinates: ${subjectLat}, ${subjectLng}. Only include comps within 1 mile of this location.`
       : ` Only include comparable sales within a 1 mile radius of the subject property.`;
 
-  const systemPrompt = `You are a real estate analyst. Return a JSON array of comparable home sales (comps) for the given property. CRITICAL RULES: (1) Only include sales that closed in the LAST 6 MONTHS (saleDate must be ${cutoffDateStr} or later). (2) Only include sales ${oneMilePhrase} of the subject property—exclude anything farther. Do not include any sale from 2023 or earlier. Each comp must be an object with these keys (use null or omit if unknown): address (string), salePrice (number), saleDate (string, YYYY-MM-DD), sqft (number or string), beds (number or string), baths (number or string), dom (number or string). Return only the JSON array, no markdown. Include 3 to 8 comps. Only real sales with sale price and address.`;
+  const systemPrompt = `You are a real estate comparable SALES (comps) extractor. Return only verified sold transactions supported by the search snippets.
 
-  const userContent = hasSearch
-    ? `Subject property: ${address}${zipCode ? `, ZIP ${zipCode}` : ""}.${locationHint}\n\nWeb search results (use only sales from within 1 mile of the subject; prioritize most recent):\n${searchContext}\n\nExtract ONLY comparable sales that (1) closed in the last 6 months (saleDate ${cutoffDateStr} or later) and (2) are within 1 mile of the subject. Return a JSON array of comp objects (address, salePrice, saleDate, sqft, beds, baths, dom). Exclude any sale from 2023 or before or outside 1 mile. Return only the array.`
-    : `Subject property: ${address}${zipCode ? `, ZIP ${zipCode}` : ""}.${locationHint}\n\nYou do not have live data. Return a JSON array of comp objects with keys: address, salePrice, saleDate (last 6 months only, e.g. ${currentYear}), sqft, beds, baths, dom. Use plausible addresses and prices for properties within 1 mile. saleDate MUST be within the last 6 months. Return only the JSON array.`;
+STRICT RULES:
+1. Each comp MUST cite a sourceUrl from the search results AND copy sourceTitle and sourceSnippet EXACTLY from that result (the snippet must mention the sale or the sold listing).
+2. ONLY include properties where the search snippet/title clearly indicates a completed sale (e.g. "sold", "sold on", "recently sold", "last sold", "sold for", "sale date", "closed"). Do NOT include estimated values, "est.", Zestimate, property-record-only pages, or "off market" without an explicit sold statement.
+3. Do NOT use Realtor "propertyrecord-search" URLs or similar assessor/estimate pages as sources.
+4. Only include properties near the subject (same ZIP or immediate neighborhood).
+5. Do NOT invent addresses, prices, or sale dates. If you cannot verify a sale from the text, omit the comp.
+6. Prefer sales after ${cutoffDateStr} when possible.
 
-  const response = await fetch(OPENAI_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: GPT_MODEL,
-      max_tokens: 2048,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userContent },
-      ],
-    }),
-  });
+JSON schema per comp:
+{ "address": string, "salePrice": number, "saleDate": "YYYY-MM-DD", "sqft": number, "beds": number, "baths": number, "dom": number, "sourceUrl": string, "sourceTitle": string, "sourceSnippet": string }
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} ${errText}`);
-  }
+Return: { "comps": [ ... ] } only. No markdown.`;
 
-  const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const text = (data.choices?.[0]?.message?.content ?? "").trim();
+  const userContent = `Subject property: ${address}${zipCode ? `, ZIP ${zipCode}` : ""}.${locationHint}
+
+Web search results:
+${searchContext}
+
+Extract comps only where the snippet/title explicitly supports a sold transaction. Copy sourceTitle and sourceSnippet verbatim from the matching search result. Return { "comps": [ ... ] }.`;
+
   let arr: unknown[] = [];
-  try {
-    const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
-    const parsed = JSON.parse(cleaned);
-    arr = Array.isArray(parsed) ? parsed : (parsed?.comps && Array.isArray(parsed.comps) ? parsed.comps : []);
-  } catch {
-    // try to extract array from text
-    const match = text.match(/\[[\s\S]*\]/);
-    if (match) {
+  let aiRawText = "";
+
+  const runWithOpenAI = async (): Promise<{ arr: unknown[]; rawText: string }> => {
+    const apiKey = getOpenAIKey();
+    if (!apiKey) throw new Error("OPENAI_API_KEY is not set.");
+    const response = await fetch(OPENAI_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: GPT_MODEL,
+        max_tokens: 2048,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+      }),
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} ${errText}`);
+    }
+    const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const text = (data.choices?.[0]?.message?.content ?? "").trim();
+    try {
+      const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
+      const parsed = JSON.parse(cleaned);
+      const out = (parsed?.comps && Array.isArray(parsed.comps) ? parsed.comps : Array.isArray(parsed) ? parsed : []) as unknown[];
+      return { arr: out, rawText: text.slice(0, 800) };
+    } catch {
+      const match = text.match(/\[[\s\S]*\]/);
+      if (match) {
+        try {
+          return { arr: JSON.parse(match[0]) as unknown[], rawText: text.slice(0, 800) };
+        } catch {
+          return { arr: [], rawText: text.slice(0, 800) };
+        }
+      }
+      return { arr: [], rawText: text.slice(0, 800) };
+    }
+  };
+
+  if (useQwen) {
+    try {
+      const model = Deno.env.get("QWEN_MODEL") || "qwen-plus";
+      const parsed = await callQwenJson({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+        model,
+      });
+      arr = (parsed?.comps && Array.isArray(parsed.comps) ? parsed.comps : []) as unknown[];
       try {
-        arr = JSON.parse(match[0]);
+        aiRawText = JSON.stringify(parsed).slice(0, 800);
       } catch {
-        // ignore
+        aiRawText = "";
+      }
+    } catch (qwenErr) {
+      const msg = (qwenErr as Error).message || "";
+      if (openAiKey && (msg.includes("401") || msg.includes("invalid_api_key") || msg.includes("Incorrect API key"))) {
+        console.warn("[compsWebSearch] Qwen 401/invalid key, falling back to OpenAI");
+        const out = await runWithOpenAI();
+        arr = out.arr;
+        aiRawText = out.rawText;
+      } else {
+        throw qwenErr;
       }
     }
+  } else {
+    const out = await runWithOpenAI();
+    arr = out.arr;
+    aiRawText = out.rawText;
   }
 
+  const rawCount = arr.length;
   const normalized = (arr as Record<string, unknown>[])
     .map((c) => normalizeAiComp(c))
     .filter((c): c is Record<string, unknown> => c != null && (c.address as string)?.trim().length > 0);
 
-  // Only allow comps with saleDate within last 6 months; do not return or display anything older
-  const comps = normalized.filter((c) => {
-    const dateStr = (c.saleDate as string) ?? (c.sale_date as string);
-    if (!dateStr || dateStr.length < 4) return false; // no date = exclude (cannot verify recency)
-    return isWithinLast6Months(dateStr);
+  const withUrl = normalized.filter((c) => {
+    const url = (c.sourceUrl as string) ?? (c.source_url as string);
+    return !!(url && String(url).trim().length >= 8);
   });
+  const comps = withUrl.filter((c) => passesVerifiedSaleEvidence(c));
+  const droppedEvidence = withUrl.length - comps.length;
 
-  return { comps, source: hasSearch ? "ChatGPT (Web Search)" : "ChatGPT" };
+  const warnings: string[] = [];
+  if (droppedEvidence > 0) {
+    warnings.push(
+      `${droppedEvidence} comp(s) removed: need a real sold listing (snippet/title must mention sold, or a past sale date) — not estimates or property-record pages.`
+    );
+  }
+
+  return {
+    comps,
+    source: useQwen ? "Qwen (Web Search)" : "ChatGPT (Web Search)",
+    ...(warnings.length ? { warnings } : {}),
+    _debugSearch: { hasSearch, searchQuery, searchContextLen: searchContext.length },
+    _debugAi: {
+      rawCount,
+      normalizedCount: normalized.length,
+      filteredCount: comps.length,
+      droppedNoEvidence: droppedEvidence,
+      rawText: aiRawText,
+      searchContextPreview: searchContext.slice(0, 1000),
+    },
+  };
 }
 
 Deno.serve(async (req) => {
@@ -343,9 +641,18 @@ Deno.serve(async (req) => {
       }
       const subjectLat = additionalParams.lat != null && Number.isFinite(Number(additionalParams.lat)) ? Number(additionalParams.lat) : undefined;
       const subjectLng = additionalParams.lng != null && Number.isFinite(Number(additionalParams.lng)) ? Number(additionalParams.lng) : undefined;
+      const debugRequested = body?.debug === true || additionalParams?.debug === true;
       try {
-        const { comps, source } = await runCompsWebSearch(address, zipCode, subjectLat, subjectLng);
-        return json({ comps, source, recentComps: comps });
+        const result = await runCompsWebSearch(address, zipCode, subjectLat, subjectLng);
+        const { comps, source, warnings, _debugSearch, _debugAi } = result;
+        return json({
+          comps,
+          source,
+          recentComps: comps,
+          ...(Array.isArray(warnings) && warnings.length ? { warnings } : {}),
+          ...(debugRequested && _debugSearch ? { _debugSearch } : {}),
+          ...(debugRequested && _debugAi ? { _debugAi } : {}),
+        });
       } catch (e) {
         console.error("compsWebSearch error:", e);
         const message = (e as Error).message || "Comps web search failed.";

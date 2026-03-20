@@ -28,7 +28,7 @@ import AdminDashboard from '@/pages/AdminDashboard';
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <div className="min-h-screen flex flex-col bg-background text-foreground font-sans selection:bg-primary/20">
           <Navbar />
           <main className="flex-1 pt-20">

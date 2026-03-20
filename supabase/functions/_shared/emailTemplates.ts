@@ -26,23 +26,24 @@ function pct(v: unknown): string {
 }
 
 function kpiGrid(kpis: Kpi[]): string {
-  const items = kpis
-    .map(
-      (k) => `
+  const cells = kpis.map(
+    (k) => `
       <td style="padding:8px 8px 0 0; vertical-align:top;">
         <div style="border:1px solid #E5E7EB; border-radius:12px; padding:14px 16px; background:linear-gradient(135deg, #FFFFFF 0%, #F9FAFB 100%); box-shadow:0 1px 3px rgba(0,0,0,0.05);">
           <div style="font-size:11px; color:#6B7280; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">${esc(k.label)}</div>
           <div style="font-size:18px; font-weight:700; color:#0F172A;">${esc(k.value)}</div>
         </div>
       </td>`
-    )
-    .join("");
+  );
 
   const rows: string[] = [];
-  for (let i = 0; i < items.length; i += 2) {
-    rows.push(`<tr>${items[i] ?? ""}${items[i + 1] ?? ""}</tr>`);
+  for (let i = 0; i < cells.length; i += 2) {
+    rows.push(`<tr>${cells[i] ?? ""}${cells[i + 1] ?? ""}</tr>`);
   }
-  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">${rows.join("")}</table>`;
+
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">${rows.join(
+    ""
+  )}</table>`;
 }
 
 function bulletList(items: string[]): string {
@@ -127,6 +128,7 @@ export function dealSummaryEmailHtml(params: {
   score?: number;
   risk?: string;
   downloadUrl?: string;
+  shareUrl?: string;
 }): string {
   const {
     dealAddress,
@@ -138,6 +140,7 @@ export function dealSummaryEmailHtml(params: {
     score,
     risk,
     downloadUrl,
+    shareUrl,
   } = params;
 
   const kpis: Kpi[] = [
@@ -154,7 +157,7 @@ export function dealSummaryEmailHtml(params: {
     ${kpiGrid(kpis)}
     <div style="margin-top:24px; font-size:15px; color:#0F172A; font-weight:700; border-bottom:2px solid #EA580C; padding-bottom:8px; margin-bottom:12px;">Summary</div>
     <div style="font-size:14px; color:#475569; line-height:1.6;">
-      Full Analysis PDF is ready for review. Use the button below to download the report or view it in your browser.
+      The PDF summary is attached. Click the button below to view the complete analysis in your browser.
     </div>
   `;
 
@@ -162,8 +165,8 @@ export function dealSummaryEmailHtml(params: {
     title: "Deal Summary Report",
     subtitle: dealAddress,
     bodyHtml: body,
-    ctaUrl: downloadUrl,
-    ctaLabel: downloadUrl ? "Download Full Analysis (PDF)" : undefined,
+    ctaUrl: shareUrl || downloadUrl,
+    ctaLabel: shareUrl ? "View complete analysis" : downloadUrl ? "Download Full Analysis (PDF)" : undefined,
   });
 }
 
@@ -176,8 +179,9 @@ export function loanProposalEmailHtml(params: {
   roi?: number;
   score?: number;
   downloadUrl?: string;
+  shareUrl?: string;
 }): string {
-  const { dealAddress, arv, requestedLoanAmount, ltvArv, netProfit, roi, score, downloadUrl } = params;
+  const { dealAddress, arv, requestedLoanAmount, ltvArv, netProfit, roi, score, downloadUrl, shareUrl } = params;
 
   const kpis: Kpi[] = [
     { label: "ARV", value: money(arv) },
@@ -195,6 +199,14 @@ export function loanProposalEmailHtml(params: {
     <div style="font-size:14px; color:#475569; line-height:1.6;">
       Attached is a lender-ready loan proposal PDF. The request targets <b>80% ARV LTV</b> and includes a full presentation of the deal, supporting comps/market context (when available), and rehab summary.
     </div>
+    ${
+      shareUrl
+        ? `<div style="margin-top:16px; font-size:13px; color:#475569; line-height:1.6;">
+            <b>Full shared analysis link:</b><br/>
+            <a href="${esc(shareUrl)}" style="color:#EA580C; text-decoration:none; word-break:break-all;">${esc(shareUrl)}</a>
+          </div>`
+        : ""
+    }
   `;
 
   return layout({
@@ -214,8 +226,9 @@ export function dealPackageEmailHtml(params: {
   risk?: string;
   downloadUrl?: string;
   packageContents?: string[];
+  shareUrl?: string;
 }): string {
-  const { dealAddress, netProfit, roi, score, risk, downloadUrl, packageContents } = params;
+  const { dealAddress, netProfit, roi, score, risk, downloadUrl, packageContents, shareUrl } = params;
 
   const kpis: Kpi[] = [
     { label: "Est. Net Profit", value: money(netProfit) },
@@ -240,6 +253,14 @@ export function dealPackageEmailHtml(params: {
             ]
       )}
     </div>
+    ${
+      shareUrl
+        ? `<div style="margin-top:16px; font-size:13px; color:#475569; line-height:1.6;">
+            <b>View the full shared analysis:</b><br/>
+            <a href="${esc(shareUrl)}" style="color:#EA580C; text-decoration:none; word-break:break-all;">${esc(shareUrl)}</a>
+          </div>`
+        : ""
+    }
   `;
 
   return layout({
@@ -248,6 +269,55 @@ export function dealPackageEmailHtml(params: {
     bodyHtml: body,
     ctaUrl: downloadUrl,
     ctaLabel: downloadUrl ? "Download Full Package (.zip)" : undefined,
+  });
+}
+
+export function businessDeckEmailHtml(params: {
+  deckTitle?: string;
+  dealAddress: string;
+  netProfit?: number;
+  roi?: number;
+  score?: number;
+  risk?: string;
+  downloadUrl?: string;
+  shareUrl?: string;
+}): string {
+  const { deckTitle, dealAddress, netProfit, roi, score, risk, downloadUrl, shareUrl } = params;
+
+  const kpis: Kpi[] = [
+    { label: "Est. Net Profit", value: money(netProfit) },
+    { label: "Est. ROI", value: pct(roi) },
+    { label: "Score / Risk", value: `${Number(score ?? 0)}/100 • ${esc(risk ?? "N/A")}` },
+    { label: "Format", value: "Slide Deck (PDF)" },
+  ];
+
+  const body = `
+    <div style="font-size:13px; color:#64748B; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px;">Presentation Deck Ready</div>
+    ${kpiGrid(kpis)}
+    <div style="margin-top:24px; font-size:15px; color:#0F172A; font-weight:700; border-bottom:2px solid #EA580C; padding-bottom:8px; margin-bottom:12px;">What's included</div>
+    <div style="font-size:14px; color:#475569; line-height:1.6;">
+      ${bulletList([
+        "Executive-ready slide deck built directly from FlipIQ analysis",
+        "Provable charts (KPI, cost mix, profit bridge, comps and risk when available)",
+        "Designed for quick review and decision-making",
+      ])}
+    </div>
+    ${
+      shareUrl
+        ? `<div style="margin-top:16px; font-size:13px; color:#475569; line-height:1.6;">
+            <b>Full shared analysis link:</b><br/>
+            <a href="${esc(shareUrl)}" style="color:#EA580C; text-decoration:none; word-break:break-all;">${esc(shareUrl)}</a>
+          </div>`
+        : ""
+    }
+  `;
+
+  return layout({
+    title: deckTitle || "Business Presentation Deck",
+    subtitle: dealAddress,
+    bodyHtml: body,
+    ctaUrl: downloadUrl,
+    ctaLabel: downloadUrl ? "Download Deck (PDF)" : undefined,
   });
 }
 

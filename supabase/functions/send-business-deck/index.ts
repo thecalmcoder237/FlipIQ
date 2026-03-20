@@ -1,5 +1,5 @@
 import { handleCors, json } from "../_shared/cors.ts";
-import { loanProposalEmailHtml } from "../_shared/emailTemplates.ts";
+import { businessDeckEmailHtml } from "../_shared/emailTemplates.ts";
 import { sendEmailWithResend } from "../_shared/resend.ts";
 
 Deno.serve(async (req) => {
@@ -9,30 +9,24 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const recipients: string[] = Array.isArray(body?.recipients) ? body.recipients : [];
+    if (!recipients.length) return json({ error: "recipients[] is required" }, { status: 400 });
+
     const deal = body?.deal || {};
     const metrics = body?.metrics || {};
-
-    if (!recipients.length) {
-      return json({ error: "recipients[] is required" }, { status: 400 });
-    }
-
-    const arv = Number(deal?.arv) || 0;
-    const requestedLoanAmount = Math.round(arv * 0.8);
-    const ltvArv = arv > 0 ? (requestedLoanAmount / arv) * 100 : 80;
 
     const downloadUrl: string | undefined = body?.downloadUrl;
     const shareUrl: string | undefined = body?.shareUrl;
     const pdfBase64: string | undefined = body?.pdfBase64;
-    const pdfFileName: string = body?.pdfFileName || "Loan_Proposal.pdf";
+    const pdfFileName: string = body?.pdfFileName || "Business_Deck.pdf";
+    const deckTitle: string | undefined = body?.deckTitle;
 
-    const html = loanProposalEmailHtml({
+    const html = businessDeckEmailHtml({
+      deckTitle,
       dealAddress: deal?.address || "Deal",
-      arv: deal?.arv,
-      requestedLoanAmount,
-      ltvArv,
       netProfit: metrics?.netProfit,
       roi: metrics?.roi,
       score: metrics?.score,
+      risk: metrics?.risk,
       downloadUrl,
       shareUrl,
     });
@@ -47,7 +41,7 @@ Deno.serve(async (req) => {
         ]
       : undefined;
 
-    const subject = `Loan Proposal: ${deal?.address || "Deal"} (80% ARV LTV)`;
+    const subject = `${deckTitle || "Business Deck"}: ${deal?.address || "Deal"}`;
     const resendResult = await sendEmailWithResend({
       to: recipients,
       subject,

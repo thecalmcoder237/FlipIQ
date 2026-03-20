@@ -128,102 +128,32 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
       const citySend = inputs.city || inputs.propertyIntelligence?.city;
       const countySend = inputs.county || inputs.propertyIntelligence?.county;
       const stateSend = inputs.propertyIntelligence?.state || inputs.state;
-      // #region agent log
-      if (import.meta.env.DEV) {
-        console.debug('[PropertyIntel] requestParams', { address, zipToSend, city: citySend, county: countySend, state: stateSend });
-      }
-      // #endregion
 
-      let propertyResponse = null;
-      let compsResponse = null;
-      try {
-        propertyResponse = await fetchPropertyIntelligence(
-          address,
-          zipToSend,
-          inputs.propertyType || "Single-Family",
-          Number(inputs.arv) || 0,
-          {
-            formattedAddress: address,
-            city: citySend,
-            county: countySend,
-            state: stateSend,
-            propertyId: inputs.propertyIntelligence?.propertyId,
-            userId: currentUser?.id,
-          }
-        );
-      } catch (propertyErr) {
-        console.warn('Property fetch failed, still fetching comps:', propertyErr?.message);
-      }
-      // Pass propertyId from property response so fetch-comps can exclude the subject by ID (fast, accurate); falls back to address matching if missing.
-      const propertyIdForComps =
-        propertyResponse?.propertyId ?? propertyResponse?.id ?? propertyResponse?.parcelId
-        ?? inputs.propertyIntelligence?.propertyId ?? inputs.propertyIntelligence?.id ?? inputs.propertyIntelligence?.parcelId;
-      const subjectSpecsForComps = (propertyResponse?.bedrooms != null || propertyResponse?.bathrooms != null)
-        ? { bedrooms: propertyResponse?.bedrooms, bathrooms: propertyResponse?.bathrooms }
-        : undefined;
-      // #region agent log
-      if (import.meta.env.DEV) {
-        console.debug('[PropertyIntel] calling fetchComps', { address, zipToSend, subjectSpecs: subjectSpecsForComps });
-      }
-      // #endregion
-      try {
-        compsResponse = await fetchComps(address, zipToSend, {
+      const propertyResponse = await fetchPropertyIntelligence(
+        address,
+        zipToSend,
+        inputs.propertyType || "Single-Family",
+        Number(inputs.arv) || 0,
+        {
+          formattedAddress: address,
           city: citySend,
+          county: countySend,
           state: stateSend,
-          propertyId: propertyIdForComps,
-          subjectAddress: propertyResponse?.address ?? propertyResponse?.formattedAddress ?? propertyResponse?.streetAddress ?? address,
-          subjectSpecs: subjectSpecsForComps,
+          propertyId: inputs.propertyIntelligence?.propertyId,
           userId: currentUser?.id,
-        });
-        // #region agent log
-        if (import.meta.env.DEV) {
-          console.debug('[PropertyIntel] fetchComps returned', {
-            recentCompsLen: Array.isArray(compsResponse?.recentComps) ? compsResponse.recentComps.length : 0,
-            hasError: !!compsResponse?.error,
-          });
         }
-        // #endregion
-      } catch (compsErr) {
-        console.warn('Comps fetch failed:', compsErr?.message);
-        // #region agent log
-        if (import.meta.env.DEV) {
-          console.debug('[PropertyIntel] fetchComps threw', { message: compsErr?.message, name: compsErr?.name });
-        }
-        // #endregion
-        toast({
-          variant: 'destructive',
-          title: 'Comps unavailable',
-          description: 'Property details loaded, but comparable sales could not be fetched. Try "Refresh comps" or check that fetch-comps is deployed.',
-        });
-      }
+      );
+
+      const existingComps = Array.isArray(inputs.propertyIntelligence?.recentComps) ? inputs.propertyIntelligence.recentComps : [];
       const data = {
         ...(propertyResponse || {}),
-        recentComps: Array.isArray(compsResponse?.recentComps) ? compsResponse.recentComps : [],
-        ...(compsResponse?.subjectSaleListing != null ? { subjectSaleListing: compsResponse.subjectSaleListing } : {}),
-        ...(compsResponse?.avmValue != null ? { avmValue: compsResponse.avmValue } : {}),
-        ...(compsResponse?.avmSubject != null ? { avmSubject: compsResponse.avmSubject } : {}),
-        usage: compsResponse?.usage ?? propertyResponse?.usage,
-        warnings: [].concat(
-          Array.isArray(propertyResponse?.warnings) ? propertyResponse.warnings : [],
-          Array.isArray(compsResponse?.warnings) ? compsResponse.warnings : []
-        ).filter(Boolean),
+        recentComps: existingComps,
+        usage: propertyResponse?.usage,
+        warnings: Array.isArray(propertyResponse?.warnings) ? propertyResponse.warnings.filter(Boolean) : [],
       };
 
-      // #region agent log
-      if (import.meta.env.DEV) {
-        console.debug('[PropertyIntel] afterFetch', {
-          recentCompsLen: Array.isArray(data?.recentComps) ? data.recentComps.length : 0,
-          hasProperty: !!(propertyResponse && typeof propertyResponse === 'object'),
-          compsWarnings: compsResponse?.warnings,
-          _debugComps: compsResponse?._debugComps,
-        });
-      }
-      // #endregion
-
       const normalized = normalizePropertyIntelligenceResponse(data || {});
-      const compsDropped = Array.isArray(data?.recentComps) ? data.recentComps.length - (normalized.recentComps?.length ?? 0) : 0;
       const hasUsableData =
-        (normalized.recentComps?.length ?? 0) > 0 ||
         normalized.propertyType ||
         normalized.yearBuilt != null ||
         (normalized.squareFootage != null && Number(normalized.squareFootage) > 0) ||
@@ -234,13 +164,10 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
       if (!hasUsableData) {
         toast({
           title: "No data found",
-          description: "No property details or comps were returned for this address. Try another address or check back later.",
+          description: "No property details returned for this address. Try another address or check back later.",
         });
-      } else if (compsDropped > 0) {
-        logDataFlow('FETCH_COMPS_DROPPED', compsDropped, new Date());
-        toast({ title: "Success", description: `Property intelligence retrieved. ${compsDropped} comp(s) excluded due to missing data.` });
       } else {
-        toast({ title: "Success", description: "Property intelligence retrieved successfully." });
+        toast({ title: "Success", description: "Property details retrieved. Use 'Refresh comps' to fetch comparable sales." });
       }
 
       if (onPropertyDataFetch) {
@@ -255,7 +182,7 @@ const PropertyIntelligenceSection = ({ inputs, calculations, onPropertyDataFetch
         });
       }
     } catch (err) {
-      console.error('❌ Property intelligence error:', err);
+      console.error('Property intelligence error:', err);
       logDataFlow('FETCH_ERROR', err?.message, new Date());
       setFetchError(err?.message || 'Failed to fetch property data.');
       toast({
@@ -403,6 +330,9 @@ setCompsRefreshing(false);
     setCompsSearching(true);
     try {
       const result = await fetchCompsWebSearch(address, zipToSend, { lat: subjectLat, lng: subjectLng });
+      if (Array.isArray(result?.warnings) && result.warnings.length) {
+        toast({ title: 'AI comps: limited results', description: String(result.warnings[0]) });
+      }
       const rawComps = Array.isArray(result?.recentComps) ? result.recentComps : (Array.isArray(result?.comps) ? result.comps : []);
       const normalizedComps = rawComps
         .map((c) => normalizeComp(c))
@@ -744,6 +674,15 @@ setCompsRefreshing(false);
                     exit={{ height: 0, opacity: 0 }}
                   >
                     <CardContent className="pt-0">
+                      {Array.isArray(recentComps) && recentComps.length > 1 && (() => {
+                        const prices = recentComps.map((c) => c.salePrice).filter((p) => p != null && Number.isFinite(Number(p)));
+                        const samePrice = prices.length > 1 && prices.every((p) => p === prices[0]);
+                        return samePrice ? (
+                          <p className="text-xs text-amber-600 dark:text-amber-400 mb-2">
+                            Same sale price on all comps may indicate data quality issues (e.g. tax/lien or API error). Consider removing or editing.
+                          </p>
+                        ) : null;
+                      })()}
                       <div className="overflow-x-auto">
                         <Table>
                           <TableHeader>
@@ -763,10 +702,10 @@ setCompsRefreshing(false);
                                 <TableRow key={i} className="border-border hover:bg-accent/50">
                                   <TableCell className="font-medium text-foreground">{comp.address}</TableCell>
                                   <TableCell className="text-green-600 font-bold">{comp.salePrice != null ? `$${Number(comp.salePrice).toLocaleString()}` : '—'}</TableCell>
-                                  <TableCell className="text-muted-foreground">{comp.sqft}</TableCell>
-                                  <TableCell className="text-muted-foreground">{comp.beds} / {comp.baths}</TableCell>
-                                  <TableCell className="text-muted-foreground">{comp.dom}</TableCell>
-                                  <TableCell className="text-muted-foreground">{formatDateUS(comp.saleDate)}</TableCell>
+                                  <TableCell className="text-muted-foreground">{comp.sqft != null && comp.sqft !== '' ? comp.sqft : '—'}</TableCell>
+                                  <TableCell className="text-muted-foreground">{[comp.beds, comp.baths].some(Boolean) ? `${comp.beds ?? '—'} / ${comp.baths ?? '—'}` : '—'}</TableCell>
+                                  <TableCell className="text-muted-foreground">{comp.dom != null && comp.dom !== '' ? comp.dom : '—'}</TableCell>
+                                  <TableCell className="text-muted-foreground">{comp.saleDate ? formatDateUS(comp.saleDate) : '—'}</TableCell>
                                   {!readOnly && (
                                     <TableCell className="p-1">
                                       <div className="flex items-center gap-0.5">

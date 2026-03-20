@@ -26,6 +26,13 @@ function uint8ToBase64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
+function base64ToUint8(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
 Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
@@ -37,6 +44,9 @@ Deno.serve(async (req) => {
     const metrics = body?.metrics || {};
     const propertyIntelligence = body?.propertyIntelligence || null;
     const rehabSOW = body?.rehabSOW || body?.rehabSow || null;
+    const shareUrl: string | undefined = body?.shareUrl;
+    const businessDeckPdfBase64: string | undefined = body?.businessDeckPdfBase64;
+    const businessDeckPdfFileName: string | undefined = body?.businessDeckPdfFileName;
 
     // Build zip contents (best-effort, "everything about the deal" available to this function)
     const zip = new JSZip();
@@ -44,6 +54,17 @@ Deno.serve(async (req) => {
     zip.file("metrics.json", JSON.stringify(metrics, null, 2));
     if (propertyIntelligence) zip.file("property-intelligence.json", JSON.stringify(propertyIntelligence, null, 2));
     if (rehabSOW) zip.file("rehab-sow.md", String(rehabSOW));
+
+    // Optional: include a generated deck PDF (client-generated)
+    if (businessDeckPdfBase64 && typeof businessDeckPdfBase64 === "string" && businessDeckPdfBase64.length > 1000) {
+      const name = (businessDeckPdfFileName && String(businessDeckPdfFileName).trim()) || "Business_Deck.pdf";
+      try {
+        const bytes = base64ToUint8(businessDeckPdfBase64);
+        zip.file(name, bytes);
+      } catch {
+        // ignore malformed base64; still export other files
+      }
+    }
 
     const comps = (propertyIntelligence?.recentComps || deal?.comps || []) as unknown[];
     if (Array.isArray(comps) && comps.length) {
@@ -94,6 +115,7 @@ Deno.serve(async (req) => {
         score: metrics?.score,
         risk: metrics?.risk,
         downloadUrl,
+        shareUrl,
       });
 
       await sendEmailWithResend({

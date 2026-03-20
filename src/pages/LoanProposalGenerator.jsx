@@ -96,38 +96,46 @@ const LoanProposalGenerator = () => {
   /** Get PDF as ArrayBuffer from proposal HTML (uses hidden iframe + html2pdf). */
   const getPdfArrayBufferFromHtml = (htmlString) => {
     return new Promise((resolve, reject) => {
+      // Wrapper keeps iframe in the render tree (so html2canvas can capture it)
+      // while being invisible to the user. Width must match the content layout.
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText =
+        'position:fixed;top:0;left:0;width:900px;height:800px;' +
+        'overflow:hidden;opacity:0.001;pointer-events:none;z-index:2147483647;';
       const iframe = document.createElement('iframe');
-      iframe.style.cssText = 'position:absolute;width:1px;height:1px;left:-9999px;visibility:hidden;';
+      iframe.style.cssText = 'width:900px;height:800px;border:none;display:block;';
       iframe.srcdoc = htmlString;
-      document.body.appendChild(iframe);
+      wrapper.appendChild(iframe);
+      document.body.appendChild(wrapper);
+      const removeWrapper = () => { try { document.body.removeChild(wrapper); } catch { /* ignore */ } };
       const onLoad = () => {
         try {
           const body = iframe.contentDocument?.body;
           if (!body) {
-            document.body.removeChild(iframe);
+            removeWrapper();
             reject(new Error('Iframe body not available'));
             return;
           }
           html2pdf()
-            .set(html2pdfOptions)
+            .set({ ...html2pdfOptions, html2canvas: { ...html2pdfOptions.html2canvas, scrollX: 0, scrollY: 0, allowTaint: true } })
             .from(body)
             .outputPdf('arraybuffer')
             .then((arrayBuffer) => {
-              document.body.removeChild(iframe);
+              removeWrapper();
               resolve(arrayBuffer);
             })
             .catch((err) => {
-              document.body.removeChild(iframe);
+              removeWrapper();
               reject(err);
             });
         } catch (e) {
-          document.body.removeChild(iframe);
+          removeWrapper();
           reject(e);
         }
       };
       iframe.onload = onLoad;
       iframe.onerror = () => {
-        document.body.removeChild(iframe);
+        removeWrapper();
         reject(new Error('Iframe failed to load'));
       };
     });

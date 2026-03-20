@@ -8,18 +8,17 @@ import { extractSOWTierBudgets, extractSOWTotalCost } from '@/utils/sowParser';
 
 const TIER_LABELS = { budget: 'Budget Tier', midGrade: 'Mid-Grade Tier', highEnd: 'High-End Tier' };
 
-const SOWBudgetComparison = ({ sowText, currentBudget, deal, onApplyRehabCost }) => {
-  if (!sowText) return null;
+const TIER_COLORS = {
+  budget: '#059669',
+  midGrade: '#2563eb',
+  highEnd: '#7c3aed',
+};
 
-  const tiers = extractSOWTierBudgets(sowText);
+const SOWBudgetComparison = ({ sowText, currentBudget, deal, onApplyRehabCost }) => {
+  const tiers = useMemo(() => (sowText ? extractSOWTierBudgets(sowText) : { budget: null, midGrade: null, highEnd: null }), [sowText]);
   const budget = Number(currentBudget) || 0;
   const hasAnyTier = tiers.budget != null || tiers.midGrade != null || tiers.highEnd != null;
 
-  const TIER_COLORS = {
-    budget: '#059669',
-    midGrade: '#2563eb',
-    highEnd: '#7c3aed',
-  };
   const chartData = useMemo(() => {
     const items = [];
     if (budget > 0) items.push({ name: 'Your Budget', value: budget, fill: 'hsl(var(--primary))' });
@@ -39,11 +38,13 @@ const SOWBudgetComparison = ({ sowText, currentBudget, deal, onApplyRehabCost })
     if (withDiff.length === 0) return null;
     withDiff.sort((a, b) => a.diff - b.diff);
     return withDiff[0];
-  }, [budget, tiers]);
+  }, [budget, hasAnyTier, tiers.budget, tiers.midGrade, tiers.highEnd]);
 
   const variance = closestTier ? closestTier.diff : null;
   const isOverBudget = closestTier != null && closestTier.value > budget;
   const percentDifference = closestTier != null && budget > 0 ? ((closestTier.value - budget) / budget * 100).toFixed(1) : null;
+
+  if (!sowText) return null;
 
   if (!hasAnyTier) {
     return (

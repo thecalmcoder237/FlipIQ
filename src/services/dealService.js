@@ -45,16 +45,16 @@ export const dealService = {
         // If 0 rows are returned (PGRST116) the deal's user_id in the DB is stale
         // or null — fall back to the admin edge function which handles this case.
         delete payload.id; // never send id in the update SET clause
-        const { data: directData, error: directError } = await supabase
+        const { data: directRows, error: directError } = await supabase
           .from('deals')
           .update(payload)
           .eq('id', inputs.id)
           .eq('user_id', userId)
-          .select()
-          .maybeSingle(); // maybeSingle won't throw PGRST116 for 0 rows
+          .select();
 
         if (directError) throw directError;
 
+        const directData = Array.isArray(directRows) && directRows.length > 0 ? directRows[0] : null;
         if (directData) {
           return databaseToInputs(directData);
         }

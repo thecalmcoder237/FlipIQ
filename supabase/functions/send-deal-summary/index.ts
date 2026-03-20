@@ -17,6 +17,7 @@ Deno.serve(async (req) => {
     }
 
     const downloadUrl: string | undefined = body?.downloadUrl;
+    const shareUrl: string | undefined = body?.shareUrl;
     const pdfBase64: string | undefined = body?.pdfBase64;
     const pdfFileName: string = body?.pdfFileName || "Deal_Report.pdf";
 
@@ -30,6 +31,7 @@ Deno.serve(async (req) => {
       score: metrics?.score,
       risk: metrics?.risk,
       downloadUrl,
+      shareUrl,
     });
 
     const attachments = pdfBase64

@@ -4,9 +4,10 @@
  * Helps trace data from input -> database -> loading -> state -> UI.
  */
 
+const DEBUG_DATA_FLOW = import.meta.env.VITE_DEBUG_DATA_FLOW === 'true';
+
 export const logDataFlow = (stage, data, timestamp = new Date()) => {
-  // Replaced process.env.NODE_ENV with import.meta.env.MODE for Vite compatibility
-  if (import.meta.env.MODE === 'development') {
+  if (!DEBUG_DATA_FLOW || import.meta.env.MODE !== 'development') return;
     const timeStr = timestamp.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
     const color = getStageColor(stage);
     
@@ -18,7 +19,6 @@ export const logDataFlow = (stage, data, timestamp = new Date()) => {
         console.log('Keys:', Object.keys(data));
     }
     console.groupEnd();
-  }
 };
 
 const getStageColor = (stage) => {

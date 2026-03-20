@@ -43,7 +43,7 @@ const STYLES = `
         font-family: 'Arial', sans-serif;
         line-height: 1.6;
         color: #333;
-        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        background: linear-gradient(135deg, #0B1220 0%, #1e293b 100%);
         min-height: 100vh;
     }
     .slide {
@@ -59,20 +59,20 @@ const STYLES = `
         color: #2c3e50;
         font-size: 2.5em;
         margin-bottom: 20px;
-        border-bottom: 4px solid #27ae60;
+        border-bottom: 4px solid #EA580C;
         padding-bottom: 15px;
         text-align: center;
     }
     .slide h2 {
-        color: #16a085;
+        color: #EA580C;
         font-size: 2em;
         margin-bottom: 25px;
-        border-left: 5px solid #16a085;
+        border-left: 5px solid #EA580C;
         padding-left: 20px;
     }
     .slide h3 { color: #c0392b; font-size: 1.5em; margin-bottom: 15px; }
     .highlight-box {
-        background: linear-gradient(135deg, #11998e, #16a085);
+        background: linear-gradient(135deg, #EA580C, #C2410C);
         color: white;
         padding: 25px;
         border-radius: 10px;
@@ -87,7 +87,7 @@ const STYLES = `
         margin: 25px 0;
     }
     .financial-card {
-        background: linear-gradient(135deg, #27ae60, #229954);
+        background: linear-gradient(135deg, #EA580C, #C2410C);
         color: white;
         padding: 25px;
         border-radius: 10px;
@@ -117,7 +117,7 @@ const STYLES = `
         width: 60px;
         height: 60px;
         border-radius: 50%;
-        background: linear-gradient(135deg, #e74c3c, #c0392b);
+        background: linear-gradient(135deg, #EA580C, #C2410C);
         color: white;
         display: flex;
         align-items: center;
@@ -185,11 +185,11 @@ const STYLES = `
         background: #f8f9fa;
         padding: 25px;
         border-radius: 10px;
-        border: 2px solid #27ae60;
+        border: 2px solid #EA580C;
         margin: 20px 0;
     }
     .executive-summary {
-        background: linear-gradient(135deg, #11998e, #38ef7d);
+        background: linear-gradient(135deg, #EA580C, #C2410C);
         color: white;
         padding: 30px;
         border-radius: 15px;
@@ -218,7 +218,7 @@ const STYLES = `
  * @param {{ deal: object, metrics: object, loanTerms: object, borrowerInfo: object }} options
  * @returns {string} Full HTML document string
  */
-export function generateLoanProposalHtml({ deal, metrics, loanTerms, borrowerInfo }) {
+export function generateLoanProposalHtml({ deal, metrics, loanTerms, borrowerInfo, shareUrl }) {
   const purchasePrice = safeNum(deal?.purchase_price ?? deal?.purchasePrice);
   const arv = safeNum(deal?.arv);
   const rehabBudget = safeNum(deal?.rehab_costs ?? deal?.rehabCosts);
@@ -263,6 +263,7 @@ export function generateLoanProposalHtml({ deal, metrics, loanTerms, borrowerInf
   const title = `${escapeHtml(address)} - Investment Opportunity`;
   const safeThesis = escapeHtml(thesis);
   const safeRehabSow = escapeHtml(rehabSowText);
+  const safeShareUrl = shareUrl ? escapeHtml(shareUrl) : '';
 
   // Slide 1 – Title
   const slide1 = `
@@ -307,6 +308,12 @@ export function generateLoanProposalHtml({ deal, metrics, loanTerms, borrowerInf
             <h3 style="color: white; margin-bottom: 20px;">Investment Thesis</h3>
             <p style="font-size: 1.1em; line-height: 1.8;">${safeThesis}</p>
         </div>
+        ${safeShareUrl ? `
+        <div style="margin-top: 18px; background:#ffffff; border:2px solid #EA580C; padding:14px 16px; border-radius:10px;">
+          <p style="font-weight:bold; color:#155724; margin-bottom:6px;">View full FlipIQ analysis (shared link)</p>
+          <p style="font-size: 0.95em; word-break: break-all;"><a href="${safeShareUrl}" target="_blank" rel="noreferrer">${safeShareUrl}</a></p>
+        </div>
+        ` : ''}
         <div class="property-stats">
             <div class="stat-box">
                 <div class="stat-number">${beds}</div>
@@ -333,7 +340,7 @@ export function generateLoanProposalHtml({ deal, metrics, loanTerms, borrowerInf
                 <p>After Sale Costs</p>
             </div>
         </div>
-        <div style="background: #d4edda; border: 2px solid #27ae60; padding: 25px; border-radius: 10px; margin-top: 25px;">
+        <div style="background: #fff7ed; border: 2px solid #EA580C; padding: 25px; border-radius: 10px; margin-top: 25px;">
             <h3 style="color: #155724;">Exit Strategy</h3>
             <p>${escapeHtml(exitStrategy)}</p>
         </div>
@@ -362,7 +369,7 @@ export function generateLoanProposalHtml({ deal, metrics, loanTerms, borrowerInf
             </div>
         </div>
         <div class="profit-breakdown no-break">
-            <h3 style="color: #27ae60;">Profit Analysis - Flip Exit</h3>
+            <h3 style="color: #EA580C;">Profit Analysis - Flip Exit</h3>
             <table style="width: 100%; margin-top: 15px;">
                 <tr>
                     <td style="padding: 10px;">After Repair Value (ARV)</td>
@@ -380,13 +387,13 @@ export function generateLoanProposalHtml({ deal, metrics, loanTerms, borrowerInf
                     <td style="padding: 8px;">Less: Total Investment</td>
                     <td style="padding: 8px; text-align: right;">-${formatCurrency(totalCost)}</td>
                 </tr>
-                <tr style="border-top: 2px solid #27ae60; background: #e8f5e8;">
+                <tr style="border-top: 2px solid #EA580C; background: #fff7ed;">
                     <td style="padding: 10px; font-weight: bold;">Net Profit</td>
-                    <td style="padding: 10px; text-align: right; font-weight: bold; color: #27ae60;">${formatCurrency(netProfit)}</td>
+                    <td style="padding: 10px; text-align: right; font-weight: bold; color: #EA580C;">${formatCurrency(netProfit)}</td>
                 </tr>
-                <tr style="background: #e8f5e8;">
+                <tr style="background: #fff7ed;">
                     <td style="padding: 10px; font-weight: bold;">ROI</td>
-                    <td style="padding: 10px; text-align: right; font-weight: bold; color: #27ae60;">${roi.toFixed(1)}%</td>
+                    <td style="padding: 10px; text-align: right; font-weight: bold; color: #EA580C;">${roi.toFixed(1)}%</td>
                 </tr>
             </table>
         </div>
@@ -445,7 +452,7 @@ export function generateLoanProposalHtml({ deal, metrics, loanTerms, borrowerInf
                 <p>Sale Period</p>
             </div>
         </div>
-        <div style="background: #d4edda; border: 2px solid #27ae60; padding: 20px; border-radius: 10px; margin-top: 25px;">
+        <div style="background: #fff7ed; border: 2px solid #EA580C; padding: 20px; border-radius: 10px; margin-top: 25px;">
             <h3 style="color: #155724;">Loan Security</h3>
             <p><strong>Loan-to-ARV:</strong> ${loanToArvPct.toFixed(1)}% – Equity cushion</p>
             <p><strong>Deal Score:</strong> ${score}/100 · Risk: ${escapeHtml(risk)}</p>
@@ -505,7 +512,7 @@ export function generateLoanProposalHtml({ deal, metrics, loanTerms, borrowerInf
     <div class="slide">
         <h1>Renovation Scope</h1>
         <h2>Scope of Work</h2>
-        <div style="background: #f8f9fa; padding: 25px; border-radius: 10px; border-left: 4px solid #27ae60; margin: 20px 0;">
+        <div style="background: #f8f9fa; padding: 25px; border-radius: 10px; border-left: 4px solid #EA580C; margin: 20px 0;">
             <div style="white-space: pre-wrap; line-height: 1.7;">${safeRehabSow}</div>
         </div>
         <p style="margin-top: 15px;"><strong>Total Rehab Budget:</strong> ${formatCurrency(rehabBudget)}</p>

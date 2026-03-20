@@ -1,67 +1,15 @@
-/** Deno global provided by Supabase Edge Runtime */
 declare const Deno: { env: { get(key: string): string | undefined }; serve(handler: (req: Request) => Promise<Response> | Response): void };
 
-// npm: specifier is resolved at runtime by Supabase Edge/Deno (no types in this repo)
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error - Deno resolves npm:@supabase/supabase-js@2 at runtime
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { handleCors, json } from "../_shared/cors.ts";
+import { createSupabaseAdminClient } from "../_shared/supabaseAdmin.ts";
+import { RENTCAST_BASE, RENTCAST_LIMIT, getRentCastKey, buildFullAddress } from "../_shared/rentcast.ts";
+import { yearMonth, getUsage, incrementUsage } from "../_shared/apiUsage.ts";
+import { validateAndNormalize } from "../_shared/validation.ts";
 
-// Inlined CORS and Supabase admin (single file for deploy bundle)
-const corsHeaders: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
-function handleCors(req: Request): Response | null {
-  if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: corsHeaders });
-  return null;
-}
-function json(data: unknown, init?: ResponseInit): Response {
-  return new Response(JSON.stringify(data), {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}), ...corsHeaders },
-  });
-}
-function createSupabaseAdminClient() {
-  const url = Deno.env.get("SUPABASE_URL");
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!url) throw new Error("Missing SUPABASE_URL");
-  if (!key) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
-  return createClient(url, key, { auth: { persistSession: false } });
-}
+// ---------------------------------------------------------------------------
+// Property-specific RentCast helpers
+// ---------------------------------------------------------------------------
 
-const RENTCAST_BASE = "https://api.rentcast.io/v1";
-/** Up to 2 RentCast calls per request (property search, optional property by id); limit is per month. Comps come from fetch-comps only. */
-const RENTCAST_LIMIT = 50;
-
-/** Normalize and validate request data before calling RentCast. Returns 400 if invalid. */
-function validateAndNormalize(body: Record<string, unknown>): { valid: true; address: string; zipCode: string; city?: string; state?: string } | { valid: false; error: string } {
-  const rawAddress = String(body?.address ?? body?.formattedAddress ?? "").trim();
-  const address = rawAddress.replace(/\s+/g, " ").trim();
-  const zipRaw = String(body?.zipCode ?? body?.zip_code ?? "").trim().replace(/\D/g, "").slice(0, 5);
-  const zipCode = zipRaw;
-  const city = (body?.city != null && body?.city !== "") ? String(body.city).trim() : undefined;
-  const stateRaw = String(body?.state ?? body?.stateCode ?? body?.state_code ?? "").trim();
-  const state = stateRaw ? stateRaw.slice(0, 2).toUpperCase() : undefined;
-  if (!address || address.length < 5) {
-    return { valid: false, error: "address is required and must be at least 5 characters" };
-  }
-  if (zipCode.length !== 5) {
-    return { valid: false, error: "zipCode must be a 5-digit US ZIP" };
-  }
-  return { valid: true, address, zipCode, city, state };
-}
-
-function yearMonth(): string {
-  return new Date().toISOString().slice(0, 7);
-}
-
-function getRentCastKey(): string | null {
-  return Deno.env.get("RENTCAST_API_KEY")?.trim() || null;
-}
-
-/** Fetch full property record by id (GET /v1/properties/{id}). Returns { mapped, raw } API record. */
 async function fetchRentCastPropertyById(id: string): Promise<{ mapped: Record<string, unknown>; raw: Record<string, unknown> | null }> {
   const apiKey = getRentCastKey();
   if (!apiKey || !id) return { mapped: {}, raw: null };
@@ -78,23 +26,6 @@ async function fetchRentCastPropertyById(id: string): Promise<{ mapped: Record<s
   return { mapped: mapRentCastToProperty(record as Record<string, unknown>), raw: record as Record<string, unknown> };
 }
 
-/**
- * Build RentCast full address per docs: "Street, City, State, Zip" (e.g. "5500 Grand Lake Dr, San Antonio, TX, 78244").
- * City and state are case-sensitive; state must be 2-character abbreviation.
- */
-function buildRentCastAddress(opts: {
-  street: string;
-  zipCode: string;
-  city?: string;
-  state?: string;
-}): string {
-  const { street, zipCode, city, state } = opts;
-  const stateNorm = state?.trim().slice(0, 2).toUpperCase() || undefined;
-  const parts = [street.trim(), city?.trim(), stateNorm, zipCode].filter(Boolean);
-  return parts.join(", ");
-}
-
-/** Fetch property from RentCast: search by full address (Street, City, State, Zip) per docs, then optionally full record by id. */
 async function fetchRentCastProperty(
   fullAddress: string,
   zipCode: string,
@@ -118,7 +49,6 @@ async function fetchRentCastProperty(
   if (list.length === 0 && d.property && typeof d.property === "object") list = [d.property];
   if (list.length === 0 && d.data && typeof d.data === "object" && !Array.isArray(d.data)) list = [d.data];
   const first = list.length ? (list[0] as Record<string, unknown>) : null;
-  let callsUsed = 1;
   if (first && typeof first.id === "string" && first.id.trim()) {
     const { mapped, raw } = await fetchRentCastPropertyById(first.id.trim());
     if (mapped && Object.keys(mapped).length > 0) {
@@ -178,53 +108,9 @@ function mapRentCastToProperty(p: Record<string, unknown> | null): Record<string
   return base;
 }
 
-/** Get or create api_usage row for user + month. */
-async function getUsage(
-  supabase: ReturnType<typeof createSupabaseAdminClient>,
-  userId: string,
-  ym: string
-): Promise<{ realie_count: number; rentcast_count: number }> {
-  const { data } = await supabase
-    .from("api_usage")
-    .select("realie_count, rentcast_count")
-    .eq("user_id", userId)
-    .eq("year_month", ym)
-    .maybeSingle();
-  if (data) return { realie_count: data.realie_count ?? 0, rentcast_count: data.rentcast_count ?? 0 };
-  await supabase.from("api_usage").upsert(
-    { user_id: userId, year_month: ym, realie_count: 0, rentcast_count: 0, updated_at: new Date().toISOString() },
-    { onConflict: "user_id,year_month" }
-  );
-  return { realie_count: 0, rentcast_count: 0 };
-}
-
-/** Increment rentcast_count (realie_count kept for DB compatibility but not used). */
-async function incrementUsage(
-  supabase: ReturnType<typeof createSupabaseAdminClient>,
-  userId: string,
-  ym: string,
-  type: "rentcast"
-): Promise<void> {
-  const { data: row } = await supabase
-    .from("api_usage")
-    .select("realie_count, rentcast_count")
-    .eq("user_id", userId)
-    .eq("year_month", ym)
-    .maybeSingle();
-  const rentcast = ((row?.rentcast_count ?? 0) as number) + (type === "rentcast" ? 1 : 0);
-  await supabase
-    .from("api_usage")
-    .upsert(
-      {
-        user_id: userId,
-        year_month: ym,
-        realie_count: (row?.realie_count ?? 0) as number,
-        rentcast_count: rentcast,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id,year_month" }
-    );
-}
+// ---------------------------------------------------------------------------
+// Request handler
+// ---------------------------------------------------------------------------
 
 Deno.serve(async (req) => {
   const cors = handleCors(req);
@@ -247,32 +133,26 @@ Deno.serve(async (req) => {
     const ym = yearMonth();
     const supabase = createSupabaseAdminClient();
     const usage = userId ? await getUsage(supabase, userId, ym) : { realie_count: 0, rentcast_count: 0 };
-    /** Up to 2 RentCast calls per request (property search, optional property by id). Comps come from fetch-comps only. */
     const rentcastAllowed = !userId || usage.rentcast_count + 2 <= RENTCAST_LIMIT;
 
     let property: Record<string, unknown> = {};
     const errors: string[] = [];
 
-    const rentCastOpts = {
-      fullAddress: buildRentCastAddress({
-        street: address,
-        zipCode,
-        city: city ?? undefined,
-        state: stateFromBody ?? undefined,
-      }),
+    const fullAddr = buildFullAddress({
+      address,
+      zipCode,
       city: city ?? undefined,
       state: stateFromBody ?? undefined,
-    };
+    });
 
     let rawRentCastRecord: Record<string, unknown> | null = null;
     
-    // Fetch property details
     if (getRentCastKey() && rentcastAllowed) {
       try {
         const { property: prop, rawRentCastRecord: raw, callsUsed } = await fetchRentCastProperty(
-          rentCastOpts.fullAddress,
+          fullAddr,
           zipCode,
-          { city: rentCastOpts.city, state: rentCastOpts.state }
+          { city: city ?? undefined, state: stateFromBody ?? undefined }
         );
         property = prop;
         rawRentCastRecord = raw ?? null;
@@ -305,7 +185,7 @@ Deno.serve(async (req) => {
         zipCode, 
         city: city ?? null, 
         county: county ?? null,
-        fullAddress: rentCastOpts.fullAddress,
+        fullAddress: fullAddr,
         subjectPropertyId: property.propertyId ?? property.id ?? propertyId,
       };
     }

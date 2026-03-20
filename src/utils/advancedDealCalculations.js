@@ -1,3 +1,4 @@
+const DEBUG_CALC = import.meta.env.VITE_DEBUG_CALC === 'true';
 
 export const calculateAcquisitionCosts = (deal) => {
   const purchasePrice = Number(deal.purchasePrice || deal.purchase_price) || 0;
@@ -27,7 +28,7 @@ export const calculateAcquisitionCosts = (deal) => {
   // Fees Only (For Project Cost calculation to avoid double counting Purchase Price + Down Payment)
   const feesOnly = hardMoneyPoints + inspection + appraisal + titleInsurance + closingCostsBuying + transferTax;
 
-  console.log('AdvancedCalc: Acquisition', { downPayment, feesOnly, total });
+  if (DEBUG_CALC) console.log('AdvancedCalc: Acquisition', { downPayment, feesOnly, total });
 
   return {
     downPayment,
@@ -54,7 +55,7 @@ export const calculateHardMoneyCosts = (deal, adjustedMonths = null) => {
   const monthlyInterest = loanAmount * (rate / 100 / 12);
   const totalInterest = monthlyInterest * months;
 
-  console.log('AdvancedCalc: HardMoney', { loanAmount, monthlyInterest, totalInterest, months });
+  if (DEBUG_CALC) console.log('AdvancedCalc: HardMoney', { loanAmount, monthlyInterest, totalInterest, months });
 
   return {
     loanAmount,
@@ -81,7 +82,7 @@ export const calculateRehabCosts = (deal, overrunPercent = 0) => {
 
   const total = baseRehab + overrun + contingency + permitFees;
 
-  console.log('AdvancedCalc: Rehab', { baseRehab, overrun, contingency, permitFees, total });
+  if (DEBUG_CALC) console.log('AdvancedCalc: Rehab', { baseRehab, overrun, contingency, permitFees, total });
 
   return {
     baseRehab,
@@ -105,7 +106,7 @@ export const calculateHoldingCosts = (deal, adjustedMonths = null) => {
     const totalMonthlySoft = monthlyTax + monthlyIns + monthlyUtil + monthlyHoa + monthlyLawn;
     const totalSoft = totalMonthlySoft * months;
 
-    console.log('AdvancedCalc: Holding', { totalMonthlySoft, totalSoft, months });
+    if (DEBUG_CALC) console.log('AdvancedCalc: Holding', { totalMonthlySoft, totalSoft, months });
 
     return {
         monthlyTax,
@@ -138,7 +139,7 @@ export const calculateSellingCosts = (deal, arvAdjustment = 0) => {
 
   const total = realtorCommission + closingCostsSelling + staging + marketing + fallthroughCost;
 
-  console.log('AdvancedCalc: Selling', { arv, realtorCommission, total });
+  if (DEBUG_CALC) console.log('AdvancedCalc: Selling', { arv, realtorCommission, total });
 
   return {
     realtorCommission,
@@ -205,7 +206,7 @@ export const calculateDealQualityScore = (roi, monthlyCashFlow, riskScore, marke
     // Weights: 0.3 + 0.2 + 0.3 + 0.2 = 1.0
     const score = (finalRoi * 0.3) + (finalCF * 0.2) + (riskComponent * 0.3) + (marketComponent * 0.2);
     
-    console.log('📊 Deal Score Calc:', { 
+    if (DEBUG_CALC) console.log('📊 Deal Score Calc:', { 
         roi, normalizedRoi: finalRoi, 
         monthlyCashFlow, normalizedCF: finalCF, 
         riskScore, riskComponent,
